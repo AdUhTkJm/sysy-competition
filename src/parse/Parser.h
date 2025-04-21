@@ -1,6 +1,7 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+#include <iostream>
 #include <vector>
 #include <cassert>
 
@@ -14,19 +15,25 @@ class Parser {
   size_t loc;
 
   Token last() {
+    if (loc - 1 >= tokens.size())
+      return Token::End;
     return tokens[loc - 1];
   }
 
   Token peek() {
+    if (loc >= tokens.size())
+      return Token::End;
     return tokens[loc];
   }
 
   Token consume() {
+    if (loc >= tokens.size())
+      return Token::End;
     return tokens[loc++];
   }
   
   bool peek(Token::Type t) {
-    return tokens[loc].type == t;
+    return peek().type == t;
   }
 
   template<class... Rest>
@@ -43,11 +50,29 @@ class Parser {
     return false;
   }
 
-  void expect(Token::Type t) {
-    if (!test(t))
+  Token expect(Token::Type t) {
+    if (!test(t)) {
+      std::cerr << "expected " << t << ", but got " << peek().type << "\n";
       assert(false);
+    }
+    return last();
   }
 
+  // Parses only void, int and float.
+  Type *parseSimpleType();
+
+  ASTNode *primary();
+  ASTNode *mul();
+  ASTNode *add();
+  ASTNode *rel();
+  ASTNode *eq();
+  ASTNode *land();
+  ASTNode *lor();
+  ASTNode *expr();
+  ASTNode *stmt();
+  BlockNode *block();
+  TransparentBlockNode *varDecl();
+  FnDeclNode *fnDecl();
   BlockNode *compUnit();
 
 public:

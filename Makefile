@@ -1,10 +1,10 @@
 CXX = clang++
-CXXFLAGS = -std=c++17 -Wall
+CXXFLAGS = -std=c++17 -Wall -g
 
 SRC_DIR = src
 OBJ_DIR = build
 BIN_DIR = bin
-TARGET = $(BIN_DIR)/my_project
+TARGET = $(BIN_DIR)/sysc
 
 # Find all source files in src directory (including subdirectories)
 SOURCES = $(wildcard $(SRC_DIR)/**/*cpp)

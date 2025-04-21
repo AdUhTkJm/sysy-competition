@@ -13,6 +13,7 @@ std::map<std::string, Token::Type> keywords = {
   { "return", Token::Return },
   { "int", Token::Int },
   { "float", Token::Float },
+  { "const", Token::Const },
 };
 
 Token Lexer::nextToken() {

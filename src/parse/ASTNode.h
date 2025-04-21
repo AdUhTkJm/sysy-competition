@@ -20,6 +20,7 @@ public:
   int getID() const { return id; }
 
   virtual void walk(ASTWalker walker) = 0;
+  virtual std::string toString() const = 0;
 
   ASTNode(int id): id(id) {}
 };
@@ -40,9 +41,8 @@ public:
 
   IntNode(int value): value(value) {}
   
-  void walk(ASTWalker walker) {
-    walker(this);
-  }
+  void walk(ASTWalker walker);
+  std::string toString() const;
 };
 
 class BlockNode : public ASTNodeImpl<BlockNode, __LINE__> {
@@ -51,27 +51,44 @@ public:
 
   BlockNode(const decltype(nodes) &n): nodes(n) {}
 
-  void walk(ASTWalker walker) {
-    walker(this);
-    for (auto x : nodes)
-      x->walk(walker);
-  }
+  void walk(ASTWalker walker);
+  std::string toString() const;
 };
 
-class ConstDeclNode : public ASTNodeImpl<ConstDeclNode, __LINE__> {
+class VarDeclNode : public ASTNodeImpl<VarDeclNode, __LINE__> {
 public:
   std::string name;
   ASTNode *init;
+  bool mut;
 
-  ConstDeclNode(std::string name, ASTNode *init): name(name), init(init) {}
+  VarDeclNode(const std::string &name, ASTNode *init, bool mut = true):
+    name(name), init(init), mut(mut) {}
+  
+  void walk(ASTWalker walker);
+  std::string toString() const;
 };
 
-class DeclNode : public ASTNodeImpl<DeclNode, __LINE__> {
+class VarRefNode : public ASTNodeImpl<VarRefNode, __LINE__> {
 public:
   std::string name;
-  ASTNode *init;
 
-  DeclNode(std::string name, ASTNode *init): name(name), init(init) {}
+  VarRefNode(const std::string &name): name(name) {}
+
+  void walk(ASTWalker walker);
+  std::string toString() const;
+};
+
+// Note that we allow defining multiple variables in a single statement,
+// so we have to group multiple VarDeclNodes together.
+// Using a BlockNode creates a new scope, but this one does not.
+class TransparentBlockNode : public ASTNodeImpl<TransparentBlockNode, __LINE__> {
+public:
+  std::vector<VarDeclNode*> nodes;
+
+  TransparentBlockNode(const decltype(nodes) &n): nodes(n) {}
+
+  void walk(ASTWalker walker);
+  std::string toString() const;
 };
 
 class BinaryNode : public ASTNodeImpl<BinaryNode, __LINE__> {
@@ -86,6 +103,9 @@ public:
 
   BinaryNode(decltype(kind) k, ASTNode *l, ASTNode *r):
     kind(k), l(l), r(r) {}
+  
+  void walk(ASTWalker walker);
+  std::string toString() const;
 };
 
 class UnaryNode : public ASTNodeImpl<UnaryNode, __LINE__> {
@@ -98,6 +118,32 @@ public:
 
   UnaryNode(decltype(kind) k, ASTNode *node):
     kind(k), node(node) {}
+  
+  void walk(ASTWalker walker);
+  std::string toString() const;
+};
+
+class FnDeclNode : public ASTNodeImpl<FnDeclNode, __LINE__> {
+public:
+  std::string name;
+  std::vector<std::string> args;
+  BlockNode *body;
+
+  FnDeclNode(std::string name, const decltype(args) &a, BlockNode *body):
+    name(name), args(a), body(body) {}
+
+  void walk(ASTWalker walker);
+  std::string toString() const;
+};
+
+class ReturnNode : public ASTNodeImpl<ReturnNode, __LINE__> {
+public:
+  ASTNode *node;
+
+  ReturnNode(ASTNode *node): node(node) {}
+
+  void walk(ASTWalker walker);
+  std::string toString() const;
 };
   
 template<class T>

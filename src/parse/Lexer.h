@@ -21,7 +21,8 @@ struct Token {
     Comma,
 
     // Keywords
-    If, Else, While, For, Return, Int, Float,
+    If, Else, While, For, Return, Int, Float, Void,
+    Const,
 
     // EOF
     End,
@@ -50,7 +51,7 @@ class Lexer {
   size_t loc;
 
 public:
-  Lexer(const std::string &input): input(input) {}
+  Lexer(const std::string &input): input(input), loc(0) {}
 
   Token nextToken();
   bool hasMore() const;
