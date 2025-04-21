@@ -44,7 +44,7 @@ Token Lexer::nextToken() {
   if (std::isdigit(c)) {
     int value = 0;
     if (c == '0') {
-      if (input[loc + 1] == 'x') {
+      if (input[loc + 1] == 'x' || input[loc + 1] == 'X') {
         // Hexadecimal, skip '0x'
         loc += 2;
         while (std::isdigit(input[loc]) || 'a' <= tolower(input[loc]) && tolower(input[loc]) <= 'f') {
