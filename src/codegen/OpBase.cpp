@@ -19,7 +19,7 @@ void indent(std::ostream &os, int n) {
 }
 
 Region *Op::appendRegion() {
-  auto region = new Region();
+  auto region = new Region(this);
   regions.push_back(region);
   return region;
 }
@@ -63,7 +63,7 @@ void Op::dump(std::ostream &os, int depth) {
 }
 
 BasicBlock *Region::appendBlock() {
-  auto bb = new BasicBlock();
+  auto bb = new BasicBlock(this, end());
   bbs.push_back(bb);
   return bb;
 }

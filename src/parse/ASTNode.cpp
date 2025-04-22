@@ -127,3 +127,13 @@ WALK(AssignNode) {
 TOSTR(AssignNode) {
   return "=";
 }
+
+WALK(WhileNode) {
+  walker(this);
+  cond->walk(walker);
+  body->walk(walker);
+}
+
+TOSTR(WhileNode) {
+  return "while";
+}

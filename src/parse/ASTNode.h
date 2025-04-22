@@ -167,6 +167,16 @@ public:
   std::string toString() const;
 };
 
+class WhileNode : public ASTNodeImpl<WhileNode, __LINE__> {
+public:
+  ASTNode *cond, *body;
+
+  WhileNode(ASTNode *cond, ASTNode *body): cond(cond), body(body) {}
+
+  void walk(ASTWalker walker);
+  std::string toString() const;
+};
+
 };
 
 #endif

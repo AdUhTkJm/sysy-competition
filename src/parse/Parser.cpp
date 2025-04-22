@@ -116,7 +116,7 @@ ASTNode *Parser::eq() {
 }
 
 ASTNode *Parser::expr() {
-  return rel();
+  return eq();
 }
 
 ASTNode *Parser::stmt() {
@@ -138,6 +138,14 @@ ASTNode *Parser::stmt() {
     if (test(Token::Else))
       ifnot = stmt();
     return new IfNode(cond, ifso, ifnot);
+  }
+
+  if (test(Token::While)) {
+    expect(Token::LPar);
+    auto cond = expr();
+    expect(Token::RPar);
+    auto body = stmt();
+    return new WhileNode(cond, body);
   }
 
   if (peek(Token::Const, Token::Int, Token::Float))

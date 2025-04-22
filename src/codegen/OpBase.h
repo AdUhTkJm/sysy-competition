@@ -32,15 +32,20 @@ public:
 
   BasicBlock *appendBlock();
   void dump(std::ostream &os, int depth);
+
+  Region(Op *parent): parent(parent) {}
 };
 
 class BasicBlock {
   std::list<Op*> ops;
   Region *parent;
-  Region::iterator place;
+  Region::iterator place; // The iterator *after* this basic block.
   
 public:
   using iterator = decltype(ops)::iterator;
+
+  BasicBlock(Region *parent, Region::iterator place):
+    parent(parent), place(place) {}
 
   auto &getOps() { return ops; }
   Op *getFirstOp() { return *ops.begin(); }
@@ -91,7 +96,7 @@ protected:
   std::vector<Region*> regions;
   std::vector<Attr*> attrs;
   BasicBlock *parent;
-  BasicBlock::iterator place;
+  BasicBlock::iterator place; // The iterator *after* this op.
   Value result;
 
   friend class Builder;
@@ -120,6 +125,7 @@ public:
   Region *appendRegion();
   BasicBlock *createFirstBlock();
   void erase();
+  void replaceAllUsesWith(Op *other);
 
   void dump(std::ostream&, int depth = 0);
 

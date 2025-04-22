@@ -2,6 +2,7 @@
 #include "../utils/DynamicCast.h"
 #include "Attrs.h"
 #include "OpBase.h"
+#include "Ops.h"
 #include <iostream>
 
 using namespace sys;
@@ -168,6 +169,29 @@ void CodeGen::emit(ASTNode *node) {
       builder.setToBlockStart(elseBlock);
       emit(branch->ifnot);
     }
+    return;
+  }
+
+  if (auto loop = dyn_cast<WhileNode>(node)) {
+    // Imitate the design of scf.while.
+    // The `condRegion` is the `before` region, and the last op of it is ProceedOp;
+    // Only when the operand of ProceedOp is true, the `after` region is executed,
+    // which is called `bodyRegion` here.
+    auto op = builder.create<WhileOp>();
+    auto condRegion = op->createFirstBlock();
+
+    {
+      Builder::Guard guard(builder);
+      builder.setToBlockStart(condRegion);
+      auto cond = emitExpr(loop->cond);
+      builder.create<ProceedOp>({ cond });
+    }
+    auto bodyRegion = op->appendRegion();
+    auto bodyBlock = bodyRegion->appendBlock();
+
+    Builder::Guard guard(builder);
+    builder.setToBlockStart(bodyBlock);
+    emit(loop->body);
     return;
   }
 

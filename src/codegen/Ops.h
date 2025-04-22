@@ -38,6 +38,8 @@ OP(StoreOp);
 OP(LoadOp);
 OP(ReturnOp);
 OP(IfOp);
+OP(WhileOp);
+OP(ProceedOp);
 
 }
 

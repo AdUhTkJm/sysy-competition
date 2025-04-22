@@ -80,6 +80,16 @@ Type *Sema::infer(ASTNode *node) {
     return node->type = ctx.create<VoidType>();
   }
 
+  if (auto loop = dyn_cast<WhileNode>(node)) {
+    auto condTy = infer(loop->cond);
+    if (!isa<IntType>(condTy)) {
+      std::cerr << "bad cond type\n";
+      assert(false);
+    }
+    infer(loop->body);
+    return node->type = ctx.create<VoidType>();
+  }
+
   if (auto assign = dyn_cast<AssignNode>(node)) {
     auto lty = infer(assign->l);
     auto rty = infer(assign->r);
