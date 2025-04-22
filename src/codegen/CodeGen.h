@@ -30,12 +30,10 @@ public:
   void setAfterOp(Op *op);
   void setBeforeOp(Op *op);
 
+  // We use 4 overloads because literal { ... } can't be deduced.
   template<class T>
   T *create(const std::vector<Value> &v) {
     auto op = new T(v);
-    op->parent = bb;
-    op->place = at;
-    
     bb->insert(at, op);
     return op;
   }
@@ -43,9 +41,6 @@ public:
   template<class T>
   T *create() {
     auto op = new T();
-    op->parent = bb;
-    op->place = at;
-    
     bb->insert(at, op);
     return op;
   }
@@ -53,9 +48,13 @@ public:
   template<class T>
   T *create(const std::vector<Attr*> &v) {
     auto op = new T(v);
-    op->parent = bb;
-    op->place = at;
-    
+    bb->insert(at, op);
+    return op;
+  }
+
+  template<class T>
+  T *create(const std::vector<Value> &v, const std::vector<Attr*> &v2) {
+    auto op = new T(v, v2);
     bb->insert(at, op);
     return op;
   }

@@ -39,7 +39,7 @@ struct Token {
   /* implicit */ Token(Type t): type(t) {}
   /* implicit */ Token(int vi): type(LInt), vi(vi) {}
   /* implicit */ Token(float vf): type(LFloat), vf(vf) {}
-  /* implicit */ Token(std::string str): type(Ident), vs(new char[str.size()]) {
+  /* implicit */ Token(std::string str): type(Ident), vs(new char[str.size() + 1]) {
     strcpy(vs, str.c_str());
   }
 };

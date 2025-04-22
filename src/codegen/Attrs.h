@@ -2,6 +2,7 @@
 #define ATTRS_H
 
 #include "OpBase.h"
+#include <map>
 
 namespace sys {
 
@@ -30,6 +31,30 @@ public:
   SizeAttr(size_t value): value(value) {}
 
   std::string toString() { return "<size = " + std::to_string(value) + ">"; }
+};
+
+// A map for printing purposes.
+extern std::map<BasicBlock*, int> bbmap;
+extern int bbid;
+
+// The target for GotoOp, and for BranchOp if the condition is true.
+class TargetAttr : public AttrImpl<TargetAttr, __LINE__> {
+public:
+  BasicBlock *bb;
+
+  TargetAttr(BasicBlock *bb): bb(bb) {}
+
+  std::string toString();
+};
+
+// The target for BranchOp if the condition is false.
+class ElseAttr : public AttrImpl<ElseAttr, __LINE__> {
+public:
+  BasicBlock *bb;
+
+  ElseAttr(BasicBlock *bb): bb(bb) {}
+
+  std::string toString();
 };
 
 }

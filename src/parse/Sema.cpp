@@ -76,7 +76,8 @@ Type *Sema::infer(ASTNode *node) {
       assert(false);
     }
     infer(branch->ifso);
-    infer(branch->ifnot);
+    if (branch->ifnot)
+      infer(branch->ifnot);
     return node->type = ctx.create<VoidType>();
   }
 

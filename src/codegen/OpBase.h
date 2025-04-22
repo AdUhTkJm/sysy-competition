@@ -1,6 +1,7 @@
 #ifndef OPBASE_H
 #define OPBASE_H
 
+#include <algorithm>
 #include <iterator>
 #include <list>
 #include <ostream>
@@ -33,13 +34,19 @@ public:
   BasicBlock *appendBlock();
   void dump(std::ostream &os, int depth);
 
+  BasicBlock *insert(BasicBlock* at);
+  BasicBlock *insertAfter(BasicBlock* at);
+  BasicBlock *remove(BasicBlock* at);
+
   Region(Op *parent): parent(parent) {}
 };
 
 class BasicBlock {
   std::list<Op*> ops;
   Region *parent;
-  Region::iterator place; // The iterator *after* this basic block.
+  Region::iterator place;
+
+  friend class Region;
   
 public:
   using iterator = decltype(ops)::iterator;
@@ -57,17 +64,11 @@ public:
   Region *getParent() { return parent; }
 
   // Inserts before `at`.
-  void insert(iterator at, Op *op) {
-    ops.insert(at, op);
-  }
+  void insert(iterator at, Op *op);
+  void insertAfter(iterator at, Op *op);
+  void remove(iterator at);
 
-  void insertAfter(iterator at, Op *op) {
-    if (at == ops.end()) {
-      ops.push_back(op);
-      return;
-    }
-    ops.insert(++at, op);
-  }
+  void moveAllOpsTo(BasicBlock *bb);
 };
 
 class Value {
@@ -91,15 +92,16 @@ class Op {
 protected:
   const int id;
 
-  std::vector<Op*> uses;
+  std::set<Op*> uses;
   std::vector<Value> operands;
   std::vector<Region*> regions;
   std::vector<Attr*> attrs;
   BasicBlock *parent;
-  BasicBlock::iterator place; // The iterator *after* this op.
+  BasicBlock::iterator place;
   Value result;
 
   friend class Builder;
+  friend class BasicBlock;
 
   std::string opname;
   // This is for ease of writing macro.
@@ -108,6 +110,7 @@ protected:
 public:
   int getID() const { return id; }
   const std::string &getName() { return opname; }
+  BasicBlock *getParent() { return parent; }
 
   const auto &getUses() const { return uses; }
   const auto &getRegions() const { return regions; }
@@ -128,6 +131,10 @@ public:
   void replaceAllUsesWith(Op *other);
 
   void dump(std::ostream&, int depth = 0);
+  
+  void moveBefore(Op *op);
+  void moveAfter(Op *op);
+  void moveToEnd(BasicBlock *block);
 
   template<class T>
   bool has(T attr) {
@@ -141,6 +148,22 @@ public:
   void addAttr(Args... args) {
     auto attr = new T(std::forward<Args>(args)...);
     attrs.push_back(attr);
+  }
+
+  template<class T>
+  std::vector<T*> findAll() {
+    std::vector<T*> result;
+    if (isa<T>(this))
+      result.push_back(cast<T>(this));
+
+    for (auto region : getRegions())
+      for (auto bb : region->getBlocks())
+        for (auto x : bb->getOps()) {
+          auto v = x->findAll<T>();
+          std::copy(v.begin(), v.end(), std::back_inserter(result));
+        }
+
+    return result;
   }
 };
 

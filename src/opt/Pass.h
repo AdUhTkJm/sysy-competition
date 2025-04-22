@@ -10,20 +10,25 @@
 namespace sys {
 
 class Pass {
+protected:
   ModuleOp *module;
+
+  template<class T>
+  void runRewriter(T rewriter) {
+    auto ts = module->findAll<T>();
+    bool success;
+    do {
+      success = false;
+      for (auto t : ts)
+        success |= rewriter(t);
+    } while (success);
+  }
 public:
   Pass(ModuleOp *module): module(module) {}
   virtual ~Pass() {}
   virtual std::string name() = 0;
   virtual std::map<std::string, int> stats() = 0;
   virtual void run() = 0;
-};
-
-template<class T>
-class Rewriter {
-public:
-  virtual void rewrite(T *op) = 0;
-  void run(Op *op);
 };
 
 class PassManager {
@@ -34,6 +39,7 @@ public:
   ~PassManager();
 
   void run();
+  ModuleOp *getModule() { return module; }
 
   template<class T, class... Args>
   void addPass(Args... args) {

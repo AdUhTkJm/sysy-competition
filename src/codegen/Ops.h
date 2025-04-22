@@ -16,6 +16,10 @@
       setName(#Ty); \
       this->attrs = attrs; \
     } \
+    Ty(const std::vector<Value> &values, const std::vector<Attr*> &attrs): OpImpl(values) { \
+      setName(#Ty); \
+      this->attrs = attrs; \
+    } \
   }
 
 namespace sys {
@@ -40,6 +44,8 @@ OP(ReturnOp);
 OP(IfOp);
 OP(WhileOp);
 OP(ProceedOp);
+OP(GotoOp);   // Jumps unconditionally.
+OP(BranchOp); // Branches according to the only operand.
 
 }
 

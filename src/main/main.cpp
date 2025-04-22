@@ -1,9 +1,14 @@
 #include "../parse/Parser.h"
 #include "../parse/Sema.h"
 #include "../codegen/CodeGen.h"
+#include "../opt/Passes.h"
 #include "Options.h"
 #include <fstream>
 #include <sstream>
+
+void initPipeline(sys::PassManager &pm) {
+  pm.addPass<sys::FlattenCFG>();
+}
 
 int main(int argc, char **argv) {
   auto opts = sys::parseArgs(argc, argv);
@@ -24,7 +29,12 @@ int main(int argc, char **argv) {
   sys::ASTNode *node = parser.parse();
   sys::Sema sema(node, ctx);
 
-  sys::CodeGen gen(node);
-  gen.getModule()->dump(std::cout);
+  sys::CodeGen cg(node);
+  cg.getModule()->dump(std::cerr);
+
+  sys::PassManager pm(cg.getModule());
+  initPipeline(pm);
+  pm.run();
+  pm.getModule()->dump(std::cerr);
   return 0;
 }
