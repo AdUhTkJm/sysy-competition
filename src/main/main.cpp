@@ -1,4 +1,5 @@
 #include "../parse/Parser.h"
+#include "../parse/Sema.h"
 #include "Options.h"
 #include <fstream>
 #include <sstream>
@@ -16,7 +17,10 @@ int main(int argc, char **argv) {
   std::stringstream ss;
   ss << ifs.rdbuf();
 
-  sys::Parser parser(ss.str());
+  sys::TypeContext ctx;
+
+  sys::Parser parser(ss.str(), ctx);
   sys::ASTNode *node = parser.parse();
+  sys::Sema sema(node, ctx);
   return 0;
 }

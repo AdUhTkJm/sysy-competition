@@ -82,6 +82,8 @@ TOSTR(UnaryNode) {
   static std::map<decltype(kind), std::string> mapping = {
     { Minus, "-" },
     { Not, "!" },
+    { Float2Int, "(int)" },
+    { Int2Float, "(float)" }
   };
 
   return mapping[kind];

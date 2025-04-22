@@ -15,7 +15,7 @@ using ASTWalker = std::function<void (ASTNode *)>;
 class ASTNode {
   int id;
 public:
-  Type *type;
+  Type *type = nullptr;
 
   int getID() const { return id; }
 
@@ -111,7 +111,7 @@ public:
 class UnaryNode : public ASTNodeImpl<UnaryNode, __LINE__> {
 public:
   enum {
-    Not, Minus,
+    Not, Minus, Float2Int, Int2Float
   } kind;
 
   ASTNode *node;
@@ -145,24 +145,6 @@ public:
   void walk(ASTWalker walker);
   std::string toString() const;
 };
-  
-template<class T>
-bool isa(T *t) {
-  return T::classof(t);
-}
-
-template<class T>
-T *cast(T *t) {
-  assert(isa<T>(t));
-  return (T*) t;
-}
-
-template<class T>
-T *dyn_cast(T *t) {
-  if (!isa<T>(t))
-    return nullptr;
-  return cast<T>(t);
-}
 
 };
 

@@ -11,6 +11,7 @@ public:
   int getID() const { return id; }
   virtual std::string toString() const = 0;
 
+  virtual ~Type() {}
   Type(int id): id(id) {}
 };
 

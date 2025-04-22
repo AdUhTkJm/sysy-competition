@@ -7,12 +7,14 @@
 
 #include "ASTNode.h"
 #include "Lexer.h"
+#include "TypeContext.h"
 
 namespace sys {
 
 class Parser {
   std::vector<Token> tokens;
   size_t loc;
+  TypeContext &ctx;
 
   Token last() {
     if (loc - 1 >= tokens.size())
@@ -76,7 +78,7 @@ class Parser {
   BlockNode *compUnit();
 
 public:
-  Parser(const std::string &input);
+  Parser(const std::string &input, TypeContext &ctx);
   ASTNode *parse();
 };
 

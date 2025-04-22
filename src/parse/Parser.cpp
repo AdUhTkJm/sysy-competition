@@ -2,6 +2,7 @@
 #include "ASTNode.h"
 #include "Lexer.h"
 #include "Type.h"
+#include "TypeContext.h"
 #include <vector>
 
 using namespace sys;
@@ -9,11 +10,11 @@ using namespace sys;
 Type *Parser::parseSimpleType() {
 switch (consume().type) {
   case Token::Void:
-    return new VoidType();
+    return ctx.create<VoidType>();
   case Token::Int:
-    return new IntType();
+    return ctx.create<IntType>();
   case Token::Float:
-    return new FloatType();
+    return ctx.create<FloatType>();
   default:
     std::cerr << "unknown type: " << peek().type << "\n";
     assert(false);
@@ -119,6 +120,7 @@ TransparentBlockNode *Parser::varDecl() {
     }
 
     if (dimExprs.size() != 0)
+      // TODO: do folding immediately
       ty = new ArrayType(ty, dimExprs);
 
     ASTNode *init = nullptr;
@@ -164,7 +166,7 @@ FnDeclNode *Parser::fnDecl() {
     if (dimExprs.size() != 0)
       ty = new ArrayType(ty, dimExprs);
     if (isPointer)
-      ty = new PointerType(ty);
+      ty = ctx.create<PointerType>(ty);
 
     params.push_back(ty);
 
@@ -201,7 +203,7 @@ BlockNode *Parser::compUnit() {
   return new BlockNode(nodes);
 }
 
-Parser::Parser(const std::string &input): loc(0) {
+Parser::Parser(const std::string &input, TypeContext &ctx): loc(0), ctx(ctx) {
   Lexer lex(input);
 
   while (lex.hasMore())
