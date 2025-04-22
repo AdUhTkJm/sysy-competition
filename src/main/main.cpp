@@ -1,5 +1,6 @@
 #include "../parse/Parser.h"
 #include "../parse/Sema.h"
+#include "../codegen/CodeGen.h"
 #include "Options.h"
 #include <fstream>
 #include <sstream>
@@ -22,5 +23,8 @@ int main(int argc, char **argv) {
   sys::Parser parser(ss.str(), ctx);
   sys::ASTNode *node = parser.parse();
   sys::Sema sema(node, ctx);
+
+  sys::CodeGen gen(node);
+  gen.getModule()->dump(std::cout);
   return 0;
 }

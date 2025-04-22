@@ -13,7 +13,7 @@ class ASTNode;
 using ASTWalker = std::function<void (ASTNode *)>;
 
 class ASTNode {
-  int id;
+  const int id;
 public:
   Type *type = nullptr;
 

@@ -6,7 +6,7 @@
 namespace sys {
 
 class Type {
-  int id;
+  const int id;
 public:
   int getID() const { return id; }
   virtual std::string toString() const = 0;

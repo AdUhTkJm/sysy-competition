@@ -10,10 +10,13 @@ struct Options {
 
   struct {
     option dumpAST : 1;
+    option noLink : 1;
   };
 
   std::string inputFile;
   std::string outputFile;
+  
+  Options();
 };
 
 Options parseArgs(int argc, char **argv);
