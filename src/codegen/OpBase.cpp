@@ -1,12 +1,12 @@
 #include "OpBase.h"
 #include <cassert>
+#include <map>
 #include <ostream>
 
 using namespace sys;
 
-int Value::id = 0;
-
-Op::Op(int id, const std::vector<Value> &values): id(id), result(this) {
+Op::Op(int id, const std::vector<Value> &values):
+  id(id), result(this) {
   for (auto x : values) {
     operands.push_back(x);
     x.defining->uses.push_back(this);
@@ -31,16 +31,25 @@ void Op::setName(std::string name) {
   opname = name;
 }
 
-void Op::createFirstBlock() {
+BasicBlock *Op::createFirstBlock() {
   appendRegion();
-  regions[0]->appendBlock();
+  return regions[0]->appendBlock();
+}
+
+static std::map<Op*, int> valueName = {};
+static int id = 0;
+
+std::ostream &operator<<(std::ostream &os, Value &value) {
+  if (!valueName.count(value.defining))
+    valueName[value.defining] = id++;
+  return os << "%" << valueName[value.defining];
 }
 
 void Op::dump(std::ostream &os, int depth) {
   indent(os, depth * 2);
-  os << "%" << result.name << " = " << opname;
-  for (auto operand : operands)
-    os << " " << "%" << operand.name;
+  os << result << " = " << opname;
+  for (auto &operand : operands)
+    os << " " << operand;
   for (auto attr : attrs)
     os << " " << attr->toString() << " ";
   if (regions.size() > 0) {
@@ -51,8 +60,10 @@ void Op::dump(std::ostream &os, int depth) {
   os << "\n";
 }
 
-void Region::appendBlock() {
-  bbs.push_back(new BasicBlock());
+BasicBlock *Region::appendBlock() {
+  auto bb = new BasicBlock();
+  bbs.push_back(bb);
+  return bb;
 }
 
 void Region::dump(std::ostream &os, int depth) {

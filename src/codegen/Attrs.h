@@ -14,6 +14,15 @@ public:
   std::string toString() { return "<name = " + name + ">"; }
 };
 
+class IntAttr : public AttrImpl<IntAttr, __LINE__> {
+public:
+  int value;
+
+  IntAttr(int value): value(value) {}
+
+  std::string toString() { return "<" + std::to_string(value) + ">"; }
+};
+
 }
 
 #endif

@@ -63,10 +63,10 @@ ASTNode *Parser::add() {
   while (peek(Token::Plus, Token::Minus)) {
     switch (consume().type) {
     case Token::Plus:
-      n = new BinaryNode(BinaryNode::Mul, n, mul());
+      n = new BinaryNode(BinaryNode::Add, n, mul());
       break;
     case Token::Minus:
-      n = new BinaryNode(BinaryNode::Div, n, mul());
+      n = new BinaryNode(BinaryNode::Sub, n, mul());
       break;
     default:
       assert(false);

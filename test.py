@@ -8,9 +8,9 @@ parser.add_argument("-t", "--test", type=str)
 
 args = parser.parse_args()
 
-proc.run(["make"])
+proc.run(["make"], check=True)
 if args.test:
   command = ["bin/sysc", f"test/{args.test}"]
   if args.gdb:
     command = ["gdb", "--args", *command]
-  proc.run(command)
+  proc.run(command, check=True)

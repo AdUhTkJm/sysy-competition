@@ -12,6 +12,10 @@
     Ty(): OpImpl({}) { \
       setName(#Ty); \
     } \
+    Ty(const std::vector<Attr*> &attrs): OpImpl({}) { \
+      setName(#Ty); \
+      this->attrs = attrs; \
+    } \
   }
 
 namespace sys {
@@ -21,16 +25,14 @@ OP(AddIOp);
 OP(SubIOp);
 OP(MulIOp);
 OP(DivIOp);
+OP(ModIOp);
 OP(FuncOp);
-
-class IntOp : public OpImpl<IntOp, __LINE__> {
-public:
-  int value;
-
-  IntOp(int value): OpImpl({}), value(value) {
-    setName("IntOp");
-  }
-};
+OP(IntOp);
+OP(AllocaOp);
+OP(GetArgOp);
+OP(StoreOp);
+OP(LoadOp);
+OP(ReturnOp);
 
 }
 

@@ -30,7 +30,7 @@ public:
 
   Op *getParent() { return parent; }
 
-  void appendBlock();
+  BasicBlock *appendBlock();
   void dump(std::ostream &os, int depth);
 };
 
@@ -66,15 +66,13 @@ public:
 };
 
 class Value {
-  static int id;
 public:
-  const int name;
-  Op *const defining;
+  Op *defining;
 
-  Value(Op *from): name(id++), defining(from) {}
+  Value() {} // uninitialized, for std::map
+  Value(Op *from): defining(from) {}
 };
 
-// An empty base.
 class Attr {
   const int id;
 public:
@@ -85,9 +83,9 @@ public:
 };
 
 class Op {
+protected:
   const int id;
 
-  // Note that this doesn't own Op*'s referred to here.
   std::vector<Op*> uses;
   std::vector<Value> operands;
   std::vector<Region*> regions;
@@ -98,7 +96,6 @@ class Op {
 
   friend class Builder;
 
-protected:
   std::string opname;
   // This is for ease of writing macro.
   void setName(std::string name);
@@ -121,7 +118,7 @@ public:
   Op(int id, const std::vector<Value> &values);
 
   void appendRegion();
-  void createFirstBlock();
+  BasicBlock *createFirstBlock();
   void erase();
 
   void dump(std::ostream&, int depth = 0);
