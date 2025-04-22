@@ -59,7 +59,7 @@ ASTNode *Parser::mul() {
 }
 
 ASTNode *Parser::add() {
-  auto n = primary();
+  auto n = mul();
   while (peek(Token::Plus, Token::Minus)) {
     switch (consume().type) {
     case Token::Plus:
@@ -75,21 +75,85 @@ ASTNode *Parser::add() {
   return n;
 }
 
+ASTNode *Parser::rel() {
+  auto n = add();
+  while (peek(Token::Lt, Token::Gt, Token::Ge, Token::Le)) {
+    switch (consume().type) {
+    case Token::Lt:
+      n = new BinaryNode(BinaryNode::Lt, n, add());
+      break;
+    case Token::Le:
+      n = new BinaryNode(BinaryNode::Le, n, add());
+      break;
+    case Token::Gt:
+      n = new BinaryNode(BinaryNode::Lt, add(), n);
+      break;
+    case Token::Ge:
+      n = new BinaryNode(BinaryNode::Le, add(), n);
+      break;
+    default:
+      assert(false);
+    }
+  }
+  return n;
+}
+
+ASTNode *Parser::eq() {
+  auto n = rel();
+  while (peek(Token::Eq, Token::Ne)) {
+    switch (consume().type) {
+    case Token::Eq:
+      n = new BinaryNode(BinaryNode::Eq, n, rel());
+      break;
+    case Token::Ne:
+      n = new BinaryNode(BinaryNode::Ne, n, rel());
+      break;
+    default:
+      assert(false);
+    }
+  }
+  return n;
+}
+
 ASTNode *Parser::expr() {
-  return add();
+  return rel();
 }
 
 ASTNode *Parser::stmt() {
+  if (peek(Token::LBrace))
+    return block();
+
   if (test(Token::Return)) {
     auto ret = new ReturnNode(expr());
     expect(Token::Semicolon);
     return ret;
   }
 
+  if (test(Token::If)) {
+    expect(Token::LPar);
+    auto cond = expr();
+    expect(Token::RPar);
+    auto ifso = stmt();
+    ASTNode *ifnot = nullptr;
+    if (test(Token::Else))
+      ifnot = stmt();
+    return new IfNode(cond, ifso, ifnot);
+  }
+
   if (peek(Token::Const, Token::Int, Token::Float))
     return varDecl();
 
   auto n = expr();
+  if (test(Token::Assign)) {
+    if (!isa<VarRefNode>(n)) {
+      std::cerr << "expected lval\n";
+      assert(false);
+    }
+    auto value = expr();
+    expect(Token::Semicolon);
+    return new AssignNode(n, value);
+  }
+
   expect(Token::Semicolon);
   return n;
 }

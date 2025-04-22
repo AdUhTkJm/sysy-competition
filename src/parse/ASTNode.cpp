@@ -105,3 +105,25 @@ WALK(ReturnNode) {
 TOSTR(ReturnNode) {
   return "return";
 }
+
+WALK(IfNode) {
+  walker(this);
+  cond->walk(walker);
+  ifso->walk(walker);
+  if (ifnot)
+    ifnot->walk(walker);
+}
+
+TOSTR(IfNode) {
+  return "if";
+}
+
+WALK(AssignNode) {
+  walker(this);
+  l->walk(walker);
+  r->walk(walker);
+}
+
+TOSTR(AssignNode) {
+  return "=";
+}

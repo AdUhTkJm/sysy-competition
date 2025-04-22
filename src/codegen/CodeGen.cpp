@@ -62,6 +62,14 @@ Value CodeGen::emitBinary(BinaryNode *node) {
     return builder.create<DivIOp>({ l, r });
   case BinaryNode::Mod:
     return builder.create<ModIOp>({ l, r });
+  case BinaryNode::Eq:
+    return builder.create<EqOp>({ l, r });
+  case BinaryNode::Ne:
+    return builder.create<NeOp>({ l, r });
+  case BinaryNode::Lt:
+    return builder.create<LtOp>({ l, r });
+  case BinaryNode::Le:
+    return builder.create<LeOp>({ l, r });
   default:
     std::cerr << "unsupported binary " << node->kind << "\n";
     assert(false);
@@ -84,7 +92,7 @@ Value CodeGen::emitExpr(ASTNode *node) {
     }
     auto from = symbols[ref->name];
     auto load = builder.create<LoadOp>({ from });
-    // load->addAttr<IntAttr>(getSize(ref->type));
+    load->addAttr<SizeAttr>(getSize(ref->type));
     return load;
   }
 
@@ -132,7 +140,7 @@ void CodeGen::emit(ASTNode *node) {
     if (vardecl->init) {
       auto value = emitExpr(vardecl->init);
       auto store = builder.create<StoreOp>({ value, addr });
-      // store->addAttr<IntAttr>(getSize(vardecl->type));
+      store->addAttr<SizeAttr>(getSize(vardecl->type));
     }
     return;
   }
@@ -140,6 +148,34 @@ void CodeGen::emit(ASTNode *node) {
   if (auto ret = dyn_cast<ReturnNode>(node)) {
     auto value = emitExpr(ret->node);
     builder.create<ReturnOp>({ value });
+    return;
+  }
+
+  if (auto branch = dyn_cast<IfNode>(node)) {
+    auto cond = emitExpr(branch->cond);
+    auto op = builder.create<IfOp>({ cond });
+
+    auto thenBlock = op->createFirstBlock();
+    {
+      Builder::Guard guard(builder);
+      builder.setToBlockStart(thenBlock);
+      emit(branch->ifso);
+    }
+    if (branch->ifnot) {
+      auto elseRegion = op->appendRegion();
+      auto elseBlock = elseRegion->appendBlock();
+      Builder::Guard guard(builder);
+      builder.setToBlockStart(elseBlock);
+      emit(branch->ifnot);
+    }
+    return;
+  }
+
+  if (auto assign = dyn_cast<AssignNode>(node)) {
+    auto l = cast<VarRefNode>(assign->l);
+    auto addr = symbols[l->name];
+    auto value = emitExpr(assign->r);
+    builder.create<StoreOp>({ value, addr });
     return;
   }
   

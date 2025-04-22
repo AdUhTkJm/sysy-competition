@@ -18,8 +18,10 @@ void indent(std::ostream &os, int n) {
     os << ' ';
 }
 
-void Op::appendRegion() {
-  regions.push_back(new Region());
+Region *Op::appendRegion() {
+  auto region = new Region();
+  regions.push_back(region);
+  return region;
 }
 
 void Op::setName(std::string name) {

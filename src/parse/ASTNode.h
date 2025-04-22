@@ -146,6 +146,27 @@ public:
   std::string toString() const;
 };
 
+class IfNode : public ASTNodeImpl<IfNode, __LINE__> {
+public:
+  ASTNode *cond, *ifso, *ifnot;
+
+  IfNode(ASTNode *cond, ASTNode *ifso, ASTNode *ifnot):
+    cond(cond), ifso(ifso), ifnot(ifnot) {}
+
+  void walk(ASTWalker walker);
+  std::string toString() const;
+};
+
+class AssignNode : public ASTNodeImpl<AssignNode, __LINE__> {
+public:
+  ASTNode *l, *r;
+
+  AssignNode(ASTNode *l, ASTNode *r): l(l), r(r) {}
+
+  void walk(ASTWalker walker);
+  std::string toString() const;
+};
+
 };
 
 #endif

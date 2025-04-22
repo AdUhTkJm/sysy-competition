@@ -23,6 +23,15 @@ public:
   std::string toString() { return "<" + std::to_string(value) + ">"; }
 };
 
+class SizeAttr : public AttrImpl<SizeAttr, __LINE__> {
+public:
+  size_t value;
+
+  SizeAttr(size_t value): value(value) {}
+
+  std::string toString() { return "<size = " + std::to_string(value) + ">"; }
+};
+
 }
 
 #endif

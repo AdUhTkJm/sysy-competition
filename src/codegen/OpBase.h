@@ -117,7 +117,7 @@ public:
 
   Op(int id, const std::vector<Value> &values);
 
-  void appendRegion();
+  Region *appendRegion();
   BasicBlock *createFirstBlock();
   void erase();
 

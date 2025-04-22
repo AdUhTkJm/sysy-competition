@@ -26,6 +26,10 @@ OP(SubIOp);
 OP(MulIOp);
 OP(DivIOp);
 OP(ModIOp);
+OP(EqOp);
+OP(NeOp);
+OP(LtOp);
+OP(LeOp);
 OP(FuncOp);
 OP(IntOp);
 OP(AllocaOp);
@@ -33,6 +37,7 @@ OP(GetArgOp);
 OP(StoreOp);
 OP(LoadOp);
 OP(ReturnOp);
+OP(IfOp);
 
 }
 
