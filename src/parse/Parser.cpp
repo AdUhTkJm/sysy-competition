@@ -283,5 +283,13 @@ Parser::Parser(const std::string &input, TypeContext &ctx): loc(0), ctx(ctx) {
 }
 
 ASTNode *Parser::parse() {
-  return compUnit();
+  auto unit = compUnit();
+
+  // Release memory of tokens.
+  for (auto tok : tokens) {
+    if (tok.type == Token::Ident)
+      delete[] tok.vs;
+  }
+
+  return unit;
 }

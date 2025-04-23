@@ -135,6 +135,42 @@ void BasicBlock::moveAllOpsTo(BasicBlock *bb) {
   }
 }
 
+void BasicBlock::splitOpsAfter(BasicBlock *dest, Op *op) {
+  for (auto it = op->place; it != end(); ) {
+    auto advanced = it; ++advanced;
+    // `it` invalidates now.
+    (*it)->moveToEnd(dest);
+    it = advanced;
+  }
+}
+
+void BasicBlock::splitOpsBefore(BasicBlock *dest, Op *op) {
+  for (auto it = begin(); it != op->place; ) {
+    auto advanced = it; ++advanced;
+    // `it` invalidates now.
+    (*it)->moveToEnd(dest);
+    it = advanced;
+  }
+}
+
+void BasicBlock::moveBefore(BasicBlock *bb) {
+  parent->remove(place);
+  parent = bb->parent;
+  parent->insert(bb->place, this);
+}
+
+void BasicBlock::moveAfter(BasicBlock *bb) {
+  parent->remove(place);
+  parent = bb->parent;
+  parent->insertAfter(bb->place, this);
+}
+
+void BasicBlock::moveToEnd(Region *region) {
+  parent->remove(place);
+  parent = region;
+  parent->insert(parent->end(), this);
+}
+
 BasicBlock *Region::insert(BasicBlock *at) {
   assert(at->parent == this);
 
@@ -156,11 +192,50 @@ BasicBlock *Region::insertAfter(BasicBlock *at) {
   return *it;
 }
 
+void Region::remove(BasicBlock *bb) {
+  bbs.erase(bb->place);
+}
+
+void Region::remove(iterator at) {
+  bbs.erase(at);
+}
+
+void Region::insert(iterator at, BasicBlock *bb) {
+  bb->parent = this;
+  bb->place = bbs.insert(at, bb);
+}
+
+void Region::insertAfter(iterator at, BasicBlock *bb) {
+  bb->parent = this;
+  if (at == bbs.end()) {
+    bbs.push_back(bb);
+    bb->place = --end();
+    return;
+  }
+  bb->place = bbs.insert(++at, bb);
+}
+
 BasicBlock *Region::appendBlock() {
   bbs.push_back(nullptr);
   auto place = --bbs.end();
   *place = new BasicBlock(this, place);
   return *place;
+}
+
+std::pair<BasicBlock*, BasicBlock*> Region::moveTo(BasicBlock *bb) {
+  BasicBlock *prev = bb;
+  // Preserve it beforehand; the region will become empty afterwards
+  auto result = std::make_pair(getFirstBlock(), getLastBlock());
+
+  for (auto it = begin(); it != end(); ) {
+    auto advanced = it; advanced++;
+    auto current = *it;
+    current->moveAfter(prev);
+    prev = current;
+    it = advanced;
+  }
+
+  return result;
 }
 
 void Region::dump(std::ostream &os, int depth) {

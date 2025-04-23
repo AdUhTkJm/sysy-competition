@@ -24,7 +24,7 @@ public:
 
   auto &getBlocks() { return bbs; }
   BasicBlock *getFirstBlock() { return *bbs.begin(); }
-  BasicBlock *getLastBlock() { return *bbs.end(); }
+  BasicBlock *getLastBlock() { return *--bbs.end(); }
 
   iterator begin() { return bbs.begin(); }
   iterator end() { return bbs.end(); }
@@ -36,7 +36,15 @@ public:
 
   BasicBlock *insert(BasicBlock* at);
   BasicBlock *insertAfter(BasicBlock* at);
-  BasicBlock *remove(BasicBlock* at);
+  void remove(BasicBlock* at);
+
+  void insert(iterator at, BasicBlock *bb);
+  void insertAfter(iterator at, BasicBlock *bb);
+  void remove(iterator at);
+
+  // Moves all blocks in `from` after `insertionPoint`.
+  // Returns the first and final block.
+  std::pair<BasicBlock*, BasicBlock*> moveTo(BasicBlock *insertionPoint);
 
   Region(Op *parent): parent(parent) {}
 };
@@ -47,6 +55,7 @@ class BasicBlock {
   Region::iterator place;
 
   friend class Region;
+  friend class Op;
   
 public:
   using iterator = decltype(ops)::iterator;
@@ -56,7 +65,7 @@ public:
 
   auto &getOps() { return ops; }
   Op *getFirstOp() { return *ops.begin(); }
-  Op *getLastOp() { return *ops.end(); }
+  Op *getLastOp() { return *--ops.end(); }
 
   iterator begin() { return ops.begin(); }
   iterator end() { return ops.end(); }
@@ -69,6 +78,15 @@ public:
   void remove(iterator at);
 
   void moveAllOpsTo(BasicBlock *bb);
+
+  // Moves every op after `op` to `dest`, including `op`.
+  void splitOpsAfter(BasicBlock *dest, Op *op);
+  // Moves every op before `op` to `dest`, not including `op`.
+  void splitOpsBefore(BasicBlock *dest, Op *op);
+
+  void moveBefore(BasicBlock *bb);
+  void moveAfter(BasicBlock *bb);
+  void moveToEnd(Region *region);
 };
 
 class Value {
