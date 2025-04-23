@@ -137,3 +137,21 @@ WALK(WhileNode) {
 TOSTR(WhileNode) {
   return "while";
 }
+
+WALK(ConstArrayNode) {
+  walker(this);
+}
+
+TOSTR(ConstArrayNode) {
+  return "const-array";
+}
+
+WALK(ArrayAccessNode) {
+  walker(this);
+  array->walk(walker);
+  index->walk(walker);
+}
+
+TOSTR(ArrayAccessNode) {
+  return "[]";
+}

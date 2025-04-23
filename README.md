@@ -22,7 +22,7 @@ Lexer 和 Parser 是手写的，其中 Parser 是简单的递归下降。不用 
 
 ### CodeGen
 
-CodeGen 所生成的 IR 类似 MLIR 的 `scf` 方言。作为一个例子，考虑这样的一段代码。
+CodeGen 所生成的 IR 吸收了 MLIR 的 `scf` 方言的设计方式。作为一个例子，考虑这样的一段代码：
 
 ```cpp
 int main() {
@@ -91,10 +91,12 @@ int main() {
 
 ### Passes
 
-**FlattenCFG**
+Pass 分为三个部分：保证正确性的 (S)，用于将 IR 降低为更底层的 Op 的 (L)，以及优化的 (O)。这里的列举顺序就是执行顺序。
 
-展平控制流。将 IfOp 和 WhileOp 展开，变为 Goto, Branch 和基本块。这类似于 MLIR 的 `scf` 到 `cf` 的转换。
-
-**MoveAlloca**
+**MoveAlloca** - S
 
 将函数里的所有 `alloca` 移到函数的最前方：不管原来这个 `alloca` 是处在 if 还是 while 中，它本来都应该只被执行一次。
+
+**FlattenCFG** - L
+
+展平控制流。将 IfOp 和 WhileOp 展开，变为 Goto, Branch 和基本块。这类似于 MLIR 的 `scf` 到 `cf` 的转换。

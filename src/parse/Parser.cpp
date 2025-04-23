@@ -3,9 +3,84 @@
 #include "Lexer.h"
 #include "Type.h"
 #include "TypeContext.h"
+#include <iostream>
 #include <vector>
 
 using namespace sys;
+
+int ConstValue::size() {
+  int total = 1;
+  for (auto x : dims)
+    total *= x;
+  return total;
+}
+
+int ConstValue::stride() {
+  int stride = 1;
+  for (size_t i = 1; i < dims.size(); i++)
+    stride *= dims[i];
+  return stride;
+}
+
+ConstValue ConstValue::operator[](int i) {
+  assert(dims.size() >= 1);
+
+  std::vector<int> newDims;
+  newDims.reserve(dims.size() - 1);
+
+  for (size_t i = 1; i < dims.size(); i++) 
+    newDims.push_back(i);
+  
+  return ConstValue(vi + stride(), newDims);
+};
+
+int *ConstValue::getRaw() {
+  auto total = size();
+  auto result = new int[total];
+  memcpy(result, vi, total * sizeof(int));
+  return result;
+}
+
+float *ConstValue::getRawFloat() {
+  auto total = size();
+  auto result = new float[total];
+  memcpy(result, vi, total * sizeof(float));
+  return result;
+}
+
+void ConstValue::release() {
+  delete[] vi;
+}
+
+Token Parser::last() {
+  if (loc - 1 >= tokens.size())
+    return Token::End;
+  return tokens[loc - 1];
+}
+
+Token Parser::peek() {
+  if (loc >= tokens.size())
+    return Token::End;
+  return tokens[loc];
+}
+
+Token Parser::consume() {
+  if (loc >= tokens.size())
+    return Token::End;
+  return tokens[loc++];
+}
+
+bool Parser::peek(Token::Type t) {
+  return peek().type == t;
+}
+
+Token Parser::expect(Token::Type t) {
+  if (!test(t)) {
+    std::cerr << "expected " << t << ", but got " << peek().type << "\n";
+    assert(false);
+  }
+  return last();
+}
 
 Type *Parser::parseSimpleType() {
 switch (consume().type) {
@@ -19,6 +94,60 @@ switch (consume().type) {
     std::cerr << "unknown type: " << peek().type << "\n";
     assert(false);
   }
+}
+
+ConstValue Parser::getArrayInit(const std::vector<int> &dims) {
+  expect(Token::LBrace);
+
+  auto carry = [&](std::vector<int> &x) {
+    for (int i = (int) x.size() - 1; i >= 1; i--) {
+      if (x[i] >= dims[i]) {
+        auto quot = x[i] / dims[i];
+        x[i] %= dims[i];
+        x[i - 1] += quot;
+      }
+    }
+  };
+
+  auto offset = [&](const std::vector<int> &x) {
+    int total = 0, stride = 1;
+    for (int i = (int) x.size() - 1; i >= 0; i--) {
+      total += x[i] * stride;
+      stride *= dims[i];
+    }
+    return total;
+  };
+
+  // Initialize with `dims.size()` zeroes.
+  std::vector<int> place(dims.size(), 0);
+  int size = 1;
+  for (auto x : dims)
+    size *= x;
+  int *vi = new int[size];
+  memset(vi, 0, size * sizeof(int));
+
+  // add 1 to `place[addAt]` when we meet the next `}`.
+  int addAt = dims.size() - 1;
+  while (!peek(Token::RBrace)) {
+    if (test(Token::LBrace)) {
+      addAt--;
+      continue;
+    }
+
+    if (test(Token::RBrace)) {
+      // Bump `place[addAt]`, and set everything after it to 0.
+      place[addAt]++;
+      carry(place);
+      addAt++;
+      continue;
+    }
+
+    // Automatically carry.
+    vi[offset(place)] = earlyFold(expr()).getInt();
+    place[place.size() - 1]++;
+    carry(place);
+  }
+  return ConstValue(vi, dims);
 }
 
 ASTNode *Parser::primary() {
@@ -167,6 +296,8 @@ ASTNode *Parser::stmt() {
 }
 
 BlockNode *Parser::block() {
+  SemanticScope scope(*this);
+
   expect(Token::LBrace);
   std::vector<ASTNode *> nodes;
   
@@ -177,31 +308,35 @@ BlockNode *Parser::block() {
 }
 
 TransparentBlockNode *Parser::varDecl() {
-  bool mut = test(Token::Const);
+  bool mut = !test(Token::Const);
   auto base = parseSimpleType();
   std::vector<VarDeclNode*> decls;
 
   do {
     Type *ty = base;
     std::string name = expect(Token::Ident).vs;
-    std::vector<ASTNode *> dimExprs;
+    std::vector<int> dims;
 
     while (test(Token::LBrak)) {
-      dimExprs.push_back(expr());
+      dims.push_back(earlyFold(expr()).getInt());
       expect(Token::RBrak);
     }
 
-    if (dimExprs.size() != 0)
+    if (dims.size() != 0)
       // TODO: do folding immediately
-      ty = new ArrayType(ty, dimExprs);
+      ty = new ArrayType(ty, dims);
 
     ASTNode *init = nullptr;
     if (test(Token::Assign))
-      init = expr();
+      init = isa<ArrayType>(ty) ? new ConstArrayNode(getArrayInit(dims).getRaw()) : expr();
 
     auto decl = new VarDeclNode(name, init, mut);
     decl->type = ty;
     decls.push_back(decl);
+
+    // Record in symbol table.
+    if (!mut && isa<IntType>(base))
+      symbols[name] = earlyFold(init);
 
     if (!test(Token::Comma) && !peek(Token::Semicolon))
       expect(Token::Comma);
@@ -222,7 +357,7 @@ FnDeclNode *Parser::fnDecl() {
   while (!test(Token::RPar)) {
     auto ty = parseSimpleType();
     args.push_back(expect(Token::Ident).vs);
-    std::vector<ASTNode *> dimExprs;
+    std::vector<int> dims;
 
     bool isPointer = false;
     if (test(Token::LBrak)) {
@@ -231,12 +366,12 @@ FnDeclNode *Parser::fnDecl() {
     }
 
     while (test(Token::LBrak)) {
-      dimExprs.push_back(expr());
+      dims.push_back(earlyFold(expr()).getInt());
       expect(Token::RBrak);
     }
 
-    if (dimExprs.size() != 0)
-      ty = new ArrayType(ty, dimExprs);
+    if (dims.size() != 0)
+      ty = new ArrayType(ty, dims);
     if (isPointer)
       ty = ctx.create<PointerType>(ty);
 
@@ -275,6 +410,59 @@ BlockNode *Parser::compUnit() {
   return new BlockNode(nodes);
 }
 
+// Yes, heavy memory leak... But who cares?
+ConstValue Parser::earlyFold(ASTNode *node) {
+  if (auto ref = dyn_cast<VarRefNode>(node)) {
+    if (!symbols.count(ref->name)) {
+      std::cerr << "cannot find const: " << ref->name << "\n";
+      assert(false);
+    }
+    return symbols[ref->name];
+  }
+
+  if (auto binary = dyn_cast<BinaryNode>(node)) {
+    auto l = earlyFold(binary).getInt();
+    auto r = earlyFold(binary).getInt();
+    switch (binary->kind) {
+    case BinaryNode::Add:
+      return ConstValue(new int(l + r), {});
+    case BinaryNode::Sub:
+      return ConstValue(new int(l - r), {});
+    case BinaryNode::Mul:
+      return ConstValue(new int(l * r), {});
+    case BinaryNode::Div:
+      return ConstValue(new int(l / r), {});
+    case BinaryNode::Mod:
+      return ConstValue(new int(l % r), {});
+    case BinaryNode::And:
+      return ConstValue(new int(l && r), {});
+    case BinaryNode::Or:
+      return ConstValue(new int(l || r), {});
+    case BinaryNode::Eq:
+      return ConstValue(new int(l == r), {});
+    case BinaryNode::Ne:
+      return ConstValue(new int(l != r), {});
+    case BinaryNode::Lt:
+      return ConstValue(new int(l < r), {});
+    case BinaryNode::Le:
+      return ConstValue(new int(l > r), {});
+    }
+  }
+
+  if (auto lint = dyn_cast<IntNode>(node)) {
+    return ConstValue(new int(lint->value), {});
+  }
+
+  if (auto access = dyn_cast<ArrayAccessNode>(node)) {
+    auto array = earlyFold(access->array);
+    int index = earlyFold(access->index).getInt();
+    return array[index];
+  }
+
+  std::cerr << "not constexpr: " << node->getID() << "\n";
+  assert(false);
+}
+
 Parser::Parser(const std::string &input, TypeContext &ctx): loc(0), ctx(ctx) {
   Lexer lex(input);
 
@@ -285,11 +473,14 @@ Parser::Parser(const std::string &input, TypeContext &ctx): loc(0), ctx(ctx) {
 ASTNode *Parser::parse() {
   auto unit = compUnit();
 
-  // Release memory of tokens.
+  // Release memory.
   for (auto tok : tokens) {
     if (tok.type == Token::Ident)
       delete[] tok.vs;
   }
+
+  for (auto [name, constVal] : symbols)
+    constVal.release();
 
   return unit;
 }

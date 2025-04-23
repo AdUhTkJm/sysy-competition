@@ -15,7 +15,6 @@ public:
 };
 
 // Moves all alloca to the beginning.
-// Operates on flattened CFG.
 class MoveAlloca : public Pass {
 public:
   MoveAlloca(ModuleOp *module): Pass(module) {}

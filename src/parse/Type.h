@@ -64,13 +64,10 @@ class ASTNode;
 class ArrayType : public TypeImpl<ArrayType, __LINE__> {
 public:
   Type *base;
-  // We will fold them.
-  std::vector<ASTNode*> dimExprs;
-
   std::vector<int> dims;
 
-  ArrayType(Type *base, std::vector<ASTNode*> dimExprs):
-    base(base), dimExprs(dimExprs) {}
+  ArrayType(Type *base, std::vector<int> dims):
+    base(base), dims(dims) {}
 
   std::string toString() const override;
 };

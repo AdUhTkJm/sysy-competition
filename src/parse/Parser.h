@@ -2,6 +2,7 @@
 #define PARSER_H
 
 #include <iostream>
+#include <map>
 #include <vector>
 #include <cassert>
 
@@ -11,32 +12,56 @@
 
 namespace sys {
 
+// A compile-time integer constant, used when early-folding array dimensions.
+// Only integer is allowed, as the language specifies.
+class ConstValue {
+  union {
+    int *vi;
+    float *vf;
+  };
+  std::vector<int> dims;
+public:
+  ConstValue() {}
+  ConstValue(int *vi, const std::vector<int> &dims): vi(vi), dims(dims) {}
+
+  ConstValue operator[](int i);
+  int getInt() { assert(!dims.size()); return *vi; }
+  float getFloat() { assert(!dims.size()); return *vf; }
+
+  int size();
+  int stride();
+
+  // Copies a new memory. Doesn't release the original one.
+  int *getRaw();
+  float *getRawFloat();
+
+  // Note that we don't use a destructor,
+  // because the Parser object will live till end of program.
+  void release();
+};
+
 class Parser {
+  using SymbolTable = std::map<std::string, ConstValue>;
+  SymbolTable symbols;
+
+  class SemanticScope {
+    Parser &parser;
+    SymbolTable symbols;
+  public:
+    SemanticScope(Parser &parser): parser(parser), symbols(parser.symbols) {};
+    ~SemanticScope() { parser.symbols = symbols; }
+  };
+
   std::vector<Token> tokens;
   size_t loc;
   TypeContext &ctx;
 
-  Token last() {
-    if (loc - 1 >= tokens.size())
-      return Token::End;
-    return tokens[loc - 1];
-  }
-
-  Token peek() {
-    if (loc >= tokens.size())
-      return Token::End;
-    return tokens[loc];
-  }
-
-  Token consume() {
-    if (loc >= tokens.size())
-      return Token::End;
-    return tokens[loc++];
-  }
+  Token last();
+  Token peek();
+  Token consume();
   
-  bool peek(Token::Type t) {
-    return peek().type == t;
-  }
+  bool peek(Token::Type t);
+  Token expect(Token::Type t);
 
   template<class... Rest>
   bool peek(Token::Type t, Rest... ts) {
@@ -52,16 +77,11 @@ class Parser {
     return false;
   }
 
-  Token expect(Token::Type t) {
-    if (!test(t)) {
-      std::cerr << "expected " << t << ", but got " << peek().type << "\n";
-      assert(false);
-    }
-    return last();
-  }
-
   // Parses only void, int and float.
   Type *parseSimpleType();
+
+  // Const-fold the node.
+  ConstValue earlyFold(ASTNode *node);
 
   ASTNode *primary();
   ASTNode *mul();
@@ -76,6 +96,8 @@ class Parser {
   TransparentBlockNode *varDecl();
   FnDeclNode *fnDecl();
   BlockNode *compUnit();
+
+  ConstValue getArrayInit(const std::vector<int> &dims);
 
 public:
   Parser(const std::string &input, TypeContext &ctx);

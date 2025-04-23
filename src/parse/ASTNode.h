@@ -177,6 +177,32 @@ public:
   std::string toString() const;
 };
 
+class ConstArrayNode : public ASTNodeImpl<ConstArrayNode, __LINE__> {
+public:
+  union {
+    int *vi;
+    float *vf;
+  };
+
+  ConstArrayNode(int *vi): vi(vi) {}
+  ConstArrayNode(float *vf): vf(vf) {}
+
+  void walk(ASTWalker walker);
+  std::string toString() const;
+};
+
+class ArrayAccessNode : public ASTNodeImpl<ArrayAccessNode, __LINE__> {
+public:
+  ASTNode *array;
+  ASTNode *index;
+
+  ArrayAccessNode(ASTNode *array, ASTNode *index):
+    array(array), index(index) {}
+  
+  void walk(ASTWalker walker);
+  std::string toString() const;
+};
+
 };
 
 #endif
