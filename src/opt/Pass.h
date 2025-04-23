@@ -3,21 +3,30 @@
 
 #include <map>
 #include <string>
+#include <type_traits>
 #include <vector>
+#include <iostream>
 
 #include "../codegen/Ops.h"
 
 namespace sys {
 
 class Pass {
+  template<typename F, typename Ret, typename A>
+  static A helper(Ret (F::*)(A) const);
+
+  template<class F>
+  using argument_t = decltype(helper(&F::operator()));
 protected:
   ModuleOp *module;
 
-  template<class T>
-  void runRewriter(T rewriter) {
-    auto ts = module->findAll<T>();
+  template<class F>
+  void runRewriter(F rewriter) {
+    using T = std::remove_pointer_t<argument_t<F>>;
+    
     bool success;
     do {
+      auto ts = module->findAll<T>();
       success = false;
       for (auto t : ts)
         success |= rewriter(t);

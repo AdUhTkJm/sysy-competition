@@ -102,6 +102,19 @@ BasicBlock *Op::createFirstBlock() {
   return regions[0]->appendBlock();
 }
 
+void Op::replaceAllUsesWith(Op *other) {
+  for (auto use : uses) {
+    for (auto &operand : use->operands) {
+      if (operand.defining != this)
+        continue;
+
+      operand.defining = other;
+      other->uses.insert(use);
+    }
+  }
+  uses.clear();
+}
+
 static std::map<Op*, int> valueName = {};
 static int id = 0;
 

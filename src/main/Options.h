@@ -13,6 +13,8 @@ struct Options {
     option noLink : 1;
     option dumpMidIR : 1;
     option o1 : 1;
+    option arm : 1;
+    option rv : 1;
   };
 
   std::string inputFile;

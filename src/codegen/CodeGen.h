@@ -58,6 +58,43 @@ public:
     bb->insert(at, op);
     return op;
   }
+
+  // Similarly 4 more, replacing `op` with the newly constructed one.
+  template<class T>
+  T *replace(Op *op, const std::vector<Value> &v) {
+    setBeforeOp(op);
+    auto opnew = create<T>(v);
+    op->replaceAllUsesWith(opnew);
+    op->erase();
+    return opnew;
+  }
+
+  template<class T>
+  T *replace(Op *op) {
+    setBeforeOp(op);
+    auto opnew = create<T>();
+    op->replaceAllUsesWith(opnew);
+    op->erase();
+    return opnew;
+  }
+
+  template<class T>
+  T *replace(Op *op, const std::vector<Attr*> &v) {
+    setBeforeOp(op);
+    auto opnew = create<T>(v);
+    op->replaceAllUsesWith(opnew);
+    op->erase();
+    return opnew;
+  }
+
+  template<class T>
+  T *replace(Op *op, const std::vector<Value> &v, const std::vector<Attr*> &v2) {
+    setBeforeOp(op);
+    auto opnew = create<T>(v, v2);
+    op->replaceAllUsesWith(opnew);
+    op->erase();
+    return opnew;
+  }
 };
 
 class CodeGen {

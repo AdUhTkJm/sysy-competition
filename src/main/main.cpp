@@ -2,12 +2,32 @@
 #include "../parse/Sema.h"
 #include "../codegen/CodeGen.h"
 #include "../opt/Passes.h"
+#include "../arm/ArmPasses.h"
+#include "../rv/RvPasses.h"
 #include "Options.h"
 #include <fstream>
 #include <sstream>
 
-void initPipeline(sys::PassManager &pm) {
+void initArmPipeline(sys::PassManager &pm) {
+  using namespace sys::arm;
+
+  pm.addPass<Lower>();
+}
+
+void initRvPipeline(sys::PassManager &pm) {
+  using namespace sys::rv;
+
+  pm.addPass<Lower>();
+}
+
+void initPipeline(sys::PassManager &pm, const sys::Options &opts) {
   pm.addPass<sys::FlattenCFG>();
+
+  if (opts.arm)
+    initArmPipeline(pm);
+
+  if (opts.rv)
+    initRvPipeline(pm);
 }
 
 int main(int argc, char **argv) {
@@ -34,7 +54,7 @@ int main(int argc, char **argv) {
     cg.getModule()->dump(std::cerr);
 
   sys::PassManager pm(cg.getModule());
-  initPipeline(pm);
+  initPipeline(pm, opts);
   pm.run();
   pm.getModule()->dump(std::cerr);
   return 0;

@@ -9,6 +9,8 @@ Options::Options() {
   dumpAST = false;
   dumpMidIR = false;
   o1 = false;
+  arm = false;
+  rv = false;
 }
 
 Options sys::parseArgs(int argc, char **argv) {
@@ -31,6 +33,16 @@ Options sys::parseArgs(int argc, char **argv) {
       continue;
     }
 
+    if (strcmp(argv[i], "--rv") == 0) {
+      opts.rv = true;
+      continue;
+    }
+
+    if (strcmp(argv[i], "--arm") == 0) {
+      opts.arm = true;
+      continue;
+    }
+
     if (strcmp(argv[i], "-O1") == 0) {
       opts.o1 = true;
       continue;
@@ -42,12 +54,21 @@ Options sys::parseArgs(int argc, char **argv) {
     }
 
     if (opts.inputFile != "") {
-      std::cerr << "error: multiple inputs";
+      std::cerr << "error: multiple inputs\n";
       exit(1);
     }
 
     opts.inputFile = argv[i];
   }
+
+  if (opts.rv && opts.arm) {
+    std::cerr << "error: multiple target\n";
+    exit(1);
+  }
+
+  // Default to RISC-V.
+  if (!opts.rv && !opts.arm)
+    opts.rv = true;
 
   return opts;
 }

@@ -5,6 +5,7 @@ import subprocess as proc;
 parser = argparse.ArgumentParser()
 parser.add_argument("-g", "--gdb", action="store_true")
 parser.add_argument("-r", "--dump-mid-ir", action="store_true")
+parser.add_argument("--arm", action="store_true")
 parser.add_argument("-t", "--test", type=str)
 
 args = parser.parse_args()
@@ -16,4 +17,6 @@ if args.test:
     command = ["gdb", "--args", *command]
   if args.dump_mid_ir:
     command.append("--dump-mid-ir")
+  if args.arm:
+    command.append("--arm")
   proc.run(command, check=True)
