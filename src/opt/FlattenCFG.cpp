@@ -1,7 +1,7 @@
 #include "Passes.h"
 #include "../codegen/CodeGen.h"
 #include "../codegen/Attrs.h"
-#include <iostream>
+#include <vector>
 
 using namespace sys;
 
@@ -97,12 +97,68 @@ void handleWhile(WhileOp *x) {
   x->erase();
 }
 
+bool isTerminator(Op *op) {
+  return isa<BranchOp>(op) || isa<GotoOp>(op) || isa<ReturnOp>(op);
+}
+
+void tidy(FuncOp *func) {
+  Builder builder;
+  auto body = func->getRegion();
+
+  // Get a terminator for basic blocks.
+  for (auto it = body->begin(); it != body->end(); ++it) {
+    auto bb = *it;
+    auto next = it; ++next;
+    if (bb->getOps().size() == 0 || !isTerminator(bb->getLastOp())) {
+      builder.setToBlockEnd(bb);
+      builder.create<GotoOp>({ new TargetAttr(*next) });
+    }
+  }
+
+  body->updatePreds();
+
+  // If a basic block has only a single terminator, try to inline it.
+  std::map<BasicBlock*, BasicBlock*> inliner;
+  for (auto bb : body->getBlocks()) {
+    if (bb->getOps().size() != 1 || !isa<GotoOp>(bb->getLastOp()))
+      continue;
+
+    auto last = bb->getLastOp();
+    auto target = last->getAttr<TargetAttr>();
+    inliner[bb] = target->bb;
+  }
+
+  // Apply inliner.
+  auto update = [&](BasicBlock *&from) {
+    while (inliner.count(from))
+      from = inliner[from];
+  };
+
+  for (auto bb : body->getBlocks()) {
+    auto last = bb->getLastOp();
+    if (last->hasAttr<TargetAttr>()) {
+      auto target = last->getAttr<TargetAttr>();
+      update(target->bb);
+    }
+
+    if (last->hasAttr<ElseAttr>()) {
+      auto ifnot = last->getAttr<ElseAttr>();
+      update(ifnot->bb);
+    }
+  }
+
+  // Recalculate preds after change.
+  body->updatePreds();
+
+  // Remove empty blocks.
+  for (auto [k, v] : inliner)
+    k->erase();
+}
+
 void FlattenCFG::run() {
   auto ifs = module->findAll<IfOp>();
   for (auto x : ifs)
     handleIf(x);
-
-  module->dump(std::cerr);
   
   auto whiles = module->findAll<WhileOp>();
   for (auto x : whiles)
@@ -113,4 +169,7 @@ void FlattenCFG::run() {
   //    1) all basic blocks must have a terminator;
   //    2) empty basic blocks are eliminated;
   //    3) calculate `pred`.
+  auto functions = module->findAll<FuncOp>();
+  for (auto x : functions)
+    tidy(x);
 }

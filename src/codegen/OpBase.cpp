@@ -171,6 +171,13 @@ void BasicBlock::moveToEnd(Region *region) {
   parent->insert(parent->end(), this);
 }
 
+void BasicBlock::erase() {
+  assert(preds.size() == 0);
+  
+  parent->remove(place);
+  delete this;
+}
+
 BasicBlock *Region::insert(BasicBlock *at) {
   assert(at->parent == this);
 
@@ -236,6 +243,24 @@ std::pair<BasicBlock*, BasicBlock*> Region::moveTo(BasicBlock *bb) {
   }
 
   return result;
+}
+
+void Region::updatePreds() {
+  for (auto bb : bbs)
+    bb->preds.clear();
+
+  for (auto bb : bbs) {
+    auto last = bb->getLastOp();
+    if (last->hasAttr<TargetAttr>()) {
+      auto target = last->getAttr<TargetAttr>();
+      target->bb->preds.insert(bb);
+    }
+
+    if (last->hasAttr<ElseAttr>()) {
+      auto ifnot = last->getAttr<ElseAttr>();
+      ifnot->bb->preds.insert(bb);
+    }
+  }
 }
 
 void Region::dump(std::ostream &os, int depth) {

@@ -42,6 +42,9 @@ public:
   void insertAfter(iterator at, BasicBlock *bb);
   void remove(iterator at);
 
+  // Updates `preds` for every basic block inside this region. 
+  void updatePreds();
+
   // Moves all blocks in `from` after `insertionPoint`.
   // Returns the first and final block.
   std::pair<BasicBlock*, BasicBlock*> moveTo(BasicBlock *insertionPoint);
@@ -58,6 +61,9 @@ class BasicBlock {
   friend class Op;
   
 public:
+  // Available for modification.
+  std::set<BasicBlock*> preds;
+
   using iterator = decltype(ops)::iterator;
 
   BasicBlock(Region *parent, Region::iterator place):
@@ -87,6 +93,8 @@ public:
   void moveBefore(BasicBlock *bb);
   void moveAfter(BasicBlock *bb);
   void moveToEnd(Region *region);
+
+  void erase();
 };
 
 class Value {
@@ -155,11 +163,19 @@ public:
   void moveToEnd(BasicBlock *block);
 
   template<class T>
-  bool has(T attr) {
+  bool hasAttr() {
     for (auto x : attrs)
       if (isa<T>(x))
         return true;
     return false;
+  }
+
+  template<class T>
+  T *getAttr() {
+    for (auto x : attrs)
+      if (isa<T>(x))
+        return cast<T>(x);
+    assert(false);
   }
 
   template<class T, class... Args>
