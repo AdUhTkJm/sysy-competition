@@ -11,6 +11,8 @@ struct Options {
   struct {
     option dumpAST : 1;
     option noLink : 1;
+    option dumpMidIR : 1;
+    option o1 : 1;
   };
 
   std::string inputFile;

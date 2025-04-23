@@ -30,7 +30,8 @@ int main(int argc, char **argv) {
   sys::Sema sema(node, ctx);
 
   sys::CodeGen cg(node);
-  cg.getModule()->dump(std::cerr);
+  if (opts.dumpMidIR)
+    cg.getModule()->dump(std::cerr);
 
   sys::PassManager pm(cg.getModule());
   initPipeline(pm);

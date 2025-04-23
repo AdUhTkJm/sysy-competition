@@ -7,6 +7,8 @@ using namespace sys;
 Options::Options() {
   noLink = false;
   dumpAST = false;
+  dumpMidIR = false;
+  o1 = false;
 }
 
 Options sys::parseArgs(int argc, char **argv) {
@@ -24,6 +26,16 @@ Options sys::parseArgs(int argc, char **argv) {
       continue;
     }
 
+    if (strcmp(argv[i], "--dump-mid-ir") == 0) {
+      opts.dumpMidIR = true;
+      continue;
+    }
+
+    if (strcmp(argv[i], "-O1") == 0) {
+      opts.o1 = true;
+      continue;
+    }
+
     if (strcmp(argv[i], "-S") == 0) {
       opts.noLink = true;
       continue;
@@ -35,7 +47,6 @@ Options sys::parseArgs(int argc, char **argv) {
     }
 
     opts.inputFile = argv[i];
-    i++;
   }
 
   return opts;
