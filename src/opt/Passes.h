@@ -14,6 +14,17 @@ public:
   void run();
 };
 
+// Moves all alloca to the beginning.
+// Operates on flattened CFG.
+class MoveAlloca : public Pass {
+public:
+  MoveAlloca(ModuleOp *module): Pass(module) {}
+    
+  std::string name() { return "move-alloca"; };
+  std::map<std::string, int> stats() { return {}; };
+  void run();
+};
+
 }
 
 #endif

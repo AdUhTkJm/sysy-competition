@@ -22,6 +22,7 @@ void initRvPipeline(sys::PassManager &pm) {
 
 void initPipeline(sys::PassManager &pm, const sys::Options &opts) {
   pm.addPass<sys::FlattenCFG>();
+  pm.addPass<sys::MoveAlloca>();
 
   if (opts.arm)
     initArmPipeline(pm);

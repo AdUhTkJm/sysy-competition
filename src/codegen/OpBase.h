@@ -137,6 +137,7 @@ public:
   int getID() const { return id; }
   const std::string &getName() { return opname; }
   BasicBlock *getParent() { return parent; }
+  Op *getParentOp();
 
   const auto &getUses() const { return uses; }
   const auto &getRegions() const { return regions; }

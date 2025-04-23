@@ -59,6 +59,12 @@ Region *Op::appendRegion() {
   return region;
 }
 
+Op *Op::getParentOp() {
+  auto bb = parent;
+  auto region = bb->parent;
+  return region->getParent();
+}
+
 void Op::setName(std::string name) {
   // Remove the final 'Op'
   name.pop_back();
