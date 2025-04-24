@@ -29,6 +29,7 @@ namespace rv {
 
 RVOP(LiOp);
 RVOP(AddOp);
+RVOP(AddiOp);
 RVOP(SubOp);
 RVOP(MulOp);
 RVOP(DivOp); // Signed; divu for unsigned.
@@ -38,6 +39,7 @@ RVOP(BltOp);
 RVOP(BgeOp);
 RVOP(BnezOp);
 RVOP(JOp);
+RVOP(MvOp);
 RVOP(RetOp);
 RVOP(LoadOp);
 RVOP(StoreOp);

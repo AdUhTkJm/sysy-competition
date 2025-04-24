@@ -193,6 +193,16 @@ public:
   std::string toString() const;
 };
 
+class LocalArrayNode : public ASTNodeImpl<LocalArrayNode, __LINE__> {
+public:
+  ASTNode **va;
+
+  LocalArrayNode(ASTNode **va): va(va) {}
+  
+  void walk(ASTWalker walker);
+  std::string toString() const;
+};
+
 class ArrayAccessNode : public ASTNodeImpl<ArrayAccessNode, __LINE__> {
 public:
   ASTNode *array;

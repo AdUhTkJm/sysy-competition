@@ -7,7 +7,7 @@ namespace sys {
 
 namespace arm {
 
-struct Lower : public Pass {
+class Lower : public Pass {
 public:
   Lower(ModuleOp *module): Pass(module) {}
   

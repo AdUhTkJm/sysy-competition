@@ -70,6 +70,33 @@ public:
   std::string toString() { return "<reg = " + showReg(reg) + ">"; }
 };
 
+class RdAttr : public AttrImpl<RegAttr, RVLINE> {
+public:
+  Reg reg;
+
+  RdAttr(Reg reg): reg(reg) {}
+
+  std::string toString() { return "<rd = " + showReg(reg) + ">"; }
+};
+
+class RsAttr : public AttrImpl<RegAttr, RVLINE> {
+public:
+  Reg reg;
+
+  RsAttr(Reg reg): reg(reg) {}
+
+  std::string toString() { return "<rs = " + showReg(reg) + ">"; }
+};
+
+class Rs2Attr : public AttrImpl<RegAttr, RVLINE> {
+public:
+  Reg reg;
+
+  Rs2Attr(Reg reg): reg(reg) {}
+
+  std::string toString() { return "<rs2 = " + showReg(reg) + ">"; }
+};
+
 class OffsetAttr : public AttrImpl<OffsetAttr, RVLINE> {
 public:
   int offset;

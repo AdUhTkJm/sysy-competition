@@ -23,6 +23,7 @@ class ConstValue {
 public:
   ConstValue() {}
   ConstValue(int *vi, const std::vector<int> &dims): vi(vi), dims(dims) {}
+  ConstValue(float *vf, const std::vector<int> &dims): vf(vf), dims(dims) {}
 
   ConstValue operator[](int i);
   int getInt() { assert(!dims.size()); return *vi; }
@@ -100,7 +101,9 @@ class Parser {
   FnDeclNode *fnDecl();
   BlockNode *compUnit();
 
-  ConstValue getArrayInit(const std::vector<int> &dims);
+  // Global array is guaranteed to be constexpr, so we return a list of int/floats.
+  // Local array isn't; so we return a list of ASTNodes.
+  void *getArrayInit(const std::vector<int> &dims, bool expectFloat, bool doFold);
 
 public:
   Parser(const std::string &input, TypeContext &ctx);

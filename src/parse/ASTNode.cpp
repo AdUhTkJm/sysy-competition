@@ -146,6 +146,14 @@ TOSTR(ConstArrayNode) {
   return "const-array";
 }
 
+WALK(LocalArrayNode) {
+  walker(this);
+}
+
+TOSTR(LocalArrayNode) {
+  return "local-array";
+}
+
 WALK(ArrayAccessNode) {
   walker(this);
   array->walk(walker);

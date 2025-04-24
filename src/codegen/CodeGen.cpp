@@ -153,7 +153,7 @@ void CodeGen::emit(ASTNode *node) {
   }
 
   if (auto vardecl = dyn_cast<VarDeclNode>(node)) {
-    if (vardecl->global || !vardecl->mut) {
+    if (vardecl->global) {
       int *value = vardecl->init ? cast<ConstArrayNode>(vardecl->init)->vi : new int(0);
       auto size = 1;
       if (auto arrayTy = dyn_cast<ArrayType>(vardecl->type))
@@ -174,22 +174,20 @@ void CodeGen::emit(ASTNode *node) {
     symbols[vardecl->name] = addr;
     if (vardecl->init) {
       // This is a local variable with array initializer.
-      // We create a global array and copy it to the variable.
-      if (auto arr = dyn_cast<ConstArrayNode>(vardecl->init)) {
-        auto arrSize = cast<ArrayType>(vardecl->type)->getSize();
-        auto typeSize = getSize(vardecl->type);
-        Op *global;
-        {
-          Builder::Guard guard(builder);
-          builder.setToRegionStart(module->getRegion());
-          global = builder.create<GlobalOp>({
-            new SizeAttr(typeSize),
-            new IntArrayAttr(arr->vi, arrSize)
-          });
+      // We manually load everything into the array.
+      if (auto arr = dyn_cast<LocalArrayNode>(vardecl->init)) {
+        auto arrTy = cast<ArrayType>(vardecl->type);
+        auto arrSize = arrTy->getSize();
+        auto baseSize = getSize(arrTy->base);
+        for (int i = 0; i < arrSize; i++) {
+          Value value = arr->va[i]
+            ? emitExpr(arr->va[i])
+            : builder.create<IntOp>({ new IntAttr(0) });
+
+          auto offset =  builder.create<IntOp>({ new IntAttr(baseSize * i) });
+          auto place = builder.create<AddIOp>({ addr, offset });
+          builder.create<StoreOp>({ value, place });
         }
-        builder.create<MemcpyOp>({ /*dst=*/addr, /*src=*/global }, {
-          new SizeAttr(typeSize)
-        });
         return;
       }
 

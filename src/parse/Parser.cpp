@@ -103,7 +103,7 @@ switch (consume().type) {
   }
 }
 
-ConstValue Parser::getArrayInit(const std::vector<int> &dims) {
+void *Parser::getArrayInit(const std::vector<int> &dims, bool expectFloat, bool doFold) {
   auto carry = [&](std::vector<int> &x) {
     for (int i = (int) x.size() - 1; i >= 1; i--) {
       if (x[i] >= dims[i]) {
@@ -128,7 +128,9 @@ ConstValue Parser::getArrayInit(const std::vector<int> &dims) {
   int size = 1;
   for (auto x : dims)
     size *= x;
-  int *vi = new int[size];
+  void *vi = !doFold
+    ? (void*) new ASTNode*[size]
+    : expectFloat ? (void*) new float[size] : new int[size];
   memset(vi, 0, size * sizeof(int));
 
   // add 1 to `place[addAt]` when we meet the next `}`.
@@ -154,14 +156,22 @@ ConstValue Parser::getArrayInit(const std::vector<int> &dims) {
       continue;
     }
 
-    // Automatically carry.
-    vi[offset(place)] = earlyFold(expr()).getInt();
+    if (!doFold)
+      ((ASTNode**) vi)[offset(place)] = expr();
+    else if (expectFloat)
+        ((float*) vi)[offset(place)] = earlyFold(expr()).getFloat();
+    else
+      ((int*) vi)[offset(place)] = earlyFold(expr()).getInt();
+
     place[place.size() - 1]++;
+
+    // Automatically carry.
     carry(place);
     if (!test(Token::Comma) && !peek(Token::RBrace))
       expect(Token::RBrace);
   } while (addAt != dims.size());
-  return ConstValue(vi, dims);
+
+  return vi;
 }
 
 ASTNode *Parser::primary() {
@@ -358,9 +368,16 @@ TransparentBlockNode *Parser::varDecl(bool global) {
     ASTNode *init = nullptr;
     if (test(Token::Assign)) {
       if (isa<ArrayType>(ty)) {
+        bool isFloat = isa<FloatType>(base);
+        auto arrayInit = getArrayInit(dims, isFloat, global);
+        init = !global
+          ? (ASTNode*) new LocalArrayNode((ASTNode **) arrayInit)
+          : isFloat
+            ? new ConstArrayNode((float*) arrayInit)
+            : new ConstArrayNode((int*) arrayInit);
+        
         // We can never infer the real type of ConstArrayNode in Sema.
         // Must place it here.
-        init = new ConstArrayNode(getArrayInit(dims).getRaw());
         init->type = ty;
       } else init = expr();
     }

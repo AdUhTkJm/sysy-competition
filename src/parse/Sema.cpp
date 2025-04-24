@@ -111,9 +111,9 @@ Type *Sema::infer(ASTNode *node) {
     return node->type = ctx.create<VoidType>();
   }
 
-  if (auto arr = dyn_cast<ConstArrayNode>(node)) {
-    assert(arr->type);
-    return arr->type;
+  if (isa<ConstArrayNode>(node) || isa<LocalArrayNode>(node)) {
+    assert(node->type);
+    return node->type;
   }
 
   if (auto call = dyn_cast<CallNode>(node)) {

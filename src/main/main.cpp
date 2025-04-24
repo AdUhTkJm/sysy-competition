@@ -18,6 +18,7 @@ void initRvPipeline(sys::PassManager &pm) {
   using namespace sys::rv;
 
   pm.addPass<Lower>();
+  pm.addPass<InstCombine>();
 }
 
 void initPipeline(sys::PassManager &pm, const sys::Options &opts) {

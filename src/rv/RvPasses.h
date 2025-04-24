@@ -7,7 +7,7 @@ namespace sys {
 
 namespace rv {
 
-struct Lower : public Pass {
+class Lower : public Pass {
 public:
   Lower(ModuleOp *module): Pass(module) {}
   
@@ -16,7 +16,17 @@ public:
   void run();
 };
 
-struct RegAlloc : public Pass {
+class InstCombine : public Pass {
+  int combined = 0;
+public:
+  InstCombine(ModuleOp *module): Pass(module) {}
+
+  std::string name() { return "rv-inst-combine"; };
+  std::map<std::string, int> stats();
+  void run();
+};
+
+class RegAlloc : public Pass {
   int spilled = 0;
 public:
   RegAlloc(ModuleOp *module): Pass(module) {}
