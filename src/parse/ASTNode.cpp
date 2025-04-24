@@ -14,6 +14,14 @@ TOSTR(IntNode) {
   return std::to_string(value);
 }
 
+WALK(FloatNode) {
+  walker(this);
+}
+
+TOSTR(FloatNode) {
+  return std::to_string(value);
+}
+
 WALK(BlockNode) {
   walker(this);
   for (auto x : nodes)

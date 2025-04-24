@@ -110,13 +110,24 @@ CodeGen 生成的代码依旧有不正确之处。在运行其他 Pass 之前，
 
 **Pureness**
 
-给所有不纯（有副作用）的 Op 打上 `ImpureAttr`。这个分析较为细致，并不会认为所有的 CallOp 都不纯；它会在 call graph 上传播是否有副作用的信息，以分析函数是否是纯的。
+给所有不纯（有副作用，或会被其它的副作用影响）的 Op 打上 `ImpureAttr`。同时，分析函数是否是纯函数。
+
+在 SysY 中，由于不存在二级指针，一个函数不纯意味着以下三种情况之一：
+- 它访问了全局变量（读/写都算）；
+- 它修改了指针类型的参数所指向的值；
+- 它调用了另一个不纯的函数。
+
+遍历所有的 GlobalOp 即可检查第一点，而通过对 GetArgOp 的分析可以检查第二点。
+
+至于第三点，这个 pass 会在 call graph 上传播是否有副作用的信息。它也会据此决定 CallOp 纯不纯。
 
 ### 优化 Pass
 
 **DCE**
 
-死代码删除。所有 `uses` 为空的，而且没有被标记为 `<impure>` 的 Op 都会被删除。这包括一些具有 Region 的 Op，例如 `IfOp`。
+死代码删除。所有 `getUses()` 为空的，而且没有被标记为 `<impure>` 的 Op 都会被删除。这包括一些具有 Region 的 Op，例如 `IfOp`。
+
+这个 pass 会被反复调用，不论是在 CodeGen 刚结束的时候，还是 FlattenCFG 后，还是后端中。
 
 **Mem2Reg**
 
@@ -131,3 +142,26 @@ CodeGen 生成的代码依旧有不正确之处。在运行其他 Pass 之前，
 展平控制流。将 IfOp 和 WhileOp 展开，变为 Goto, Branch 和基本块。这类似于 MLIR 的 `scf` 到 `cf` 的转换。
 
 在这个 Pass 结束后，除了 `module` 和 `func` 外的 Region 彻底消失，每个基本块都相互独立，可以随意移动了。
+
+## RISC-V 后端
+
+值得注意的是，后端依然与 IR 共用一套 Op 系统。这说明了 Op 设计的灵活性。
+
+**Lower**
+
+类似 LLVM 中的 legalization。将 IR 转化为汇编指令。
+
+**InstCombine**
+
+合并指令。被合并的指令包括：
+- li + add => addi
+
+**RegAlloc**
+
+寄存器分配。这里所有 Op 的操作数都被移除，取而代之的是一系列属性。例如对于操作 `%1 = rv.add %2 %3`, 在这个 pass 执行完毕后可能会转变为：
+
+```
+rv.add <rd = a0> <rs = a1> <rs2 = a2>
+```
+
+这也就意味着 use-def chain 破裂，大部分优化手段都无法再使用。

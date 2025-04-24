@@ -131,7 +131,7 @@ void *Parser::getArrayInit(const std::vector<int> &dims, bool expectFloat, bool 
   void *vi = !doFold
     ? (void*) new ASTNode*[size]
     : expectFloat ? (void*) new float[size] : new int[size];
-  memset(vi, 0, size * sizeof(int));
+  memset(vi, 0, size * (doFold ? expectFloat ? sizeof(float) : sizeof(int) : sizeof(ASTNode*)));
 
   // add 1 to `place[addAt]` when we meet the next `}`.
   int addAt = dims.size();
@@ -177,6 +177,9 @@ void *Parser::getArrayInit(const std::vector<int> &dims, bool expectFloat, bool 
 ASTNode *Parser::primary() {
   if (peek(Token::LInt))
     return new IntNode(consume().vi);
+
+  if (peek(Token::LFloat))
+    return new FloatNode(consume().vf);
   
   if (test(Token::LPar)) {
     auto n = expr();

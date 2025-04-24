@@ -45,6 +45,16 @@ public:
   std::string toString() const;
 };
 
+class FloatNode : public ASTNodeImpl<FloatNode, __LINE__> {
+public:
+  float value;
+
+  FloatNode(float value): value(value) {}
+  
+  void walk(ASTWalker walker);
+  std::string toString() const;
+};
+
 class BlockNode : public ASTNodeImpl<BlockNode, __LINE__> {
 public:
   std::vector<ASTNode*> nodes;

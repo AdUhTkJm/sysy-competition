@@ -54,28 +54,55 @@ int CodeGen::getSize(Type *ty) {
 Value CodeGen::emitBinary(BinaryNode *node) {
   auto l = emitExpr(node->l);
   auto r = emitExpr(node->r);
-  switch (node->kind) {
-  case BinaryNode::Add:
-    return builder.create<AddIOp>({ l, r });
-  case BinaryNode::Sub:
-    return builder.create<SubIOp>({ l, r });
-  case BinaryNode::Mul:
-    return builder.create<MulIOp>({ l, r });
-  case BinaryNode::Div:
-    return builder.create<DivIOp>({ l, r });
-  case BinaryNode::Mod:
-    return builder.create<ModIOp>({ l, r });
-  case BinaryNode::Eq:
-    return builder.create<EqOp>({ l, r });
-  case BinaryNode::Ne:
-    return builder.create<NeOp>({ l, r });
-  case BinaryNode::Lt:
-    return builder.create<LtOp>({ l, r });
-  case BinaryNode::Le:
-    return builder.create<LeOp>({ l, r });
-  default:
-    std::cerr << "unsupported binary " << node->kind << "\n";
-    assert(false);
+  if (isa<IntType>(node->type)) {
+    switch (node->kind) {
+    case BinaryNode::Add:
+      return builder.create<AddIOp>({ l, r });
+    case BinaryNode::Sub:
+      return builder.create<SubIOp>({ l, r });
+    case BinaryNode::Mul:
+      return builder.create<MulIOp>({ l, r });
+    case BinaryNode::Div:
+      return builder.create<DivIOp>({ l, r });
+    case BinaryNode::Mod:
+      return builder.create<ModIOp>({ l, r });
+    case BinaryNode::Eq:
+      return builder.create<EqOp>({ l, r });
+    case BinaryNode::Ne:
+      return builder.create<NeOp>({ l, r });
+    case BinaryNode::Lt:
+      return builder.create<LtOp>({ l, r });
+    case BinaryNode::Le:
+      return builder.create<LeOp>({ l, r });
+    default:
+      std::cerr << "unsupported binary " << node->kind << "\n";
+      assert(false);
+    }
+  } else {
+    assert(isa<FloatType>(node->type));
+    switch (node->kind) {
+    case BinaryNode::Add:
+      return builder.create<AddFOp>({ l, r });
+    case BinaryNode::Sub:
+      return builder.create<SubFOp>({ l, r });
+    case BinaryNode::Mul:
+      return builder.create<MulFOp>({ l, r });
+    case BinaryNode::Div:
+      return builder.create<DivFOp>({ l, r });
+    case BinaryNode::Mod:
+      return builder.create<ModFOp>({ l, r });
+    case BinaryNode::Eq:
+      return builder.create<EqFOp>({ l, r });
+    case BinaryNode::Ne:
+      return builder.create<NeFOp>({ l, r });
+    case BinaryNode::Lt:
+      return builder.create<LtFOp>({ l, r });
+    case BinaryNode::Le:
+      return builder.create<LeFOp>({ l, r });
+    default:
+      std::cerr << "unsupported float binary " << node->kind << "\n";
+      assert(false);
+    }
   }
 }
 
@@ -83,10 +110,11 @@ Value CodeGen::emitExpr(ASTNode *node) {
   if (auto binary = dyn_cast<BinaryNode>(node))
     return emitBinary(binary);
 
-  if (auto lint = dyn_cast<IntNode>(node)) {
-    auto op = builder.create<IntOp>({ new IntAttr(lint->value) });
-    return op;
-  }
+  if (auto lint = dyn_cast<IntNode>(node))
+    return builder.create<IntOp>({ new IntAttr(lint->value) });
+
+  if (auto lfloat = dyn_cast<FloatNode>(node))
+    return builder.create<FloatOp>({ new FloatAttr(lfloat->value) });
 
   if (auto ref = dyn_cast<VarRefNode>(node)) {
     if (!symbols.count(ref->name)) {

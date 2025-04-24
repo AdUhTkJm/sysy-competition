@@ -40,6 +40,9 @@ Type *Sema::infer(ASTNode *node) {
 
   if (isa<IntNode>(node))
     return node->type = ctx.create<IntType>();
+
+  if (isa<FloatNode>(node))
+    return node->type = ctx.create<FloatType>();
   
   if (auto binary = dyn_cast<BinaryNode>(node)) {
     auto lty = infer(binary->l);

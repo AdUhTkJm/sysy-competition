@@ -24,6 +24,15 @@ public:
   std::string toString() { return "<" + std::to_string(value) + ">"; }
 };
 
+class FloatAttr : public AttrImpl<FloatAttr, __LINE__> {
+public:
+  float value;
+
+  FloatAttr(float value): value(value) {}
+
+  std::string toString() { return "<" + std::to_string(value) + "f>"; }
+};
+
 class SizeAttr : public AttrImpl<SizeAttr, __LINE__> {
 public:
   size_t value;
