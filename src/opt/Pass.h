@@ -43,9 +43,13 @@ public:
 class PassManager {
   std::vector<Pass*> passes;
   ModuleOp *module;
+
+  bool verbose;
 public:
   PassManager(ModuleOp *module): module(module) {}
   ~PassManager();
+
+  void setVerbose(bool verbose);
 
   void run();
   ModuleOp *getModule() { return module; }

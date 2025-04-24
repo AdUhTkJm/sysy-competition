@@ -23,6 +23,8 @@ void initRvPipeline(sys::PassManager &pm) {
 void initPipeline(sys::PassManager &pm, const sys::Options &opts) {
   pm.addPass<sys::MoveAlloca>();
   pm.addPass<sys::FlattenCFG>();
+  pm.addPass<sys::Mem2Reg>();
+  pm.addPass<sys::DCE>();
 
   if (opts.arm)
     initArmPipeline(pm);
@@ -55,6 +57,8 @@ int main(int argc, char **argv) {
     cg.getModule()->dump(std::cerr);
 
   sys::PassManager pm(cg.getModule());
+  pm.setVerbose(opts.verbose);
+  
   initPipeline(pm, opts);
   pm.run();
   pm.getModule()->dump(std::cerr);

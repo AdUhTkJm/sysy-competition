@@ -35,7 +35,7 @@ RVOP(DivOp); // Signed; divu for unsigned.
 RVOP(BneOp);
 RVOP(BeqOp);
 RVOP(BltOp);
-RVOP(BleOp);
+RVOP(BgeOp);
 RVOP(BnezOp);
 RVOP(JOp);
 RVOP(RetOp);

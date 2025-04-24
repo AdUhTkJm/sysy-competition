@@ -116,8 +116,11 @@ void Lower::run() {
       return true;
     }
 
+    // Note RISC-V only has `bge`. Switch operand order for this.
     if (isa<LeOp>(cond) && cond->getUses().size() == 1) {
-      builder.replace<BleOp>(op, cond->getOperands(), op->getAttrs());
+      auto v1 = cond->getOperand(0);
+      auto v2 = cond->getOperand(1);
+      builder.replace<BgeOp>(op, { v2, v1 }, op->getAttrs());
       cond->erase();
       return true;
     }

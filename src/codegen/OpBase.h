@@ -44,6 +44,8 @@ public:
 
   // Updates `preds` for every basic block inside this region. 
   void updatePreds();
+  // Updates `dominators` for every basic block inside this region.
+  void updateDoms();
 
   // Moves all blocks in `from` after `insertionPoint`.
   // Returns the first and final block.
@@ -56,14 +58,17 @@ class BasicBlock {
   std::list<Op*> ops;
   Region *parent;
   Region::iterator place;
+  std::set<BasicBlock*> preds;
+  // Note these are dominatORs, which mean `this` is dominatED by the elements.
+  std::set<BasicBlock*> doms;
+  // Dominance frontiers. `this` dominatES all blocks which are preds of the elements.
+  std::set<BasicBlock*> domFront;
+  BasicBlock *idom;
 
   friend class Region;
   friend class Op;
   
 public:
-  // Available for modification.
-  std::set<BasicBlock*> preds;
-
   using iterator = decltype(ops)::iterator;
 
   BasicBlock(Region *parent, Region::iterator place):
@@ -77,6 +82,12 @@ public:
   iterator end() { return ops.end(); }
 
   Region *getParent() { return parent; }
+
+  const auto &getPreds() { return preds; }
+  const auto &getDoms() { return doms; }
+  const auto &getDominanceFrontier() { return domFront; }
+  
+  BasicBlock *getIdom() { return idom; }
 
   // Inserts before `at`.
   void insert(iterator at, Op *op);

@@ -11,6 +11,7 @@ Options::Options() {
   o1 = false;
   arm = false;
   rv = false;
+  verbose = false;
 }
 
 Options sys::parseArgs(int argc, char **argv) {
@@ -50,6 +51,11 @@ Options sys::parseArgs(int argc, char **argv) {
 
     if (strcmp(argv[i], "-S") == 0) {
       opts.noLink = true;
+      continue;
+    }
+
+    if (strcmp(argv[i], "-v") == 0) {
+      opts.verbose = true;
       continue;
     }
 

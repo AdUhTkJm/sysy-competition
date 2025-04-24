@@ -1,6 +1,8 @@
 #include "OpBase.h"
 #include "Attrs.h"
+#include <algorithm>
 #include <cassert>
+#include <iterator>
 #include <map>
 #include <ostream>
 #include <sstream>
@@ -295,6 +297,78 @@ void Region::updatePreds() {
       ifnot->bb->preds.insert(bb);
     }
   }
+}
+
+// Use the simple data-flow approach, rather than the Tarjan one.
+// See https://en.wikipedia.org/wiki/Dominator_(graph_theory)
+void Region::updateDoms() {
+  updatePreds();
+  for (auto x : bbs)
+    std::copy(bbs.begin(), bbs.end(), std::inserter(x->doms, x->doms.end()));
+  
+  auto start = getFirstBlock();
+  start->doms.clear();
+  start->doms.insert(start);
+
+  bool changed;
+  do {
+    changed = false;
+    for (auto x : bbs) {
+      if (x == start)
+        continue;
+
+      std::set<BasicBlock*> result;
+      for (auto pred : x->preds) {
+        std::set<BasicBlock*> temp;
+        std::set_intersection(pred->doms.begin(), pred->doms.end(), result.begin(), result.end(),
+          std::inserter(temp, temp.end()));
+        result = temp;
+      }
+
+      x->doms = result;
+      x->doms.insert(x);
+    }
+  } while (changed);
+
+  // Update idom. The immediate dominator is the one that is dominated by all others.
+  for (auto bb : bbs) {
+    const auto &doms = bb->doms;
+    for (auto x : doms) {
+      bool dominated = true;
+      for (auto other : doms) {
+        if (other != x && !x->doms.count(other)) {
+          dominated = false;
+          break;
+        }
+      }
+
+      if (dominated) {
+        bb->idom = x;
+        break;
+      }
+    }
+  }
+
+  // Update dominance frontier.
+  for (auto bb : bbs)
+    bb->domFront.clear();
+
+  // See https://en.wikipedia.org/wiki/Static_single-assignment_form#Computing_minimal_SSA_using_dominance_frontiers
+  // For each block, if it has at least 2 preds, then it must be at dominance frontier of all its `preds`,
+  // till its `idom`.
+  for (auto bb : bbs) {
+    if (bb->preds.size() < 2)
+      continue;
+
+    for (auto pred : bb->preds) {
+      auto runner = pred;
+      while (runner != bb->idom) {
+        runner->domFront.insert(bb);
+        runner = runner->idom;
+      }
+    }
+  }
+
 }
 
 void Region::dump(std::ostream &os, int depth) {
