@@ -27,7 +27,7 @@ namespace sys {
 
 namespace rv {
 
-RVOP(MvOp);
+RVOP(LiOp);
 RVOP(AddOp);
 RVOP(SubOp);
 RVOP(MulOp);
@@ -36,8 +36,12 @@ RVOP(BneOp);
 RVOP(BeqOp);
 RVOP(BnezOp);
 RVOP(JOp);
+RVOP(RetOp);
 RVOP(LoadOp);
 RVOP(StoreOp);
+RVOP(SubSpOp); // Allocate stack space: sub sp, sp, <IntAttr>
+RVOP(ReadRegOp); // Read from real register
+RVOP(WriteRegOp); // Write to real register
 
 }
 

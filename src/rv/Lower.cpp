@@ -1,14 +1,71 @@
 #include "RvPasses.h"
 #include "RvOps.h"
+#include "RvAttrs.h"
 #include "../codegen/CodeGen.h"
+#include "../codegen/Attrs.h"
 
 using namespace sys::rv;
+using namespace sys;
+
+// Combines all alloca's into a SubSpOp.
+// Also rewrites load/stores with sp-offset.
+void rewriteAlloca(FuncOp *func) {
+  Builder builder;
+
+  auto region = func->getRegion();
+  auto block = region->getFirstBlock();
+
+  // If the first Op isn't alloca, then the whole function doesn't contain alloca.
+  // This is guaranteed by MoveAlloca pass.
+  if (!isa<AllocaOp>(block->getFirstOp()))
+    return;
+
+  // All alloca's are in the first block.
+  size_t offsetBp = 0; // Offset from base pointer (but we don't use base pointer)
+  size_t total = 0; // Total stack frame size
+  std::vector<AllocaOp*> allocas;
+  for (auto op : block->getOps()) {
+    if (!isa<AllocaOp>(op))
+      continue;
+
+    size_t size = op->getAttr<SizeAttr>()->value;
+    total += size;
+    allocas.push_back(cast<AllocaOp>(op));
+  }
+
+  for (auto op : allocas) {
+    // Offset from sp.
+    auto offset = offsetBp - total;
+
+    // Translate itself into `sp + offset`.
+    builder.setBeforeOp(op);
+    auto spValue = builder.create<ReadRegOp>({
+      new RegAttr(Regs::sp)
+    });
+
+    auto offsetValue = builder.create<LiOp>({
+      new IntAttr(offset)
+    });
+    auto add = builder.create<AddOp>({ spValue, offsetValue });
+    op->replaceAllUsesWith(add);
+
+    size_t size = op->getAttr<SizeAttr>()->value;
+    offsetBp += size;
+    op->erase();
+  }
+
+  // Allocate space equal to all allocas.
+  builder.setToBlockStart(block);
+  builder.create<SubSpOp>({
+    new IntAttr(total)
+  });
+}
 
 void Lower::run() {
   Builder builder;
 
   runRewriter([&](IntOp *op) {
-    builder.replace<MvOp>(op, op->getAttrs());
+    builder.replace<LiOp>(op, op->getAttrs());
     return true;
   });
 
@@ -67,5 +124,31 @@ void Lower::run() {
     builder.replace<JOp>(op, op->getAttrs());
     return true;
   });
-  
+
+  runRewriter([&](sys::LoadOp *op) {
+    builder.replace<sys::rv::LoadOp>(op, op->getOperands(), {
+      new OffsetAttr(0)
+    });
+    return true;
+  });
+
+  runRewriter([&](sys::StoreOp *op) {
+    builder.replace<sys::rv::StoreOp>(op, op->getOperands(), {
+      new OffsetAttr(0)
+    });
+    return true;
+  });
+
+  runRewriter([&](ReturnOp *op) {
+    builder.setBeforeOp(op);
+    builder.create<WriteRegOp>(op->getOperands(), {
+      new RegAttr(Regs::a0)
+    });
+    builder.replace<RetOp>(op);
+    return true;
+  });
+
+  auto funcs = module->findAll<FuncOp>();
+  for (auto func : funcs)
+    rewriteAlloca(func);
 }

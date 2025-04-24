@@ -111,6 +111,7 @@ public:
   int getID() const { return id; }
   Attr(int id): id(id) {}
   
+  virtual ~Attr() {}
   virtual std::string toString() = 0;
 };
 

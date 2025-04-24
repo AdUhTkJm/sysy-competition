@@ -111,6 +111,9 @@ void Op::erase() {
     auto op = x.defining;
     op->uses.erase(this);
   }
+
+  // We can't delete Attr* because they'll be referenced elsewhere.
+  // Memory leak? Who cares.
   delete this;
 }
 

@@ -1,7 +1,7 @@
-int a = 7;
 int count; // Automatically zeroed
 
 int main() {
+  int a = 7;
   while (a != 1) {
     count = count + 1;
     if (a % 2 == 0) {
