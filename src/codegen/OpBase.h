@@ -63,7 +63,7 @@ class BasicBlock {
   std::set<BasicBlock*> doms;
   // Dominance frontiers. `this` dominatES all blocks which are preds of the elements.
   std::set<BasicBlock*> domFront;
-  BasicBlock *idom;
+  BasicBlock *idom = nullptr;
 
   friend class Region;
   friend class Op;
@@ -159,6 +159,8 @@ public:
   Region *getRegion(int i = 0) { return regions[i]; }
   Value getOperand(int i = 0) { return operands[i]; }
 
+  void pushOperand(Value v) { operands.push_back(v); }
+
   Value getResult() const { return result; }
   operator Value() const { return result; }
 
@@ -211,6 +213,15 @@ public:
         }
 
     return result;
+  }
+
+  template<class T>
+  T *getParentOp() {
+    auto parent = getParentOp();
+    while (!isa<T>(parent))
+      parent = parent->getParentOp();
+
+    return cast<T>(parent);
   }
 };
 

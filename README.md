@@ -100,14 +100,20 @@ int main() {
 
 ### Passes
 
-Pass 分为三个部分：调整 CodeGen 生成的不正确代码的 (S)，用于将 IR 降低为更底层的 Op 的 (L)，以及优化的 (O)。这里的列举顺序就是执行顺序。
+这个编译器中的 Pass 可以分为四类：调整 CodeGen 生成的不正确代码的 (S)，用于将 IR 降低为更底层的 Op 的 (L)，分析的 (A)，以及优化的 (O)。这里的列举顺序不完全是执行顺序。
 
 **MoveAlloca** - S
 
 将函数里的所有 `alloca` 移到函数的最前方：不管原来这个 `alloca` 是处在 if 还是 while 中，它本来都应该只被执行一次。
+
+**Pureness** - A
+
+给所有不纯（有副作用）的 Op 打上 `ImpureAttr`。这个分析较为细致，并不会认为所有的 CallOp 都不纯；它会在 call graph 上传播是否有副作用的信息，以分析函数是否是纯的。
 
 **FlattenCFG** - L
 
 展平控制流。将 IfOp 和 WhileOp 展开，变为 Goto, Branch 和基本块。这类似于 MLIR 的 `scf` 到 `cf` 的转换。
 
 在这个 Pass 结束后，除了 `module` 和 `func` 外的 Region 彻底消失，每个基本块都相互独立，可以随意移动了。
+
+**Mem2Reg** - O

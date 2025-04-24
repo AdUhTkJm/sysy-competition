@@ -12,14 +12,20 @@ std::map<std::string, int> Mem2Reg::stats() {
 }
 
 // See explanation at https://longfangsong.github.io/en/mem2reg-made-simple/
+// FIXME: crash detected with valgrind
 void Mem2Reg::runImpl(FuncOp *func) {
   func->getRegion()->updateDoms();
+  converted.clear();
+  visited.clear();
+  symbols.clear();
+  phiFrom.clear();
 
   Builder builder;
 
   // We need to put PhiOp at places where a StoreOp doesn't dominate,
   // because it means at least 2 possible values.
   auto allocas = func->findAll<AllocaOp>();
+  std::copy(allocas.begin(), allocas.end(), std::inserter(converted, converted.end()));
   for (auto alloca : allocas) {
     bool good = true;
 
@@ -70,17 +76,14 @@ void Mem2Reg::fillPhi(BasicBlock *bb) {
 
     auto alloca = phiFrom[cast<PhiOp>(op)];
     
-    // Undefined behaviour in source program.
+    // Undefined behaviour in source program. Terminate.
     if (!symbols.count(alloca))
       assert(false);
 
     // We meet a PhiOp. This means the promoted register might hold value `symbols[alloca]` when it reaches here.
     // So this PhiOp should have that value as operand as well.
     auto value = symbols[alloca];
-    auto valuesBefore = op->getOperands();
-    valuesBefore.push_back(value);
-
-    builder.replace<PhiOp>(op, valuesBefore);
+    op->pushOperand(value);
   }
 
   if (visited.count(bb))
@@ -97,8 +100,10 @@ void Mem2Reg::fillPhi(BasicBlock *bb) {
     // Stores are now mutating symbol table.
     if (auto store = dyn_cast<StoreOp>(op)) {
       auto value = store->getOperand(0);
-      auto alloca = store->getOperand(1);
-      symbols[alloca.defining] = value;
+      auto alloca = store->getOperand(1).defining;
+      if (!converted.count(alloca))
+        continue;
+      symbols[alloca] = value;
 
       stores.push_back(store);
     }
@@ -117,8 +122,14 @@ void Mem2Reg::fillPhi(BasicBlock *bb) {
   }
 
   for (auto load : loads) {
-    auto value = symbols[load->getOperand().defining];
+    auto alloca = load->getOperand().defining;
+    // This is a global variable.
+    if (!converted.count(alloca))
+      continue;
+
+    auto value = symbols[alloca];
     load->replaceAllUsesWith(value.defining);
+    load->erase();
   }
 
   for (auto store : stores)

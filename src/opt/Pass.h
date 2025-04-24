@@ -32,6 +32,8 @@ protected:
         success |= rewriter(t);
     } while (success);
   }
+
+  FuncOp *findFunction(const std::string &name);
 public:
   Pass(ModuleOp *module): module(module) {}
   virtual ~Pass() {}
@@ -44,12 +46,14 @@ class PassManager {
   std::vector<Pass*> passes;
   ModuleOp *module;
 
-  bool verbose;
+  bool verbose = false;
+  bool print = false;
 public:
   PassManager(ModuleOp *module): module(module) {}
   ~PassManager();
 
   void setVerbose(bool verbose);
+  void setPrintStats(bool print);
 
   void run();
   ModuleOp *getModule() { return module; }

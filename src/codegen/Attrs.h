@@ -67,6 +67,11 @@ public:
   std::string toString();
 };
 
+class ImpureAttr : public AttrImpl<ImpureAttr, __LINE__> {
+public:
+  std::string toString() { return "<impure>"; }
+};
+
 }
 
 #endif

@@ -7,6 +7,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-g", "--gdb", action="store_true")
 parser.add_argument("-V", "--valgrind", action="store_true")
 parser.add_argument("-v", "--verbose", action="store_true")
+parser.add_argument("-s", "--stats", action="store_true")
 parser.add_argument("-r", "--dump-mid-ir", action="store_true")
 parser.add_argument("--arm", action="store_true")
 parser.add_argument("-a", "--test-all", action="store_true")
@@ -38,5 +39,7 @@ if args.test:
     command.append("--arm")
   if args.verbose:
     command.append("-v")
+  if args.stats:
+    command.append("--stats")
   
   proc.run(command, check=True)

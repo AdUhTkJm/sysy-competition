@@ -4,6 +4,12 @@
 
 using namespace sys;
 
+#define PARSEOPT(str, field) \
+  if (strcmp(argv[i], str) == 0) { \
+    opts.field = true; \
+    continue; \
+  }
+
 Options::Options() {
   noLink = false;
   dumpAST = false;
@@ -12,6 +18,7 @@ Options::Options() {
   arm = false;
   rv = false;
   verbose = false;
+  stats = false;
 }
 
 Options sys::parseArgs(int argc, char **argv) {
@@ -24,40 +31,14 @@ Options sys::parseArgs(int argc, char **argv) {
       continue;
     }
 
-    if (strcmp(argv[i], "--dump-ast") == 0) {
-      opts.dumpAST = true;
-      continue;
-    }
-
-    if (strcmp(argv[i], "--dump-mid-ir") == 0) {
-      opts.dumpMidIR = true;
-      continue;
-    }
-
-    if (strcmp(argv[i], "--rv") == 0) {
-      opts.rv = true;
-      continue;
-    }
-
-    if (strcmp(argv[i], "--arm") == 0) {
-      opts.arm = true;
-      continue;
-    }
-
-    if (strcmp(argv[i], "-O1") == 0) {
-      opts.o1 = true;
-      continue;
-    }
-
-    if (strcmp(argv[i], "-S") == 0) {
-      opts.noLink = true;
-      continue;
-    }
-
-    if (strcmp(argv[i], "-v") == 0) {
-      opts.verbose = true;
-      continue;
-    }
+    PARSEOPT("--dump-ast", dumpAST);
+    PARSEOPT("--dump-mid-ir", dumpMidIR);
+    PARSEOPT("--rv", rv);
+    PARSEOPT("--arm", arm);
+    PARSEOPT("--O1", o1);
+    PARSEOPT("-S", noLink);
+    PARSEOPT("-v", verbose);
+    PARSEOPT("--stats", stats);
 
     if (opts.inputFile != "") {
       std::cerr << "error: multiple inputs\n";

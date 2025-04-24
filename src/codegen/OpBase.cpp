@@ -4,7 +4,7 @@
 #include <cassert>
 #include <iterator>
 #include <map>
-#include <ostream>
+#include <iostream>
 #include <sstream>
 
 using namespace sys;
@@ -317,7 +317,10 @@ void Region::updateDoms() {
       if (x == start)
         continue;
 
+      // Don't forget to set the identity to the full bbs.
       std::set<BasicBlock*> result;
+      std::copy(bbs.begin(), bbs.end(), std::inserter(result, result.end()));
+
       for (auto pred : x->preds) {
         std::set<BasicBlock*> temp;
         std::set_intersection(pred->doms.begin(), pred->doms.end(), result.begin(), result.end(),
@@ -325,8 +328,11 @@ void Region::updateDoms() {
         result = temp;
       }
 
-      x->doms = result;
-      x->doms.insert(x);
+      result.insert(x);
+      if (x->doms != result) {
+        changed = true;
+        x->doms = result;
+      }
     }
   } while (changed);
 
@@ -334,9 +340,11 @@ void Region::updateDoms() {
   for (auto bb : bbs) {
     const auto &doms = bb->doms;
     for (auto x : doms) {
+      if (x == bb)
+        continue;
       bool dominated = true;
       for (auto other : doms) {
-        if (other != x && !x->doms.count(other)) {
+        if (other != x && x->doms.count(other)) {
           dominated = false;
           break;
         }
@@ -347,6 +355,7 @@ void Region::updateDoms() {
         break;
       }
     }
+    assert(bb == start || bb->idom);
   }
 
   // Update dominance frontier.

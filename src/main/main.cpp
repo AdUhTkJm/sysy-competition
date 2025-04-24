@@ -22,8 +22,18 @@ void initRvPipeline(sys::PassManager &pm) {
 
 void initPipeline(sys::PassManager &pm, const sys::Options &opts) {
   pm.addPass<sys::MoveAlloca>();
+
+  // ===== Structured control flow =====
+
+  pm.addPass<sys::Pureness>();
+  pm.addPass<sys::DCE>();
+
+  // ===== Flattened CFG =====
+
   pm.addPass<sys::FlattenCFG>();
   pm.addPass<sys::Mem2Reg>();
+  // Update <impure> for instructions introduced by previous passes.
+  pm.addPass<sys::Pureness>();
   pm.addPass<sys::DCE>();
 
   if (opts.arm)
@@ -58,6 +68,7 @@ int main(int argc, char **argv) {
 
   sys::PassManager pm(cg.getModule());
   pm.setVerbose(opts.verbose);
+  pm.setPrintStats(opts.stats);
   
   initPipeline(pm, opts);
   pm.run();

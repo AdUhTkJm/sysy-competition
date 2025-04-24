@@ -2,7 +2,6 @@
 #define PASSES_H
 
 #include "Pass.h"
-#include <map>
 #include <set>
 
 namespace sys {
@@ -40,6 +39,8 @@ class Mem2Reg : public Pass {
   SymbolTable symbols;
   std::map<PhiOp*, AllocaOp*> phiFrom;
   std::set<BasicBlock*> visited;
+  // Allocas we're going to convert in the pass.
+  std::set<Op*> converted;
 
   class SemanticScope {
     Mem2Reg &pass;
@@ -56,9 +57,32 @@ public:
   void run();
 };
 
+// Analysis pass.
+// Detects whether an operation is pure. If it isn't, give it an ImpureAttr.
+class Pureness : public Pass {
+  // Maps a function to all functions that it might call.
+  std::map<FuncOp*, std::set<FuncOp*>> callGraph;
+  // Impure functions.
+  std::set<std::string> impures;
+
+  bool markImpure(Region *region);
+  bool isImpure(Op *op);
+
+  void predetermineImpure(FuncOp *func);
+public:
+  Pureness(ModuleOp *module): Pass(module) {}
+    
+  std::string name() { return "pureness-analysis"; };
+  std::map<std::string, int> stats() { return {}; }
+  void run();
+};
+
 // Dead variable elimination.
 class DCE : public Pass {
+  std::vector<Op*> removeable;
   int elim = 0;
+
+  void runOnRegion(Region *region);
 public:
   DCE(ModuleOp *module): Pass(module) {}
     
