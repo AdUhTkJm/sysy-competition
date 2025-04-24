@@ -141,9 +141,13 @@ void Lower::run() {
 
   runRewriter([&](ReturnOp *op) {
     builder.setBeforeOp(op);
-    builder.create<WriteRegOp>(op->getOperands(), {
-      new RegAttr(Regs::a0)
-    });
+
+    // Don't create a op for an empty `return`.
+    if (op->getOperands().size())
+      builder.create<WriteRegOp>(op->getOperands(), {
+        new RegAttr(Regs::a0)
+      });
+    
     builder.replace<RetOp>(op);
     return true;
   });

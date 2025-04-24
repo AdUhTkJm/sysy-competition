@@ -105,6 +105,12 @@ void tidy(FuncOp *func) {
   Builder builder;
   auto body = func->getRegion();
 
+  // If the last Op isn't a `return`, then supply a `return`.
+  if (!isa<ReturnOp>(body->getLastBlock()->getLastOp())) {
+    builder.setToBlockEnd(body->getLastBlock());
+    builder.create<ReturnOp>();
+  }
+
   // Get a terminator for basic blocks.
   for (auto it = body->begin(); it != body->end(); ++it) {
     auto bb = *it;

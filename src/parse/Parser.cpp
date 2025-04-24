@@ -148,8 +148,8 @@ ConstValue Parser::getArrayInit(const std::vector<int> &dims) {
 
       addAt++;
       
-      // If this `}` isn't at the end, then a `,` must follow.
-      if (addAt != dims.size())
+      // If this `}` isn't at the end, then a `,` or `}` must follow.
+      if (addAt != dims.size() && !peek(Token::RBrace))
         expect(Token::Comma);
       continue;
     }
@@ -342,8 +342,14 @@ TransparentBlockNode *Parser::varDecl(bool global) {
       ty = new ArrayType(ty, dims);
 
     ASTNode *init = nullptr;
-    if (test(Token::Assign))
-      init = isa<ArrayType>(ty) ? new ConstArrayNode(getArrayInit(dims).getRaw()) : expr();
+    if (test(Token::Assign)) {
+      if (isa<ArrayType>(ty)) {
+        // We can never infer the real type of ConstArrayNode in Sema.
+        // Must place it here.
+        init = new ConstArrayNode(getArrayInit(dims).getRaw());
+        init->type = ty;
+      } else init = expr();
+    }
 
     auto decl = new VarDeclNode(name, init, mut, global);
     decl->type = ty;

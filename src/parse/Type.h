@@ -70,6 +70,7 @@ public:
     base(base), dims(dims) {}
 
   std::string toString() const override;
+  int getSize() const;
 };
 
 }

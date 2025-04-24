@@ -45,12 +45,9 @@ int CodeGen::getSize(Type *ty) {
   assert(ty);
   if (isa<IntType>(ty) || isa<FloatType>(ty))
     return 4;
-  if (auto arrTy = dyn_cast<ArrayType>(ty)) {
-    auto sz = getSize(arrTy->base);
-    for (auto x : arrTy->dims)
-      sz *= x;
-    return sz;
-  }
+  if (auto arrTy = dyn_cast<ArrayType>(ty))
+    return arrTy->getSize() * getSize(arrTy->base);
+  
   return 8;
 }
 
@@ -138,11 +135,15 @@ void CodeGen::emit(ASTNode *node) {
   }
 
   if (auto vardecl = dyn_cast<VarDeclNode>(node)) {
-    if (vardecl->global) {
-      int value = vardecl->init ? cast<IntNode>(vardecl->init)->value : 0;
+    if (vardecl->global || !vardecl->mut) {
+      int *value = vardecl->init ? cast<ConstArrayNode>(vardecl->init)->vi : new int(0);
+      auto size = 1;
+      if (auto arrayTy = dyn_cast<ArrayType>(vardecl->type))
+        size = arrayTy->getSize();
+      
       auto addr = builder.create<GlobalOp>({
         new SizeAttr(getSize(vardecl->type)),
-        new IntAttr(value)
+        new IntArrayAttr(value, size)
       });
       symbols[vardecl->name] = addr;
       return;
@@ -154,6 +155,26 @@ void CodeGen::emit(ASTNode *node) {
     
     symbols[vardecl->name] = addr;
     if (vardecl->init) {
+      // This is a local variable with array initializer.
+      // We create a global array and copy it to the variable.
+      if (auto arr = dyn_cast<ConstArrayNode>(vardecl->init)) {
+        auto arrSize = cast<ArrayType>(vardecl->type)->getSize();
+        auto typeSize = getSize(vardecl->type);
+        Op *global;
+        {
+          Builder::Guard guard(builder);
+          builder.setToRegionStart(module->getRegion());
+          global = builder.create<GlobalOp>({
+            new SizeAttr(typeSize),
+            new IntArrayAttr(arr->vi, arrSize)
+          });
+        }
+        builder.create<MemcpyOp>({ /*dst=*/addr, /*src=*/global }, {
+          new SizeAttr(typeSize)
+        });
+        return;
+      }
+
       auto value = emitExpr(vardecl->init);
       auto store = builder.create<StoreOp>({ value, addr });
       store->addAttr<SizeAttr>(getSize(vardecl->type));

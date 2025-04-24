@@ -27,3 +27,10 @@ std::string ArrayType::toString() const {
     ss << "[" << x << "]";
   return ss.str();
 }
+
+int ArrayType::getSize() const {
+  int size = 1;
+  for (auto x : dims)
+    size *= x;
+  return size;
+}

@@ -53,6 +53,14 @@ Type *Sema::infer(ASTNode *node) {
   if (auto vardecl = dyn_cast<VarDeclNode>(node)) {
     assert(node->type);
     symbols[vardecl->name] = node->type;
+    if (!vardecl->init)
+      return ctx.create<VoidType>();
+
+    if (vardecl->global || !vardecl->mut)
+      // Already folded. Just propagate type.
+      vardecl->init->type = node->type;
+    else
+      infer(vardecl->init);
     return ctx.create<VoidType>();
   }
 
@@ -99,6 +107,11 @@ Type *Sema::infer(ASTNode *node) {
       assert(false);
     }
     return node->type = ctx.create<VoidType>();
+  }
+
+  if (auto arr = dyn_cast<ConstArrayNode>(node)) {
+    assert(arr->type);
+    return arr->type;
   }
 
   std::cerr << "cannot infer node " << node->getID() << "\n";

@@ -23,7 +23,8 @@ std::string ElseAttr::toString() {
 }
 
 std::string IntArrayAttr::toString() {
-  std::stringstream ss("<array =");
+  std::stringstream ss;
+  ss << "<array = ";
   if (size > 0)
     ss << vi[0];
   for (int i = 1; i < size; i++)

@@ -38,7 +38,7 @@ OP(FuncOp);
 OP(IntOp);
 OP(AllocaOp);
 OP(GetArgOp);
-OP(StoreOp);
+OP(StoreOp); // Operand order: value, dst
 OP(LoadOp);
 OP(ReturnOp);
 OP(IfOp);
@@ -47,6 +47,7 @@ OP(ProceedOp);
 OP(GotoOp);   // Jumps unconditionally.
 OP(BranchOp); // Branches according to the only operand.
 OP(GlobalOp);
+OP(MemcpyOp); // Operand order: dst, src
 
 }
 
