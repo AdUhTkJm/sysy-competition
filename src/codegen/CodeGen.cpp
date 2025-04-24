@@ -43,8 +43,13 @@ CodeGen::CodeGen(ASTNode *node): module(new ModuleOp()) {
 
 int CodeGen::getSize(Type *ty) {
   assert(ty);
-  if (isa<IntType>(ty) || isa<FloatType>(ty)) {
+  if (isa<IntType>(ty) || isa<FloatType>(ty))
     return 4;
+  if (auto arrTy = dyn_cast<ArrayType>(ty)) {
+    auto sz = getSize(arrTy->base);
+    for (auto x : arrTy->dims)
+      sz *= x;
+    return sz;
   }
   return 8;
 }
@@ -133,10 +138,20 @@ void CodeGen::emit(ASTNode *node) {
   }
 
   if (auto vardecl = dyn_cast<VarDeclNode>(node)) {
-    // TODO: for immutable variables, produce a single SSA value
+    if (vardecl->global) {
+      int value = vardecl->init ? cast<IntNode>(vardecl->init)->value : 0;
+      auto addr = builder.create<GlobalOp>({
+        new SizeAttr(getSize(vardecl->type)),
+        new IntAttr(value)
+      });
+      symbols[vardecl->name] = addr;
+      return;
+    }
+    
     auto addr = builder.create<AllocaOp>({
-      new IntAttr(getSize(vardecl->type))
-    });
+        new SizeAttr(getSize(vardecl->type))
+      });
+    
     symbols[vardecl->name] = addr;
     if (vardecl->init) {
       auto value = emitExpr(vardecl->init);

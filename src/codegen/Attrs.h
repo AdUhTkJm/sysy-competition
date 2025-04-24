@@ -57,6 +57,16 @@ public:
   std::string toString();
 };
 
+class IntArrayAttr : public AttrImpl<IntArrayAttr, __LINE__> {
+public:
+  int *vi;
+  int size;
+
+  IntArrayAttr(int *vi, int size): vi(vi), size(size) {}
+
+  std::string toString();
+};
+
 }
 
 #endif

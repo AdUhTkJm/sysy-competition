@@ -46,6 +46,7 @@ OP(WhileOp);
 OP(ProceedOp);
 OP(GotoOp);   // Jumps unconditionally.
 OP(BranchOp); // Branches according to the only operand.
+OP(GlobalOp);
 
 }
 

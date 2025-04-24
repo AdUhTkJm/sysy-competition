@@ -3,6 +3,7 @@
 #include <cassert>
 #include <map>
 #include <ostream>
+#include <sstream>
 
 using namespace sys;
 
@@ -19,6 +20,16 @@ std::string ElseAttr::toString() {
   if (!bbmap.count(bb))
     bbmap[bb] = bbid++;
   return "<else = bb" + std::to_string(bbmap[bb]) + ">";
+}
+
+std::string IntArrayAttr::toString() {
+  std::stringstream ss("<array =");
+  if (size > 0)
+    ss << vi[0];
+  for (int i = 1; i < size; i++)
+    ss << ", " << vi[i];
+  ss << ">";
+  return ss.str();
 }
 
 void BasicBlock::insert(iterator at, Op *op) {

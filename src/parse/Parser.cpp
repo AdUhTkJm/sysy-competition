@@ -77,9 +77,16 @@ bool Parser::peek(Token::Type t) {
 Token Parser::expect(Token::Type t) {
   if (!test(t)) {
     std::cerr << "expected " << t << ", but got " << peek().type << "\n";
+    printSurrounding();
     assert(false);
   }
   return last();
+}
+
+void Parser::printSurrounding() {
+  std::cerr << "surrounding:\n";
+  for (size_t i = std::max(0ul, loc - 5); i < std::min(tokens.size(), loc + 6); i++)
+    std::cerr << tokens[i].type << (i == loc ? "(here)" : "") << "\n";
 }
 
 Type *Parser::parseSimpleType() {
@@ -97,8 +104,6 @@ switch (consume().type) {
 }
 
 ConstValue Parser::getArrayInit(const std::vector<int> &dims) {
-  expect(Token::LBrace);
-
   auto carry = [&](std::vector<int> &x) {
     for (int i = (int) x.size() - 1; i >= 1; i--) {
       if (x[i] >= dims[i]) {
@@ -127,8 +132,8 @@ ConstValue Parser::getArrayInit(const std::vector<int> &dims) {
   memset(vi, 0, size * sizeof(int));
 
   // add 1 to `place[addAt]` when we meet the next `}`.
-  int addAt = dims.size() - 1;
-  while (!peek(Token::RBrace)) {
+  int addAt = dims.size();
+  do {
     if (test(Token::LBrace)) {
       addAt--;
       continue;
@@ -137,8 +142,15 @@ ConstValue Parser::getArrayInit(const std::vector<int> &dims) {
     if (test(Token::RBrace)) {
       // Bump `place[addAt]`, and set everything after it to 0.
       place[addAt]++;
+      for (int i = addAt + 1; i < dims.size(); i++)
+        place[i] = 0;
       carry(place);
+
       addAt++;
+      
+      // If this `}` isn't at the end, then a `,` must follow.
+      if (addAt != dims.size())
+        expect(Token::Comma);
       continue;
     }
 
@@ -146,7 +158,9 @@ ConstValue Parser::getArrayInit(const std::vector<int> &dims) {
     vi[offset(place)] = earlyFold(expr()).getInt();
     place[place.size() - 1]++;
     carry(place);
-  }
+    if (!test(Token::Comma) && !peek(Token::RBrace))
+      expect(Token::RBrace);
+  } while (addAt != dims.size());
   return ConstValue(vi, dims);
 }
 
@@ -164,6 +178,7 @@ ASTNode *Parser::primary() {
     return new VarRefNode(consume().vs);
 
   std::cerr << "unexpected token " << peek().type << "\n";
+  printSurrounding();
   assert(false);
 }
 
@@ -278,7 +293,7 @@ ASTNode *Parser::stmt() {
   }
 
   if (peek(Token::Const, Token::Int, Token::Float))
-    return varDecl();
+    return varDecl(false);
 
   auto n = expr();
   if (test(Token::Assign)) {
@@ -307,7 +322,7 @@ BlockNode *Parser::block() {
   return new BlockNode(nodes);
 }
 
-TransparentBlockNode *Parser::varDecl() {
+TransparentBlockNode *Parser::varDecl(bool global) {
   bool mut = !test(Token::Const);
   auto base = parseSimpleType();
   std::vector<VarDeclNode*> decls;
@@ -330,7 +345,7 @@ TransparentBlockNode *Parser::varDecl() {
     if (test(Token::Assign))
       init = isa<ArrayType>(ty) ? new ConstArrayNode(getArrayInit(dims).getRaw()) : expr();
 
-    auto decl = new VarDeclNode(name, init, mut);
+    auto decl = new VarDeclNode(name, init, mut, global);
     decl->type = ty;
     decls.push_back(decl);
 
@@ -390,7 +405,7 @@ BlockNode *Parser::compUnit() {
   std::vector<ASTNode*> nodes;
   while (!test(Token::End)) {
     if (peek(Token::Const)) {
-      nodes.push_back(varDecl());
+      nodes.push_back(varDecl(true));
       continue;
     }
 
@@ -404,13 +419,14 @@ BlockNode *Parser::compUnit() {
       continue;
     }
 
-    nodes.push_back(varDecl());
+    nodes.push_back(varDecl(true));
   }
 
   return new BlockNode(nodes);
 }
 
 // Yes, heavy memory leak... But who cares?
+// We can't just call release(), otherwise we'd release everything in the symbol table.
 ConstValue Parser::earlyFold(ASTNode *node) {
   if (auto ref = dyn_cast<VarRefNode>(node)) {
     if (!symbols.count(ref->name)) {
@@ -421,8 +437,8 @@ ConstValue Parser::earlyFold(ASTNode *node) {
   }
 
   if (auto binary = dyn_cast<BinaryNode>(node)) {
-    auto l = earlyFold(binary).getInt();
-    auto r = earlyFold(binary).getInt();
+    auto l = earlyFold(binary->l).getInt();
+    auto r = earlyFold(binary->r).getInt();
     switch (binary->kind) {
     case BinaryNode::Add:
       return ConstValue(new int(l + r), {});

@@ -60,9 +60,10 @@ public:
   std::string name;
   ASTNode *init;
   bool mut;
+  bool global;
 
-  VarDeclNode(const std::string &name, ASTNode *init, bool mut = true):
-    name(name), init(init), mut(mut) {}
+  VarDeclNode(const std::string &name, ASTNode *init, bool mut = true, bool global = false):
+    name(name), init(init), mut(mut), global(global) {}
   
   void walk(ASTWalker walker);
   std::string toString() const;
@@ -177,6 +178,7 @@ public:
   std::string toString() const;
 };
 
+// Size is to be deduced by type.
 class ConstArrayNode : public ASTNodeImpl<ConstArrayNode, __LINE__> {
 public:
   union {

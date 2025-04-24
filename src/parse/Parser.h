@@ -63,6 +63,9 @@ class Parser {
   bool peek(Token::Type t);
   Token expect(Token::Type t);
 
+  // Prints tokens in range [loc-5, loc+5]. For debugging purposes.
+  void printSurrounding();
+
   template<class... Rest>
   bool peek(Token::Type t, Rest... ts) {
     return peek(t) || peek(ts...);
@@ -93,7 +96,7 @@ class Parser {
   ASTNode *expr();
   ASTNode *stmt();
   BlockNode *block();
-  TransparentBlockNode *varDecl();
+  TransparentBlockNode *varDecl(bool global);
   FnDeclNode *fnDecl();
   BlockNode *compUnit();
 

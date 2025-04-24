@@ -42,5 +42,30 @@ void Lower::run() {
     builder.replace<SubOp>(op, { denom, mul });
     return true;
   });
+
+  runRewriter([&](BranchOp *op) {
+    auto cond = op->getOperand().defining;
+
+    // Only merge when the value of `cond` is not used elsewhere.
+    if (isa<EqOp>(cond) && cond->getUses().size() == 1) {
+      builder.replace<BeqOp>(op, cond->getOperands(), op->getAttrs());
+      cond->erase();
+      return true;
+    }
+
+    if (isa<NeOp>(cond) && cond->getUses().size() == 1) {
+      builder.replace<BneOp>(op, cond->getOperands(), op->getAttrs());
+      cond->erase();
+      return true;
+    }
+
+    builder.replace<BnezOp>(op, op->getOperands(), op->getAttrs());
+    return true;
+  });
+
+  runRewriter([&](GotoOp *op) {
+    builder.replace<JOp>(op, op->getAttrs());
+    return true;
+  });
   
 }

@@ -32,6 +32,12 @@ RVOP(AddOp);
 RVOP(SubOp);
 RVOP(MulOp);
 RVOP(DivOp); // Signed; divu for unsigned.
+RVOP(BneOp);
+RVOP(BeqOp);
+RVOP(BnezOp);
+RVOP(JOp);
+RVOP(LoadOp);
+RVOP(StoreOp);
 
 }
 
