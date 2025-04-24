@@ -111,6 +111,17 @@ void tidy(FuncOp *func) {
     builder.create<ReturnOp>();
   }
 
+  // Remove redundant terminators.
+  // These might be inserted by flattening when terminators are already present.
+  for (auto bb : body->getBlocks()) {
+    auto &ops = bb->getOps();
+    auto size = bb->getOps().size();
+    while (size >= 2 && isTerminator(*--ops.end()) && isTerminator(*----ops.end())) {
+      bb->getLastOp()->erase();
+      size--;
+    }
+  }
+
   // Get a terminator for basic blocks.
   for (auto it = body->begin(); it != body->end(); ++it) {
     auto bb = *it;

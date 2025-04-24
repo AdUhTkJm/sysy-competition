@@ -12,6 +12,7 @@ Type *Sema::infer(ASTNode *node) {
   if (auto fn = dyn_cast<FnDeclNode>(node)) {
     assert(fn->type);
     auto fnTy = cast<FunctionType>(fn->type);
+    symbols[fn->name] = fn->type;
 
     SemanticScope scope(*this);
     for (int i = 0; i < fn->args.size(); i++) {
@@ -112,6 +113,17 @@ Type *Sema::infer(ASTNode *node) {
   if (auto arr = dyn_cast<ConstArrayNode>(node)) {
     assert(arr->type);
     return arr->type;
+  }
+
+  if (auto call = dyn_cast<CallNode>(node)) {
+    for (auto x : call->args)
+      infer(x);
+    if (!symbols.count(call->func)) {
+      std::cerr << "cannot find function " << call->func << "\n";
+      assert(false);
+    }
+    auto fnTy = cast<FunctionType>(symbols[call->func]);
+    return node->type = fnTy->ret;
   }
 
   std::cerr << "cannot infer node " << node->getID() << "\n";

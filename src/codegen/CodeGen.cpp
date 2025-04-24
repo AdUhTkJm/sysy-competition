@@ -94,9 +94,20 @@ Value CodeGen::emitExpr(ASTNode *node) {
       assert(false);
     }
     auto from = symbols[ref->name];
-    auto load = builder.create<LoadOp>({ from });
-    load->addAttr<SizeAttr>(getSize(ref->type));
+    auto load = builder.create<LoadOp>({ from }, {
+      new SizeAttr(getSize(ref->type))
+    });
     return load;
+  }
+  
+  if (auto call = dyn_cast<CallNode>(node)) {
+    std::vector<Value> args;
+    for (auto arg : call->args)
+      args.push_back(emitExpr(arg));
+    auto callOp = builder.create<CallOp>(args, {
+      new NameAttr(call->func)
+    });
+    return callOp;
   }
 
   std::cerr << "cannot codegen node type " << node->getID() << "\n";

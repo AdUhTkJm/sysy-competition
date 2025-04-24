@@ -48,6 +48,7 @@ OP(GotoOp);   // Jumps unconditionally.
 OP(BranchOp); // Branches according to the only operand.
 OP(GlobalOp);
 OP(MemcpyOp); // Operand order: dst, src
+OP(CallOp);
 
 }
 

@@ -205,6 +205,18 @@ public:
   std::string toString() const;
 };
 
+class CallNode : public ASTNodeImpl<CallNode, __LINE__> {
+public:
+  std::string func;
+  std::vector<ASTNode*> args;
+
+  CallNode(const std::string &func, const std::vector<ASTNode*> &args):
+    func(func), args(args) {}
+
+  void walk(ASTWalker walker);
+  std::string toString() const;
+};
+
 };
 
 #endif

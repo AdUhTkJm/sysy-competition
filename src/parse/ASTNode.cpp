@@ -155,3 +155,13 @@ WALK(ArrayAccessNode) {
 TOSTR(ArrayAccessNode) {
   return "[]";
 }
+
+WALK(CallNode) {
+  walker(this);
+  for (auto x : args)
+    x->walk(walker);
+}
+
+TOSTR(CallNode) {
+  return "call " + func;
+}

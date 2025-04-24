@@ -174,8 +174,22 @@ ASTNode *Parser::primary() {
     return n;
   }
 
-  if (peek(Token::Ident))
-    return new VarRefNode(consume().vs);
+  if (peek(Token::Ident)) {
+    // Function call.
+    auto vs = consume().vs;
+
+    if (test(Token::LPar)) {
+      std::vector<ASTNode*> args;
+      while (!test(Token::RPar)) {
+        args.push_back(expr());
+        if (!test(Token::Comma) && !peek(Token::RPar))
+          expect(Token::RPar);
+      }
+      return new CallNode(vs, args);
+    }
+
+    return new VarRefNode(vs);
+  }
 
   std::cerr << "unexpected token " << peek().type << "\n";
   printSurrounding();
