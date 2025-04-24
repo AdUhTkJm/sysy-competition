@@ -44,15 +44,15 @@ namespace rv {
   X(a7)
 
 #define X(name) name,
-enum class Regs {
+enum class Reg {
   REGS
 };
 
 #undef X
 
-inline std::string showReg(Regs reg) {
+inline std::string showReg(Reg reg) {
   switch (reg) {
-#define X(name) case Regs::name: return #name;
+#define X(name) case Reg::name: return #name;
     REGS
 #undef X
   }
@@ -63,9 +63,9 @@ inline std::string showReg(Regs reg) {
 
 class RegAttr : public AttrImpl<RegAttr, RVLINE> {
 public:
-  Regs reg;
+  Reg reg;
 
-  RegAttr(Regs reg): reg(reg) {}
+  RegAttr(Reg reg): reg(reg) {}
 
   std::string toString() { return "<reg = " + showReg(reg) + ">"; }
 };

@@ -135,11 +135,18 @@ void CodeGen::emit(ASTNode *node) {
 
     Builder::Guard guard(builder);
     builder.setToBlockStart(bb);
+
     // Function arguments are in the same scope with body.
     SemanticScope scope(*this);
-    for (int i = 0; i < fn->args.size(); i++)
-      symbols[fn->args[i]] = builder.create<GetArgOp>({ new IntAttr(i) });
-    
+    auto fnTy = cast<FunctionType>(fn->type);
+    for (int i = 0; i < fn->args.size(); i++) {
+      // Get the value of the argument and create a temp variable for it.
+      auto arg = builder.create<GetArgOp>({ new IntAttr(i) });
+      auto addr = builder.create<AllocaOp>({ new SizeAttr(getSize(fnTy->params[i])) });
+      builder.create<StoreOp>({ arg, addr });
+      symbols[fn->args[i]] = addr;
+    }
+
     for (auto x : fn->body->nodes)
       emit(x);
     return;

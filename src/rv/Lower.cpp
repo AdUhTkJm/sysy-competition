@@ -40,7 +40,7 @@ void rewriteAlloca(FuncOp *func) {
     // Translate itself into `sp + offset`.
     builder.setBeforeOp(op);
     auto spValue = builder.create<ReadRegOp>({
-      new RegAttr(Regs::sp)
+      new RegAttr(Reg::sp)
     });
 
     auto offsetValue = builder.create<LiOp>({
@@ -116,6 +116,18 @@ void Lower::run() {
       return true;
     }
 
+    if (isa<LeOp>(cond) && cond->getUses().size() == 1) {
+      builder.replace<BleOp>(op, cond->getOperands(), op->getAttrs());
+      cond->erase();
+      return true;
+    }
+
+    if (isa<LtOp>(cond) && cond->getUses().size() == 1) {
+      builder.replace<BltOp>(op, cond->getOperands(), op->getAttrs());
+      cond->erase();
+      return true;
+    }
+
     builder.replace<BnezOp>(op, op->getOperands(), op->getAttrs());
     return true;
   });
@@ -145,10 +157,37 @@ void Lower::run() {
     // Don't create a op for an empty `return`.
     if (op->getOperands().size())
       builder.create<WriteRegOp>(op->getOperands(), {
-        new RegAttr(Regs::a0)
+        new RegAttr(Reg::a0)
       });
     
     builder.replace<RetOp>(op);
+    return true;
+  });
+
+  static Reg regs[] = {
+    Reg::a0, Reg::a1, Reg::a2, Reg::a3,
+    Reg::a4, Reg::a5, Reg::a6, Reg::a7,
+  };
+
+  runRewriter([&](sys::CallOp *op) {
+    builder.setBeforeOp(op);
+    const auto &args = op->getOperands();
+    // TODO: spilling
+    assert(args.size() <= 8);
+
+    for (int i = 0; i < args.size(); i++)
+      builder.create<WriteRegOp>({ args[i] }, { new RegAttr(regs[i]) });
+    
+    builder.replace<sys::rv::CallOp>(op, { op->getAttr<NameAttr>() });
+    return true;
+  });
+
+  runRewriter([&](GetArgOp *op) {
+    auto value = op->getAttr<IntAttr>()->value;
+    // TODO: spilling
+    assert(value < 8);
+
+    builder.replace<ReadRegOp>(op, { new RegAttr(regs[value]) });
     return true;
   });
 

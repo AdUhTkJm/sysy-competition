@@ -34,6 +34,8 @@ RVOP(MulOp);
 RVOP(DivOp); // Signed; divu for unsigned.
 RVOP(BneOp);
 RVOP(BeqOp);
+RVOP(BltOp);
+RVOP(BleOp);
 RVOP(BnezOp);
 RVOP(JOp);
 RVOP(RetOp);
@@ -42,6 +44,7 @@ RVOP(StoreOp);
 RVOP(SubSpOp); // Allocate stack space: sub sp, sp, <IntAttr>
 RVOP(ReadRegOp); // Read from real register
 RVOP(WriteRegOp); // Write to real register
+RVOP(CallOp);
 
 }
 
