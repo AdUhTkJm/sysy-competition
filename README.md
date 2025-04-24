@@ -1,6 +1,4 @@
-# SysY 编译器
-
-## 概述
+# 概述
 
 这个编译器受到了不少 MLIR 的启发。这里的 IR 就是模仿它设计的。
 
@@ -12,9 +10,9 @@ Op 本身还追踪所有的使用者。这使得极为强大的 `replaceAllUsesW
 
 这个编译器大量运用了 CRTP 和手工的 RTTI。尽管这里没有 -fno-rtti，我也习惯了使用 dyn_cast, cast 和 isa，而不是自带的 dynamic_cast。所以我在 `utils/DynamicCast.h` 里手动搓了一个。
 
-## 编译器结构
+# 编译器结构
 
-### Parser
+## Parser
 
 Lexer 和 Parser 是手写的，其中 Parser 是简单的递归下降。不用 ANTLR 的原因是我实在配不好环境—— C++ 真难用（确信）。
 
@@ -29,7 +27,7 @@ const int y[x[1]] = ...;
 
 接下来是语义分析，主要是标记类型，并插入 int/float 转换的 AST 节点。
 
-### CodeGen
+## CodeGen
 
 CodeGen 所生成的 IR 参考了 MLIR 的 `scf` 方言的设计方式。作为一个例子，考虑这样的一段代码：
 
@@ -98,22 +96,38 @@ int main() {
 
 此外，在打印出的 IR 中以 `<>` 包裹的是属性（`Attr*`）。它们不属于操作数。
 
-### Passes
+## Pass
 
-这个编译器中的 Pass 可以分为四类：调整 CodeGen 生成的不正确代码的 (S)，用于将 IR 降低为更底层的 Op 的 (L)，分析的 (A)，以及优化的 (O)。这里的列举顺序不完全是执行顺序。
+### 整理 CodeGen
 
-**MoveAlloca** - S
+CodeGen 生成的代码依旧有不正确之处。在运行其他 Pass 之前，需要先运行这些 Pass 来纠正它。
+
+**MoveAlloca**
 
 将函数里的所有 `alloca` 移到函数的最前方：不管原来这个 `alloca` 是处在 if 还是 while 中，它本来都应该只被执行一次。
 
-**Pureness** - A
+### 分析 Pass
+
+**Pureness**
 
 给所有不纯（有副作用）的 Op 打上 `ImpureAttr`。这个分析较为细致，并不会认为所有的 CallOp 都不纯；它会在 call graph 上传播是否有副作用的信息，以分析函数是否是纯的。
 
-**FlattenCFG** - L
+### 优化 Pass
+
+**DCE**
+
+死代码删除。所有 `uses` 为空的，而且没有被标记为 `<impure>` 的 Op 都会被删除。这包括一些具有 Region 的 Op，例如 `IfOp`。
+
+**Mem2Reg**
+
+经典 Pass 之一。将 AllocaOp 转化为普通的 SSA 值。
+
+### Lowering
+
+将 IR 转化为更加贴近汇编的形态。每个后端都有自己的 lowering passes，这里给出的是公用部分。
+
+**FlattenCFG**
 
 展平控制流。将 IfOp 和 WhileOp 展开，变为 Goto, Branch 和基本块。这类似于 MLIR 的 `scf` 到 `cf` 的转换。
 
 在这个 Pass 结束后，除了 `module` 和 `func` 外的 Region 彻底消失，每个基本块都相互独立，可以随意移动了。
-
-**Mem2Reg** - O

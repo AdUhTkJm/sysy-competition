@@ -12,7 +12,6 @@ std::map<std::string, int> Mem2Reg::stats() {
 }
 
 // See explanation at https://longfangsong.github.io/en/mem2reg-made-simple/
-// FIXME: crash detected with valgrind
 void Mem2Reg::runImpl(FuncOp *func) {
   func->getRegion()->updateDoms();
   converted.clear();
@@ -44,22 +43,26 @@ void Mem2Reg::runImpl(FuncOp *func) {
     }
     count++;
 
-    // Now find all blocks where stores reside in.
-    std::vector<BasicBlock*> bbs;
+    // Now find all blocks where stores reside in. Use set to de-duplicate.
+    std::set<BasicBlock*> bbs;
     for (auto use : alloca->getUses()) {
       if (isa<StoreOp>(use))
-        bbs.push_back(use->getParent());
+        bbs.insert(use->getParent());
     }
 
+    std::set<BasicBlock*> needed;
     for (auto bb : bbs) {
-      for (auto one : bb->getDominanceFrontier()) {
-        // Insert a PhiOp at the dominance frontier of each StoreOp, as described above.
-        // The PhiOp is broken; we only record which AllocaOp it's from.
-        // We'll fill it in later.
-        builder.setToBlockStart(one);
-        auto phi = builder.create<PhiOp>();
-        phiFrom[phi] = alloca;
-      }
+      for (auto one : bb->getDominanceFrontier())
+        needed.insert(one);
+    }
+
+    for (auto bb : needed) {
+      // Insert a PhiOp at the dominance frontier of each StoreOp, as described above.
+      // The PhiOp is broken; we only record which AllocaOp it's from.
+      // We'll fill it in later.
+      builder.setToBlockStart(bb);
+      auto phi = builder.create<PhiOp>();
+      phiFrom[phi] = alloca;
     }
   }
 
@@ -84,6 +87,7 @@ void Mem2Reg::fillPhi(BasicBlock *bb) {
     // So this PhiOp should have that value as operand as well.
     auto value = symbols[alloca];
     op->pushOperand(value);
+    symbols[alloca] = op;
   }
 
   if (visited.count(bb))

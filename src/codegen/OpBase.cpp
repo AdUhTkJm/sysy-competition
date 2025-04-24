@@ -73,6 +73,11 @@ Region *Op::appendRegion() {
   return region;
 }
 
+void Op::pushOperand(Value v) {
+  v.defining->uses.insert(this);
+  operands.push_back(v);
+}
+
 Op *Op::getParentOp() {
   auto bb = parent;
   auto region = bb->parent;

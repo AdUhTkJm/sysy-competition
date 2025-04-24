@@ -159,7 +159,7 @@ public:
   Region *getRegion(int i = 0) { return regions[i]; }
   Value getOperand(int i = 0) { return operands[i]; }
 
-  void pushOperand(Value v) { operands.push_back(v); }
+  void pushOperand(Value v);
 
   Value getResult() const { return result; }
   operator Value() const { return result; }
