@@ -175,8 +175,11 @@ void Lower::run() {
 
     for (int i = 0; i < args.size(); i++)
       builder.create<WriteRegOp>({ args[i] }, { new RegAttr(regs[i]) });
-    
-    builder.replace<sys::rv::CallOp>(op, { op->getAttr<NameAttr>() });
+
+    builder.create<sys::rv::CallOp>({ op->getAttr<NameAttr>() });
+
+    // Read result from a0.
+    builder.replace<ReadRegOp>(op, { new RegAttr(Reg::a0) });
     return true;
   });
 

@@ -16,13 +16,9 @@ bool RvDCE::isImpure(Op *op) {
       isa<BneOp>(op) || isa<BltOp>(op) ||
       isa<BgeOp>(op) || isa<BnezOp>(op) ||
       isa<BeqOp>(op) || isa<WriteRegOp>(op) ||
-      isa<StoreOp>(op) || isa<RetOp>(op))
+      isa<StoreOp>(op) || isa<RetOp>(op) ||
+      isa<BezOp>(op) || isa<CallOp>(op))
     return true;
-
-  if (isa<CallOp>(op)) {
-    auto name = op->getAttr<NameAttr>()->name;
-    return findFunction(name)->hasAttr<ImpureAttr>();
-  }
 
   return false;
 }

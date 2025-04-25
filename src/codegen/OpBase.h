@@ -34,6 +34,9 @@ public:
 class Region {
   std::list<BasicBlock*> bbs;
   Op *parent;
+
+  // For debug purposes.
+  void showLiveIn();
 public:
   using iterator = decltype(bbs)::iterator;
 
@@ -113,6 +116,7 @@ public:
   const auto &getLiveOut() { return liveOut; }
   
   BasicBlock *getIdom() { return idom; }
+  BasicBlock *nextBlock();
 
   // Inserts before `at`.
   void insert(iterator at, Op *op);
@@ -209,6 +213,15 @@ public:
       if (isa<T>(x))
         return cast<T>(x);
     assert(false);
+  }
+
+  template<class T>
+  void removeAttr() {
+    for (auto it = attrs.begin(); it != attrs.end(); it++)
+      if (isa<T>(*it)) {
+        attrs.erase(it);
+        return;
+      }
   }
 
   template<class T, class... Args>

@@ -14,8 +14,43 @@ parser.add_argument("-a", "--test-all", action="store_true")
 parser.add_argument("-t", "--test", type=str)
 
 args = parser.parse_args()
-# gcc -march=armv8-a
-# gcc -march=rv64gc
+
+def run(full_file: str):
+  file = os.path.splitext(full_file)[0]
+
+  command = ["bin/sysc", f"test/{full_file}"]
+
+  if args.gdb:
+    command = ["gdb", "--args", *command]
+  
+  if args.valgrind:
+    command = ["valgrind", *command]
+  
+  if args.dump_mid_ir:
+    command.append("--dump-mid-ir")
+  
+  if args.arm:
+    command.append("--arm")
+  
+  if args.verbose:
+    command.append("-v")
+  
+  if args.stats:
+    command.append("--stats")
+
+  command.extend(["-o", f"temp/{file}.s"])
+  
+  # Invoke SysY compiler.
+  proc.run(command, check=True)
+  
+  # Invoke gcc.
+  gcc = "aarch64-linux-gnu-gcc" if args.arm else "riscv64-linux-gnu-gcc"
+  proc.run([gcc, f"temp/{file}.s", "-static", "-o", f"temp/{file}"], check=True)
+
+  # Run the file.
+  qemu = "qemu-aarch64-static" if args.arm else "qemu-riscv64-static"
+  return proc.run([qemu, f"temp/{file}"])
+
 
 proc.run(["make"], check=True)
 if args.test_all:
@@ -30,18 +65,5 @@ if args.test_all:
     # TODO
 
 if args.test:
-  command = ["bin/sysc", f"test/{args.test}"]
-  if args.gdb:
-    command = ["gdb", "--args", *command]
-  if args.valgrind:
-    command = ["valgrind", *command]
-  if args.dump_mid_ir:
-    command.append("--dump-mid-ir")
-  if args.arm:
-    command.append("--arm")
-  if args.verbose:
-    command.append("-v")
-  if args.stats:
-    command.append("--stats")
-  
-  proc.run(command, check=True)
+  result = run(args.test)
+  print(result.returncode)

@@ -38,20 +38,20 @@ void PassManager::run() {
     pass->run();
 
     if (verbose) {
-      std::cout << "===== After " << pass->name() << " =====\n\n";
-      module->dump(std::cout);
-      std::cout << "\n\n";
+      std::cerr << "===== After " << pass->name() << " =====\n\n";
+      module->dump(std::cerr);
+      std::cerr << "\n\n";
     }
     
     if (print) {
-      std::cout << pass->name() << ":\n";
+      std::cerr << pass->name() << ":\n";
 
       auto stats = pass->stats();
       if (!stats.size())
-        std::cout << "  <no stats>\n";
+        std::cerr << "  <no stats>\n";
 
       for (auto [k, v] : stats)
-        std::cout << "  " << k << " : " << v << "\n";
+        std::cerr << "  " << k << " : " << v << "\n";
     }
   }
 }

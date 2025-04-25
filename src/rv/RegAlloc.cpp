@@ -14,7 +14,7 @@ std::map<std::string, int> RegAlloc::stats() {
 }
 
 #define LOWER(Ty, Body) \
-  runRewriter([&](Ty *op) { \
+  runRewriter(funcOp, [&](Ty *op) { \
     if (op->getOperands().size() == 0) \
       return false; \
     Body \
@@ -26,10 +26,71 @@ std::map<std::string, int> RegAlloc::stats() {
 // In that case just give it a random register.
 #define V(Index, AttrTy) \
   auto v##Index = op->getOperand(Index).defining; \
-  op->addAttr<AttrTy>(assignment.count(v##Index) ? assignment[v##Index] : order[0]);
+  op->addAttr<AttrTy>(getReg(v##Index));
 
 #define BINARY V(0, RsAttr) V(1, Rs2Attr)
 #define UNARY V(0, RsAttr)
+
+#define REPLACE_BRANCH(T1, T2) \
+  REPLACE_BRANCH_IMPL(T1, T2); \
+  REPLACE_BRANCH_IMPL(T2, T1)
+
+// Say the before is `blt`, then we might see
+//   blt %1 %2 <target = bb1> <else = bb2>
+// which means `if (%1 < %2) goto bb1 else goto bb2`.
+//
+// If the next block is just <bb1>, then we flip it to bge, and make the target <bb2>.
+// if the next block is <bb2>, then we make the target <bb2>.
+// otherwise, make the target <bb1>, and add another `j <bb2>`.
+#define REPLACE_BRANCH_IMPL(BeforeTy, AfterTy) \
+  runRewriter(funcOp, [&](BeforeTy *op) { \
+    if (!op->hasAttr<ElseAttr>()) \
+      return false; \
+    auto &target = op->getAttr<TargetAttr>()->bb; \
+    auto ifnot = op->getAttr<ElseAttr>()->bb; \
+    auto me = op->getParent(); \
+    /* If there's no "next block", then give up */ \
+    if (me == me->getParent()->getLastBlock()) { \
+      GENERATE_J; \
+      END_REPLACE; \
+    } \
+    if (me->nextBlock() == target) { \
+      builder.replace<AfterTy>(op, { \
+        op->getAttr<RsAttr>(), \
+        op->getAttr<Rs2Attr>(), \
+        new TargetAttr(ifnot), \
+      }); \
+      return true; \
+    } \
+    if (me->nextBlock() == ifnot) { \
+      target = ifnot; \
+      END_REPLACE; \
+    } \
+    GENERATE_J; \
+    END_REPLACE; \
+  })
+
+// Don't touch `target`.
+#define GENERATE_J \
+  builder.setAfterOp(op); \
+  builder.create<JOp>({ new TargetAttr(ifnot) })
+
+#define END_REPLACE \
+  op->removeAttr<ElseAttr>(); \
+  return true
+
+bool hasRd(Op *op) {
+  return 
+    isa<AddOp>(op) ||
+    isa<SubOp>(op) ||
+    isa<MulOp>(op) ||
+    isa<DivOp>(op) ||
+    isa<sys::rv::LoadOp>(op) ||
+    isa<AddiOp>(op) ||
+    isa<LiOp>(op) ||
+    isa<MvOp>(op) ||
+    isa<ReadRegOp>(op);
+}
 
 // In OpBase.cpp
 std::ostream &operator<<(std::ostream &os, Value value);
@@ -88,12 +149,6 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     for (auto op : bb->getLiveIn())
       defined[op] = -1;
 
-    std::cerr << "\n\n";
-    for (auto [op, v] : lastUsed) {
-      std::cerr << "range = [" << defined[op] << ", " << v << "):\n  ";
-      op->dump(std::cerr);
-    }
-
     static auto overlap = [](int b1, int e1, int b2, int e2) {
       // The overlap is of course [max(b1, b2), min(e1, e2)).
       // We check if the range has any elements.
@@ -117,7 +172,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     }
   }
 
-  dumpInterf(region, interf);
+  // dumpInterf(region, interf);
 
   // Now time to allocate.
 
@@ -198,7 +253,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     assert(false);
   }
   
-  dumpAssignment(region, assignment);
+  // dumpAssignment(region, assignment);
 
   Builder builder;
 
@@ -233,6 +288,12 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     return true;
   });
 
+  auto funcOp = region->getParent();
+
+  auto getReg = [&](Op *op) {
+    return assignment.count(op) ? assignment[op] : order[0];
+  };
+
   // Convert all operands to registers.
   LOWER(AddOp, BINARY);
   LOWER(SubOp, BINARY);
@@ -244,15 +305,16 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(BgeOp, BINARY);
   LOWER(StoreOp, BINARY);
   LOWER(BnezOp, UNARY);
+  LOWER(BezOp, UNARY);
   LOWER(AddiOp, UNARY);
   LOWER(LoadOp, UNARY);
 
   //   writereg %1, <reg = a0>
   // becomes
   //   mv a0, assignment[%1]
-  runRewriter([&](WriteRegOp *op) {
+  runRewriter(funcOp, [&](WriteRegOp *op) {
     auto rd = new RdAttr(op->getAttr<RegAttr>()->reg);
-    auto rs = new RsAttr(assignment[op->getOperand(0).defining]);
+    auto rs = new RsAttr(getReg(op->getOperand(0).defining));
     builder.replace<MvOp>(op, { rd, rs });
     return true;
   });
@@ -260,17 +322,17 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   //   readreg %1, <reg = a0>
   // becomes
   //   mv assignment[%1], a0
-  runRewriter([&](ReadRegOp *op) {
-    auto rd = new RsAttr(op->getAttr<RegAttr>()->reg);
-    auto rs = new RdAttr(assignment[op->getResult().defining]);
-    builder.replace<MvOp>(op, { rd, rs });
+  // Note that rd will be placed later.
+  runRewriter(funcOp, [&](ReadRegOp *op) {
+    auto rs = new RsAttr(op->getAttr<RegAttr>()->reg);
+    builder.replace<MvOp>(op, { rs });
     return true;
   });
 
   //   subsp <4>
   // becomes
   //   addi <rd = sp> <rs = sp> <-4>
-  runRewriter([&](SubSpOp *op) {
+  runRewriter(funcOp, [&](SubSpOp *op) {
     int offset = op->getAttr<IntAttr>()->value;
     builder.replace<AddiOp>(op, {
       new RdAttr(Reg::sp),
@@ -283,14 +345,19 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   for (auto bb : region->getBlocks()) {
     for (auto op : bb->getOps()) {
       auto result = op->getResult().defining;
-      if (assignment.count(result))
-        op->addAttr<RdAttr>(assignment[result]);
+      if (hasRd(op) && !op->hasAttr<RdAttr>())
+        op->addAttr<RdAttr>(getReg(result));
     }
   }
 
   // Remove all phi's. They're destructed beforehand.
   for (auto phi : phisToErase)
     phi->erase();
+
+  // Now branches are still having both TargetAttr and ElseAttr.
+  REPLACE_BRANCH(BltOp, BgeOp);
+  REPLACE_BRANCH(BeqOp, BneOp);
+  REPLACE_BRANCH(BnezOp, BezOp);
 }
 
 void RegAlloc::run() {

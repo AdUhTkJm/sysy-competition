@@ -57,6 +57,11 @@ void BasicBlock::remove(iterator at) {
   ops.erase(at);
 }
 
+BasicBlock *BasicBlock::nextBlock() {
+  auto it = place;
+  return *++it;
+}
+
 Op::Op(int id, const std::vector<Value> &values):
   id(id), result(this) {
   for (auto x : values) {
@@ -294,10 +299,13 @@ std::pair<BasicBlock*, BasicBlock*> Region::moveTo(BasicBlock *bb) {
 }
 
 void Region::updatePreds() {
-  for (auto bb : bbs)
+  for (auto bb : bbs) {
     bb->preds.clear();
+    bb->succs.clear();
+  }
 
   for (auto bb : bbs) {
+    assert(bb->getOps().size() > 0);
     auto last = bb->getLastOp();
     if (last->hasAttr<TargetAttr>()) {
       auto target = last->getAttr<TargetAttr>();
@@ -482,7 +490,9 @@ void Region::updateLiveness() {
     if (liveInOld != bb->liveIn)
       std::copy(bb->preds.begin(), bb->preds.end(), std::back_inserter(worklist));
   }
+}
 
+void Region::showLiveIn() {
   for (auto bb : bbs) {
     std::cerr << "=== block ===\n";
     for (auto x : bb->getOps()) {

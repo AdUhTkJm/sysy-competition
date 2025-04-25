@@ -37,6 +37,7 @@ RVOP(BneOp);
 RVOP(BeqOp);
 RVOP(BltOp);
 RVOP(BgeOp);
+RVOP(BezOp);
 RVOP(BnezOp);
 RVOP(JOp);
 RVOP(MvOp);

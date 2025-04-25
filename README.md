@@ -171,4 +171,8 @@ rv.add <rd = a0> <rs = a1> <rs2 = a2>
 
 这也就意味着 use-def chain 破裂，pass 到此为止。
 
-同时，RegAlloc 还会将 PhiOp 降低到 `mv` 指令。
+同时，RegAlloc 还会将 PhiOp 降低到 `mv` 指令，并整理生成的汇编。
+
+**Dump**
+
+将 RegAlloc 生成的汇编输出。

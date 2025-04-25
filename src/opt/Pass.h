@@ -21,16 +21,21 @@ protected:
   ModuleOp *module;
 
   template<class F>
-  void runRewriter(F rewriter) {
+  void runRewriter(Op *op, F rewriter) {
     using T = std::remove_pointer_t<argument_t<F>>;
     
     bool success;
     do {
-      auto ts = module->findAll<T>();
+      auto ts = op->findAll<T>();
       success = false;
       for (auto t : ts)
         success |= rewriter(t);
     } while (success);
+  }
+
+  template<class F>
+  void runRewriter(F rewriter) {
+    runRewriter(module, rewriter);
   }
 
   FuncOp *findFunction(const std::string &name);
