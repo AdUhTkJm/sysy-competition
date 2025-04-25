@@ -80,12 +80,12 @@ void Lower::run() {
   });
 
   runRewriter([&](MulIOp *op) {
-    builder.replace<MulOp>(op, op->getOperands(), op->getAttrs());
+    builder.replace<MulwOp>(op, op->getOperands(), op->getAttrs());
     return true;
   });
 
   runRewriter([&](DivIOp *op) {
-    builder.replace<DivOp>(op, op->getOperands(), op->getAttrs());
+    builder.replace<DivwOp>(op, op->getOperands(), op->getAttrs());
     return true;
   });
 
@@ -94,8 +94,8 @@ void Lower::run() {
     auto nom = op->getOperand(1);
 
     builder.setBeforeOp(op);
-    auto quot = builder.create<DivOp>(op->getOperands(), op->getAttrs());
-    auto mul = builder.create<MulOp>({ quot, nom });
+    auto quot = builder.create<DivwOp>(op->getOperands(), op->getAttrs());
+    auto mul = builder.create<MulwOp>({ quot, nom });
     builder.replace<SubOp>(op, { denom, mul });
     return true;
   });

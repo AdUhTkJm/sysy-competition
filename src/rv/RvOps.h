@@ -29,10 +29,11 @@ namespace rv {
 
 RVOP(LiOp);
 RVOP(AddOp);
-RVOP(AddiOp);
+RVOP(AddiwOp);
 RVOP(SubOp);
-RVOP(MulOp);
-RVOP(DivOp); // Signed; divu for unsigned.
+RVOP(MulwOp);
+RVOP(DivwOp); // Signed; divu for unsigned.
+RVOP(SlliwOp); // Shift left.
 RVOP(BneOp);
 RVOP(BeqOp);
 RVOP(BltOp);

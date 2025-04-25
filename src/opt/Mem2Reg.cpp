@@ -94,12 +94,31 @@ void Mem2Reg::fillPhi(BasicBlock *bb) {
     return;
   visited.insert(bb);
 
-  std::vector<LoadOp*> loads;
+  std::vector<std::pair<LoadOp*, Value>> loads;
   std::vector<StoreOp*> stores;
   for (auto op : bb->getOps()) {
     // Loads are now ordinary reads.
-    if (auto load = dyn_cast<LoadOp>(op))
-      loads.push_back(load);
+    if (auto load = dyn_cast<LoadOp>(op)) {
+      auto alloca = load->getOperand().defining;
+      // This is a global variable.
+      if (!converted.count(alloca))
+        continue;
+  
+      // Undefined behaviour in source program. Terminate.
+      if (!symbols.count(alloca)) {
+        std::cerr << "warning: alloca not initialized:\n  ";
+        alloca->dump(std::cerr);
+        std::cerr << "its uses:\n";
+        for (auto x : alloca->getUses()) {
+          std::cerr << "  ";
+          x->dump(std::cerr);
+        }
+        symbols[alloca] = builder.create<IntOp>({ new IntAttr(0) });
+      }
+      
+      auto value = symbols[alloca];
+      loads.push_back(std::make_pair(load, value));
+    }
     
     // Stores are now mutating symbol table.
     if (auto store = dyn_cast<StoreOp>(op)) {
@@ -125,25 +144,7 @@ void Mem2Reg::fillPhi(BasicBlock *bb) {
       fillPhi(jmp->getAttr<TargetAttr>()->bb);
   }
 
-  for (auto load : loads) {
-    auto alloca = load->getOperand().defining;
-    // This is a global variable.
-    if (!converted.count(alloca))
-      continue;
-
-    // Undefined behaviour in source program. Terminate.
-    if (!symbols.count(alloca)) {
-      std::cerr << "warning: alloca not initialized:\n  ";
-      alloca->dump(std::cerr);
-      std::cerr << "its uses:\n";
-      for (auto x : alloca->getUses()) {
-        std::cerr << "  ";
-        x->dump(std::cerr);
-      }
-      symbols[alloca] = builder.create<IntOp>({ new IntAttr(0) });
-    }
-    
-    auto value = symbols[alloca];
+  for (auto [load, value] : loads) {
     load->replaceAllUsesWith(value.defining);
     load->erase();
   }

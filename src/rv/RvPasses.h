@@ -32,7 +32,7 @@ class RvDCE : public Pass {
   int elim = 0;
 
   bool isImpure(Op *op);
-  bool markImpure(Region *region);
+  void markImpure(Region *region);
   void runOnRegion(Region *region);
 public:
   RvDCE(ModuleOp *module): Pass(module) {}

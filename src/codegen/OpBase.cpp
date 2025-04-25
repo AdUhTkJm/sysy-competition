@@ -453,43 +453,46 @@ void Region::updateLiveness() {
     return bb->getSuccs().size() == 0;
   });
 
-  while (!worklist.empty()) {
-    auto bb = worklist.front();
-    worklist.pop_front();
+  bool changed;
+  do {
+    changed = false;
+    for (auto bb : bbs) {
+      auto liveInOld = bb->liveIn;
 
-    auto liveInOld = bb->liveIn;
+      // LiveOut(B) = \bigcup_{S\in succ(B)} (LiveIn(S) - PhiDefs(S)) \cup PhiUses(B) 
+      std::set<Op*> liveOut;
+      for (auto succ : bb->getSuccs()) {
+        std::set_difference(
+          succ->liveIn.begin(), succ->liveIn.end(),
+          phis[succ].begin(), phis[succ].end(),
+          std::inserter(liveOut, liveOut.end())
+        );
+      }
+      for (auto phi : phis[bb]) {
+        for (auto value : phi->getOperands())
+          liveOut.insert(value.defining);
+      }
 
-    // LiveOut(B) = \bigcup_{S\in succ(B)} (LiveIn(S) - PhiDefs(S)) \cup PhiUses(B) 
-    std::set<Op*> liveOut;
-    for (auto succ : bb->getSuccs()) {
+      bb->liveOut = liveOut;
+
+      // LiveIn(B) = PhiDefs(B) \cup UpwardExposed(B) \cup (LiveOut(B) - Defs(B))
+      bb->liveIn.clear();
       std::set_difference(
-        succ->liveIn.begin(), succ->liveIn.end(),
-        phis[succ].begin(), phis[succ].end(),
-        std::inserter(liveOut, liveOut.end())
+        liveOut.begin(), liveOut.end(),
+        defined[bb].begin(), defined[bb].end(),
+        std::inserter(bb->liveIn, bb->liveIn.end())
       );
+      for (auto x : upwardExposed[bb])
+        bb->liveIn.insert(x);
+      for (auto x : phis[bb])
+        bb->liveIn.insert(x);
+
+      if (liveInOld != bb->liveIn)
+        changed = true;
     }
-    for (auto phi : phis[bb]) {
-      for (auto value : phi->getOperands())
-        liveOut.insert(value.defining);
-    }
+  } while (changed);
 
-    bb->liveOut = liveOut;
-
-    // LiveIn(B) = PhiDefs(B) \cup UpwardExposed(B) \cup (LiveOut(B) - Defs(B))
-    bb->liveIn.clear();
-    std::set_difference(
-      liveOut.begin(), liveOut.end(),
-      defined[bb].begin(), defined[bb].end(),
-      std::inserter(bb->liveIn, bb->liveIn.end())
-    );
-    for (auto x : upwardExposed[bb])
-      bb->liveIn.insert(x);
-    for (auto x : phis[bb])
-      bb->liveIn.insert(x);
-
-    if (liveInOld != bb->liveIn)
-      std::copy(bb->preds.begin(), bb->preds.end(), std::back_inserter(worklist));
-  }
+  showLiveIn();
 }
 
 void Region::showLiveIn() {
@@ -501,6 +504,11 @@ void Region::showLiveIn() {
     }
     std::cerr << "=== livein ===\n";
     for (auto x : bb->liveIn) {
+      std::cerr << "  ";
+      x->dump(std::cerr);
+    }
+    std::cerr << "=== liveout ===\n";
+    for (auto x : bb->liveOut) {
       std::cerr << "  ";
       x->dump(std::cerr);
     }

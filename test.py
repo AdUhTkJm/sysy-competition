@@ -11,11 +11,12 @@ parser.add_argument("-s", "--stats", action="store_true")
 parser.add_argument("-r", "--dump-mid-ir", action="store_true")
 parser.add_argument("--arm", action="store_true")
 parser.add_argument("-a", "--test-all", action="store_true")
+parser.add_argument("-n", "--no-execute", action="store_true")
 parser.add_argument("-t", "--test", type=str)
 
 args = parser.parse_args()
 
-def run(full_file: str):
+def run(full_file: str, no_exec: bool):
   file = os.path.splitext(full_file)[0]
 
   command = ["bin/sysc", f"test/{full_file}"]
@@ -42,10 +43,13 @@ def run(full_file: str):
   
   # Invoke SysY compiler.
   proc.run(command, check=True)
+
+  if no_exec:
+    return;
   
   # Invoke gcc.
   gcc = "aarch64-linux-gnu-gcc" if args.arm else "riscv64-linux-gnu-gcc"
-  proc.run([gcc, f"temp/{file}.s", "-static", "-o", f"temp/{file}"], check=True)
+  proc.run([gcc, f"temp/{file}.s", "test/official/sylib.c", "-static", "-o", f"temp/{file}"], check=True)
 
   # Run the file.
   qemu = "qemu-aarch64-static" if args.arm else "qemu-riscv64-static"
@@ -65,5 +69,6 @@ if args.test_all:
     # TODO
 
 if args.test:
-  result = run(args.test)
-  print(result.returncode)
+  result = run(args.test, args.no_execute)
+  if not args.no_execute:
+    print(result.returncode)

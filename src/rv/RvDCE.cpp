@@ -23,23 +23,14 @@ bool RvDCE::isImpure(Op *op) {
   return false;
 }
 
-bool RvDCE::markImpure(Region *region) {
-  bool impure = false;
+// Here no nested regions are possible.
+void RvDCE::markImpure(Region *region) {
   for (auto bb : region->getBlocks()) {
     for (auto op : bb->getOps()) {
-      bool opImpure = false;
-      if (isImpure(op))
-        opImpure = true;
-      for (auto r : op->getRegions())
-        opImpure |= markImpure(r);
-
-      if (opImpure && !op->hasAttr<ImpureAttr>()) {
-        impure = true;
+      if (isImpure(op) && !op->hasAttr<ImpureAttr>())
         op->addAttr<ImpureAttr>();
-      }
     }
   }
-  return impure;
 }
 
 void RvDCE::runOnRegion(Region *region) {
