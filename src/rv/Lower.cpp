@@ -103,31 +103,26 @@ void Lower::run() {
   runRewriter([&](BranchOp *op) {
     auto cond = op->getOperand().defining;
 
-    // Only merge when the value of `cond` is not used elsewhere.
-    if (isa<EqOp>(cond) && cond->getUses().size() == 1) {
+    if (isa<EqOp>(cond)) {
       builder.replace<BeqOp>(op, cond->getOperands(), op->getAttrs());
-      cond->erase();
       return true;
     }
 
-    if (isa<NeOp>(cond) && cond->getUses().size() == 1) {
+    if (isa<NeOp>(cond)) {
       builder.replace<BneOp>(op, cond->getOperands(), op->getAttrs());
-      cond->erase();
       return true;
     }
 
     // Note RISC-V only has `bge`. Switch operand order for this.
-    if (isa<LeOp>(cond) && cond->getUses().size() == 1) {
+    if (isa<LeOp>(cond)) {
       auto v1 = cond->getOperand(0);
       auto v2 = cond->getOperand(1);
       builder.replace<BgeOp>(op, { v2, v1 }, op->getAttrs());
-      cond->erase();
       return true;
     }
 
-    if (isa<LtOp>(cond) && cond->getUses().size() == 1) {
+    if (isa<LtOp>(cond)) {
       builder.replace<BltOp>(op, cond->getOperands(), op->getAttrs());
-      cond->erase();
       return true;
     }
 

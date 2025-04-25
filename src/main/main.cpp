@@ -19,6 +19,7 @@ void initRvPipeline(sys::PassManager &pm) {
 
   pm.addPass<Lower>();
   pm.addPass<InstCombine>();
+  pm.addPass<RvDCE>();
 }
 
 void initPipeline(sys::PassManager &pm, const sys::Options &opts) {
