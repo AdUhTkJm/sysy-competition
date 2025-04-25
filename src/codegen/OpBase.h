@@ -16,6 +16,21 @@ namespace sys {
 class Op;
 class BasicBlock;
 
+class Value {
+public:
+  Op *defining;
+
+  Value() {} // uninitialized, for std::map
+  Value(Op *from): defining(from) {}
+
+  bool operator==(Value x) const { return defining == x.defining; }
+  bool operator!=(Value x) const { return defining != x.defining; }
+  bool operator<(Value x) const { return defining < x.defining; }
+  bool operator>(Value x) const { return defining > x.defining; }
+  bool operator<=(Value x) const { return defining <= x.defining; }
+  bool operator>=(Value x) const { return defining >= x.defining; }
+};
+
 class Region {
   std::list<BasicBlock*> bbs;
   Op *parent;
@@ -46,6 +61,8 @@ public:
   void updatePreds();
   // Updates `dominators` for every basic block inside this region.
   void updateDoms();
+  // Updates `liveIn` and `liveOut` for every basic block inside this region.
+  void updateLiveness();
 
   // Moves all blocks in `from` after `insertionPoint`.
   // Returns the first and final block.
@@ -59,11 +76,16 @@ class BasicBlock {
   Region *parent;
   Region::iterator place;
   std::set<BasicBlock*> preds;
+  std::set<BasicBlock*> succs;
   // Note these are dominatORs, which mean `this` is dominatED by the elements.
   std::set<BasicBlock*> doms;
   // Dominance frontiers. `this` dominatES all blocks which are preds of the elements.
   std::set<BasicBlock*> domFront;
   BasicBlock *idom = nullptr;
+  // Variable (results of the ops) alive at the beginning of this block.
+  std::set<Op*> liveIn;
+  // Variable (results of the ops) alive at the end of this block.
+  std::set<Op*> liveOut;
 
   friend class Region;
   friend class Op;
@@ -84,8 +106,11 @@ public:
   Region *getParent() { return parent; }
 
   const auto &getPreds() { return preds; }
+  const auto &getSuccs() { return succs; }
   const auto &getDoms() { return doms; }
   const auto &getDominanceFrontier() { return domFront; }
+  const auto &getLiveIn() { return liveIn; }
+  const auto &getLiveOut() { return liveOut; }
   
   BasicBlock *getIdom() { return idom; }
 
@@ -106,14 +131,6 @@ public:
   void moveToEnd(Region *region);
 
   void erase();
-};
-
-class Value {
-public:
-  Op *defining;
-
-  Value() {} // uninitialized, for std::map
-  Value(Op *from): defining(from) {}
 };
 
 class Attr {
@@ -160,6 +177,7 @@ public:
   Value getOperand(int i = 0) { return operands[i]; }
 
   void pushOperand(Value v);
+  void removeAllOperands();
 
   Value getResult() const { return result; }
   operator Value() const { return result; }

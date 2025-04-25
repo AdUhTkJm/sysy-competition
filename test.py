@@ -14,6 +14,8 @@ parser.add_argument("-a", "--test-all", action="store_true")
 parser.add_argument("-t", "--test", type=str)
 
 args = parser.parse_args()
+# gcc -march=armv8-a
+# gcc -march=rv64gc
 
 proc.run(["make"], check=True)
 if args.test_all:

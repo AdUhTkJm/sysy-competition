@@ -8,6 +8,8 @@
 #include <fstream>
 #include <sstream>
 
+sys::Options opts;
+
 void initArmPipeline(sys::PassManager &pm) {
   using namespace sys::arm;
 
@@ -20,9 +22,11 @@ void initRvPipeline(sys::PassManager &pm) {
   pm.addPass<Lower>();
   pm.addPass<InstCombine>();
   pm.addPass<RvDCE>();
+  pm.addPass<RegAlloc>();
+  pm.addPass<Dump>(opts.outputFile);
 }
 
-void initPipeline(sys::PassManager &pm, const sys::Options &opts) {
+void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::MoveAlloca>();
 
   // ===== Structured control flow =====
@@ -44,7 +48,7 @@ void initPipeline(sys::PassManager &pm, const sys::Options &opts) {
 }
 
 int main(int argc, char **argv) {
-  auto opts = sys::parseArgs(argc, argv);
+  opts = sys::parseArgs(argc, argv);
 
   // Read input file.
   std::ifstream ifs(opts.inputFile);
@@ -70,8 +74,7 @@ int main(int argc, char **argv) {
   pm.setVerbose(opts.verbose);
   pm.setPrintStats(opts.stats);
   
-  initPipeline(pm, opts);
+  initPipeline(pm);
   pm.run();
-  pm.getModule()->dump(std::cerr);
   return 0;
 }

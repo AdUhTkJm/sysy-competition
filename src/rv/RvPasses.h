@@ -44,6 +44,8 @@ public:
 
 class RegAlloc : public Pass {
   int spilled = 0;
+
+  void runImpl(Region *region, bool isLeaf);
 public:
   RegAlloc(ModuleOp *module): Pass(module) {}
 
@@ -52,9 +54,16 @@ public:
   void run();
 };
 
-enum class Reg;
-// Result of register allocation is stored here.
-extern std::map<Value, Reg> regalloc;
+// Dumps the output.
+class Dump : public Pass {
+  std::string out;
+public:
+  Dump(ModuleOp *module, const std::string &out): Pass(module), out(out) {}
+
+  std::string name() { return "rv-dump"; };
+  std::map<std::string, int> stats() { return {}; }
+  void run();
+};
 
 }
 

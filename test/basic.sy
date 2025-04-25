@@ -1,6 +1,5 @@
-int count; // Automatically zeroed
-
 int main() {
+  int count = 0;
   int a = 7;
   while (a != 1) {
     count = count + 1;

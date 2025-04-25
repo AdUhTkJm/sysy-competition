@@ -52,4 +52,6 @@ RVOP(CallOp);
 
 }
 
+#undef RVOP
+
 #endif

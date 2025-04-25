@@ -1,7 +1,10 @@
 #include "OpBase.h"
 #include "Attrs.h"
+#include "Ops.h"
+
 #include <algorithm>
 #include <cassert>
+#include <deque>
 #include <iterator>
 #include <map>
 #include <iostream>
@@ -111,15 +114,19 @@ void Op::moveToEnd(BasicBlock *block) {
   parent->insert(parent->end(), this);
 }
 
-void Op::erase() {
-  assert(uses.size() == 0);
-  
-  parent->remove(place);
+void Op::removeAllOperands() {
   for (auto x : operands) {
     auto op = x.defining;
     op->uses.erase(this);
   }
+  operands.clear();
+}
 
+void Op::erase() {
+  assert(uses.size() == 0);
+  
+  parent->remove(place);
+  removeAllOperands();
   // We can't delete Attr* because they'll be referenced elsewhere.
   // Memory leak? Who cares.
   delete this;
@@ -146,7 +153,7 @@ void Op::replaceAllUsesWith(Op *other) {
 static std::map<Op*, int> valueName = {};
 static int id = 0;
 
-std::ostream &operator<<(std::ostream &os, Value &value) {
+std::ostream &operator<<(std::ostream &os, Value value) {
   if (!valueName.count(value.defining))
     valueName[value.defining] = id++;
   return os << "%" << valueName[value.defining];
@@ -302,12 +309,24 @@ void Region::updatePreds() {
       ifnot->bb->preds.insert(bb);
     }
   }
+
+  for (auto bb : bbs) {
+    for (auto pred : bb->getPreds())
+      pred->succs.insert(bb);
+  }
 }
 
 // Use the simple data-flow approach, rather than the Tarjan one.
 // See https://en.wikipedia.org/wiki/Dominator_(graph_theory)
 void Region::updateDoms() {
   updatePreds();
+  // Clear existing data.
+  for (auto bb : bbs) {
+    bb->doms.clear();
+    bb->idom = nullptr;
+    bb->domFront.clear();
+  }
+
   for (auto x : bbs)
     std::copy(bbs.begin(), bbs.end(), std::inserter(x->doms, x->doms.end()));
   
@@ -382,7 +401,101 @@ void Region::updateDoms() {
       }
     }
   }
+}
 
+// See the SSA Book:
+//   https://pfalcon.github.io/ssabook/latest/book-full.pdf
+// Page 116.
+void Region::updateLiveness() {
+  updatePreds();
+
+  // Clear existing values.
+  for (auto bb : bbs) {
+    bb->liveIn.clear();
+    bb->liveOut.clear();
+  }
+
+  std::map<BasicBlock*, std::set<Op*>> phis;
+  std::map<BasicBlock*, std::set<Op*>> upwardExposed;
+  std::map<BasicBlock*, std::set<Op*>> defined;
+
+  for (auto bb : bbs) {
+    for (auto op : bb->getOps()) {
+      if (isa<PhiOp>(op)) {
+        phis[bb].insert(op);
+        continue;
+      }
+
+      defined[bb].insert(op);
+
+      // A value is upward exposed if it's from some block upwards;
+      // i.e. it's used but not defined in this block.
+      for (auto value : op->getOperands()) {
+        if (!defined[bb].count(value.defining))
+          upwardExposed[bb].insert(value.defining);
+      }
+    }
+  }
+
+  std::deque<BasicBlock*> worklist;
+  
+  // Do a dataflow approach. We start with all exit blocks;
+  // i.e. those that have no successors.
+  std::copy_if(bbs.begin(), bbs.end(), std::back_inserter(worklist), [&](BasicBlock *bb) {
+    return bb->getSuccs().size() == 0;
+  });
+
+  while (!worklist.empty()) {
+    auto bb = worklist.front();
+    worklist.pop_front();
+
+    auto liveInOld = bb->liveIn;
+
+    // LiveOut(B) = \bigcup_{S\in succ(B)} (LiveIn(S) - PhiDefs(S)) \cup PhiUses(B) 
+    std::set<Op*> liveOut;
+    for (auto succ : bb->getSuccs()) {
+      std::set_difference(
+        succ->liveIn.begin(), succ->liveIn.end(),
+        phis[succ].begin(), phis[succ].end(),
+        std::inserter(liveOut, liveOut.end())
+      );
+    }
+    for (auto phi : phis[bb]) {
+      for (auto value : phi->getOperands())
+        liveOut.insert(value.defining);
+    }
+
+    bb->liveOut = liveOut;
+
+    // LiveIn(B) = PhiDefs(B) \cup UpwardExposed(B) \cup (LiveOut(B) - Defs(B))
+    bb->liveIn.clear();
+    std::set_difference(
+      liveOut.begin(), liveOut.end(),
+      defined[bb].begin(), defined[bb].end(),
+      std::inserter(bb->liveIn, bb->liveIn.end())
+    );
+    for (auto x : upwardExposed[bb])
+      bb->liveIn.insert(x);
+    for (auto x : phis[bb])
+      bb->liveIn.insert(x);
+
+    if (liveInOld != bb->liveIn)
+      std::copy(bb->preds.begin(), bb->preds.end(), std::back_inserter(worklist));
+  }
+
+  for (auto bb : bbs) {
+    std::cerr << "=== block ===\n";
+    for (auto x : bb->getOps()) {
+      std::cerr << "  ";
+      x->dump(std::cerr);
+    }
+    std::cerr << "=== livein ===\n";
+    for (auto x : bb->liveIn) {
+      std::cerr << "  ";
+      x->dump(std::cerr);
+    }
+    std::cerr << "\n\n";
+  }
 }
 
 void Region::dump(std::ostream &os, int depth) {

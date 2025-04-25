@@ -68,4 +68,6 @@ OP(NotOp);
 
 }
 
+#undef OP
+
 #endif

@@ -133,14 +133,14 @@ void Mem2Reg::fillPhi(BasicBlock *bb) {
 
     // Undefined behaviour in source program. Terminate.
     if (!symbols.count(alloca)) {
-      std::cerr << "cannot find value for this alloca:\n  ";
+      std::cerr << "warning: alloca not initialized:\n  ";
       alloca->dump(std::cerr);
       std::cerr << "its uses:\n";
       for (auto x : alloca->getUses()) {
         std::cerr << "  ";
         x->dump(std::cerr);
       }
-      assert(false);
+      symbols[alloca] = builder.create<IntOp>({ new IntAttr(0) });
     }
     
     auto value = symbols[alloca];
