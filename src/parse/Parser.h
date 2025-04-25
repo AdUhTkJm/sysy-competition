@@ -56,6 +56,8 @@ class Parser {
   std::vector<Token> tokens;
   size_t loc;
   TypeContext &ctx;
+  
+  std::string currentFunc;
 
   Token last();
   Token peek();

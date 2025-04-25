@@ -106,9 +106,29 @@ Value CodeGen::emitBinary(BinaryNode *node) {
   }
 }
 
+Value CodeGen::emitUnary(UnaryNode *node) {
+  auto value = emitExpr(node->node);
+  switch (node->kind) {
+  case UnaryNode::Float2Int:
+    return builder.create<F2IOp>({ value });
+  case UnaryNode::Int2Float:
+    return builder.create<I2FOp>({ value });
+  case UnaryNode::Not:
+    return builder.create<NotOp>({ value });
+  case UnaryNode::Minus:
+    if (isa<FloatType>(node->type))
+      return builder.create<MinusFOp>({ value });
+    else
+      return builder.create<MinusOp>({ value });
+  }
+}
+
 Value CodeGen::emitExpr(ASTNode *node) {
   if (auto binary = dyn_cast<BinaryNode>(node))
     return emitBinary(binary);
+  
+  if (auto unary = dyn_cast<UnaryNode>(node))
+    return emitUnary(unary);
 
   if (auto lint = dyn_cast<IntNode>(node))
     return builder.create<IntOp>({ new IntAttr(lint->value) });

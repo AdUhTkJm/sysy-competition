@@ -3,39 +3,6 @@
 
 using namespace sys;
 
-bool Pureness::isImpure(Op *op) {
-  if (isa<StoreOp>(op) || isa<ReturnOp>(op) ||
-      isa<BranchOp>(op) || isa<GotoOp>(op) ||
-      isa<ProceedOp>(op))
-    return true;
-
-  if (isa<CallOp>(op)) {
-    auto name = op->getAttr<NameAttr>()->name;
-    return impures.count(name);
-  }
-
-  return false;
-}
-
-bool Pureness::markImpure(Region *region) {
-  bool impure = false;
-  for (auto bb : region->getBlocks()) {
-    for (auto op : bb->getOps()) {
-      bool opImpure = false;
-      if (isImpure(op))
-        opImpure = true;
-      for (auto r : op->getRegions())
-        opImpure |= markImpure(r);
-
-      if (opImpure && !op->hasAttr<ImpureAttr>()) {
-        impure = true;
-        op->addAttr<ImpureAttr>();
-      }
-    }
-  }
-  return impure;
-}
-
 // Find all stores to an address.
 // An address might be loaded, stored or added by some offset.
 bool hasStoresTo(Op *op) {
@@ -93,6 +60,12 @@ void Pureness::predetermineImpure(FuncOp *func) {
 }
 
 void Pureness::run() {
+  auto funcs = module->findAll<FuncOp>();
+
+  // Note that predetermineImpure() assumes to operate **before** Mem2Reg,
+  // and any further transformation should preserve function pureness.
+  // For pureness of individual functions, do it in DCE.
+
   // Construct a call graph.
   auto calls = module->findAll<CallOp>();
   for (auto call : calls) {
@@ -103,8 +76,6 @@ void Pureness::run() {
 
   // Predetermine all other factors that make a function impure,
   // expect the criterion of "calling another impure function".
-  auto funcs = module->findAll<FuncOp>();
-
   for (auto func : funcs)
     predetermineImpure(func);
 
@@ -137,8 +108,4 @@ void Pureness::run() {
       }
     }
   } while (changed);
-  
-  // Finally, don't forget marking individual ops as pure or not.
-  for (auto func : funcs)
-    markImpure(func->getRegion());
 }

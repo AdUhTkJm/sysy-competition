@@ -109,6 +109,7 @@ class CodeGen {
   Value emitExpr(ASTNode *node);
 
   Value emitBinary(BinaryNode *node);
+  Value emitUnary(UnaryNode *node);
   
   int getSize(Type *ty);
 public:

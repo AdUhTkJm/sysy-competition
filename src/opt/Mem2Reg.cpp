@@ -131,6 +131,18 @@ void Mem2Reg::fillPhi(BasicBlock *bb) {
     if (!converted.count(alloca))
       continue;
 
+    // Undefined behaviour in source program. Terminate.
+    if (!symbols.count(alloca)) {
+      std::cerr << "cannot find value for this alloca:\n  ";
+      alloca->dump(std::cerr);
+      std::cerr << "its uses:\n";
+      for (auto x : alloca->getUses()) {
+        std::cerr << "  ";
+        x->dump(std::cerr);
+      }
+      assert(false);
+    }
+    
     auto value = symbols[alloca];
     load->replaceAllUsesWith(value.defining);
     load->erase();

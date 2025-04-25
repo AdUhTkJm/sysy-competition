@@ -15,17 +15,17 @@ class TypeContext {
       size_t hash = ty->getID();
 
       if (auto arr = dyn_cast<ArrayType>(ty)) {
-        hash = (hash << 8) + Hash()(arr->base);
+        hash = (hash << 4) + Hash()(arr->base);
         for (auto x : arr->dims)
           hash *= (x + 1);
       }
 
       if (auto ptr = dyn_cast<PointerType>(ty)) {
-        hash = (hash << 8) + Hash()(ptr->pointee);
+        hash = (hash << 4) + Hash()(ptr->pointee);
       }
 
       if (auto fn = dyn_cast<FunctionType>(ty)) {
-        hash = (hash << 8) + Hash()(fn->ret);
+        hash = (hash << 4) + Hash()(fn->ret);
         for (auto x : fn->params) {
           hash <<= 1;
           hash += Hash()(x);

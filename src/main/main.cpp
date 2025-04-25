@@ -33,8 +33,6 @@ void initPipeline(sys::PassManager &pm, const sys::Options &opts) {
 
   pm.addPass<sys::FlattenCFG>();
   pm.addPass<sys::Mem2Reg>();
-  // Update <impure> for instructions introduced by previous passes.
-  pm.addPass<sys::Pureness>();
   pm.addPass<sys::DCE>();
 
   if (opts.arm)

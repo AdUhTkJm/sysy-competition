@@ -58,15 +58,10 @@ public:
 };
 
 // Analysis pass.
-// Detects whether an operation is pure. If it isn't, give it an ImpureAttr.
+// Detects whether a function is pure. If it isn't, give it an ImpureAttr.
 class Pureness : public Pass {
   // Maps a function to all functions that it might call.
   std::map<FuncOp*, std::set<FuncOp*>> callGraph;
-  // Impure functions.
-  std::set<std::string> impures;
-
-  bool markImpure(Region *region);
-  bool isImpure(Op *op);
 
   void predetermineImpure(FuncOp *func);
 public:
@@ -82,6 +77,8 @@ class DCE : public Pass {
   std::vector<Op*> removeable;
   int elim = 0;
 
+  bool isImpure(Op *op);
+  bool markImpure(Region *region);
   void runOnRegion(Region *region);
 public:
   DCE(ModuleOp *module): Pass(module) {}

@@ -47,11 +47,38 @@ Type *Sema::infer(ASTNode *node) {
   if (auto binary = dyn_cast<BinaryNode>(node)) {
     auto lty = infer(binary->l);
     auto rty = infer(binary->r);
+
+    if (isa<FloatType>(lty) && isa<IntType>(rty)) {
+      binary->r = new UnaryNode(UnaryNode::Int2Float, binary->r);
+      binary->r->type = ctx.create<FloatType>();
+      return binary->type = ctx.create<FloatType>();
+    }
+
+    if (isa<IntType>(lty) && isa<FloatType>(rty)) {
+      binary->l = new UnaryNode(UnaryNode::Int2Float, binary->l);
+      binary->l->type = ctx.create<FloatType>();
+      return binary->type = ctx.create<FloatType>();
+    }
+
+    if (isa<FloatType>(lty) && isa<FloatType>(rty))
+      return node->type = ctx.create<FloatType>();
+
     if (lty != rty) {
       std::cerr << "bad binary op\n";
       assert(false);
     }
-    // TODO: deal with float & implicit cast
+    
+    return node->type = ctx.create<IntType>();
+  }
+
+  if (auto unary = dyn_cast<UnaryNode>(node)) {
+    auto ty = infer(unary->node);
+    // These two ops won't be emitted in parser.
+    assert(unary->kind != UnaryNode::Float2Int && unary->kind != UnaryNode::Int2Float);
+
+    if (isa<FloatType>(ty) && unary->kind == UnaryNode::Minus)
+      return node->type = ctx.create<FloatType>();
+    
     return node->type = ctx.create<IntType>();
   }
 
@@ -64,13 +91,52 @@ Type *Sema::infer(ASTNode *node) {
     if (vardecl->global || !vardecl->mut)
       // Already folded. Just propagate type.
       vardecl->init->type = node->type;
-    else
-      infer(vardecl->init);
+    else {
+      auto ty = infer(vardecl->init);
+      if (isa<IntType>(ty) && isa<FloatType>(vardecl->type)) {
+        vardecl->init = new UnaryNode(UnaryNode::Int2Float, vardecl->init);
+        vardecl->init->type = ctx.create<FloatType>();
+        return ctx.create<VoidType>();
+      }
+
+      if (isa<FloatType>(ty) && isa<IntType>(vardecl->type)) {
+        vardecl->init = new UnaryNode(UnaryNode::Float2Int, vardecl->init);
+        vardecl->init->type = ctx.create<IntType>();
+        return ctx.create<VoidType>();
+      }
+
+      if (ty != vardecl->type) {
+        std::cerr << "bad assignment\n";
+        assert(false);
+      }
+    }
     return ctx.create<VoidType>();
   }
 
   if (auto ret = dyn_cast<ReturnNode>(node)) {
-    infer(ret->node);
+    auto ty = infer(ret->node);
+    if (!symbols.count(ret->func)) {
+      std::cerr << "cannot find symbol " << ret->func << "\n";
+      assert(false);
+    }
+
+    auto retTy = cast<FunctionType>(symbols[ret->func])->ret;
+    if (isa<IntType>(retTy) && isa<FloatType>(ty)) {
+      ret->node = new UnaryNode(UnaryNode::Float2Int, ret->node);
+      ret->node->type = ctx.create<FloatType>();
+      return ctx.create<VoidType>();
+    }
+
+    if (isa<FloatType>(retTy) && isa<IntType>(ty)) {
+      ret->node = new UnaryNode(UnaryNode::Int2Float, ret->node);
+      ret->node->type = ctx.create<IntType>();
+      return ctx.create<VoidType>();
+    }
+
+    if (retTy != ret->node->type) {
+      std::cerr << "bad return\n";
+      assert(false);
+    }
     return ctx.create<VoidType>();
   }
   
@@ -107,8 +173,20 @@ Type *Sema::infer(ASTNode *node) {
   if (auto assign = dyn_cast<AssignNode>(node)) {
     auto lty = infer(assign->l);
     auto rty = infer(assign->r);
+    if (isa<IntType>(lty) && isa<FloatType>(rty)) {
+      assign->r = new UnaryNode(UnaryNode::Int2Float, assign->r);
+      assign->r->type = ctx.create<FloatType>();
+      return ctx.create<VoidType>();
+    }
+
+    if (isa<FloatType>(lty) && isa<IntType>(rty)) {
+      assign->r = new UnaryNode(UnaryNode::Float2Int, assign->r);
+      assign->r->type = ctx.create<IntType>();
+      return ctx.create<VoidType>();
+    }
+
     if (lty != rty) {
-      std::cerr << "bad assign op\n";
+      std::cerr << "bad assignment\n";
       assert(false);
     }
     return node->type = ctx.create<VoidType>();
@@ -120,13 +198,33 @@ Type *Sema::infer(ASTNode *node) {
   }
 
   if (auto call = dyn_cast<CallNode>(node)) {
-    for (auto x : call->args)
-      infer(x);
+    auto fnTy = cast<FunctionType>(symbols[call->func]);
+    for (size_t i = 0; i < fnTy->params.size(); i++) {
+      ASTNode *&x = call->args[i];
+      auto ty = infer(x);
+      auto argTy = fnTy->params[i];
+
+      if (isa<FloatType>(ty) && isa<IntType>(argTy)) {
+        x = new UnaryNode(UnaryNode::Float2Int, x);
+        x->type = ctx.create<IntType>();
+        continue;
+      }
+
+      if (isa<IntType>(ty) && isa<FloatType>(argTy)) {
+        x = new UnaryNode(UnaryNode::Int2Float, x);
+        x->type = ctx.create<FloatType>();
+        continue;
+      }
+
+      if (ty != argTy) {
+        std::cerr << "bad function argument\n";
+        assert(false);
+      }
+    }
     if (!symbols.count(call->func)) {
       std::cerr << "cannot find function " << call->func << "\n";
       assert(false);
     }
-    auto fnTy = cast<FunctionType>(symbols[call->func]);
     return node->type = fnTy->ret;
   }
 

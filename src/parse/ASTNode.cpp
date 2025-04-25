@@ -172,6 +172,18 @@ TOSTR(ArrayAccessNode) {
   return "[]";
 }
 
+WALK(ArrayAssignNode) {
+  walker(this);
+  array->walk(walker);
+  for (auto x : indices)
+    x->walk(walker);
+  value->walk(walker);
+}
+
+TOSTR(ArrayAssignNode) {
+  return "[]=";
+}
+
 WALK(CallNode) {
   walker(this);
   for (auto x : args)

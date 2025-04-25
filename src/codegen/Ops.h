@@ -60,6 +60,11 @@ OP(GlobalOp);
 OP(MemcpyOp); // Operand order: dst, src
 OP(CallOp);
 OP(PhiOp);
+OP(F2IOp);
+OP(I2FOp);
+OP(MinusOp); // for input x, returns -x. Don't confuse with SubI/SubF.
+OP(MinusFOp);
+OP(NotOp);
 
 }
 

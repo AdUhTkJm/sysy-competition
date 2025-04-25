@@ -150,8 +150,9 @@ public:
 class ReturnNode : public ASTNodeImpl<ReturnNode, __LINE__> {
 public:
   ASTNode *node;
+  std::string func;
 
-  ReturnNode(ASTNode *node): node(node) {}
+  ReturnNode(const std::string &func, ASTNode *node): node(node), func(func) {}
 
   void walk(ASTWalker walker);
   std::string toString() const;
@@ -220,6 +221,19 @@ public:
 
   ArrayAccessNode(ASTNode *array, ASTNode *index):
     array(array), index(index) {}
+  
+  void walk(ASTWalker walker);
+  std::string toString() const;
+};
+
+class ArrayAssignNode : public ASTNodeImpl<ArrayAssignNode, __LINE__> {
+public:
+  ASTNode *array;
+  std::vector<ASTNode*> indices;
+  ASTNode *value;
+
+  ArrayAssignNode(ASTNode *array, const std::vector<ASTNode*> &indices, ASTNode *value):
+    array(array), indices(indices), value(value) {}
   
   void walk(ASTWalker walker);
   std::string toString() const;

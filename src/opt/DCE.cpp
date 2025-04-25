@@ -9,7 +9,41 @@ std::map<std::string, int> DCE::stats() {
   };
 }
 
+bool DCE::isImpure(Op *op) {
+  if (isa<StoreOp>(op) || isa<ReturnOp>(op) ||
+      isa<BranchOp>(op) || isa<GotoOp>(op) ||
+      isa<ProceedOp>(op))
+    return true;
+
+  if (isa<CallOp>(op)) {
+    auto name = op->getAttr<NameAttr>()->name;
+    return findFunction(name)->hasAttr<ImpureAttr>();
+  }
+
+  return false;
+}
+
+bool DCE::markImpure(Region *region) {
+  bool impure = false;
+  for (auto bb : region->getBlocks()) {
+    for (auto op : bb->getOps()) {
+      bool opImpure = false;
+      if (isImpure(op))
+        opImpure = true;
+      for (auto r : op->getRegions())
+        opImpure |= markImpure(r);
+
+      if (opImpure && !op->hasAttr<ImpureAttr>()) {
+        impure = true;
+        op->addAttr<ImpureAttr>();
+      }
+    }
+  }
+  return impure;
+}
+
 void DCE::runOnRegion(Region *region) {
+  markImpure(region);
   for (auto bb : region->getBlocks()) {
     for (auto op : bb->getOps()) {
       if (!op->hasAttr<ImpureAttr>() && op->getUses().size() == 0)

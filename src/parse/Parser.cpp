@@ -295,7 +295,7 @@ ASTNode *Parser::stmt() {
     return block();
 
   if (test(Token::Return)) {
-    auto ret = new ReturnNode(expr());
+    auto ret = new ReturnNode(currentFunc, expr());
     expect(Token::Semicolon);
     return ret;
   }
@@ -404,6 +404,7 @@ FnDeclNode *Parser::fnDecl() {
   Type *ret = parseSimpleType();
 
   auto name = expect(Token::Ident).vs;
+  currentFunc = name;
 
   std::vector<std::string> args;
   std::vector<Type*> params;

@@ -110,7 +110,7 @@ CodeGen 生成的代码依旧有不正确之处。在运行其他 Pass 之前，
 
 **Pureness**
 
-给所有不纯（有副作用，或会被其它的副作用影响）的 Op 打上 `ImpureAttr`。同时，分析函数是否是纯函数。
+分析函数是否是纯函数。给所有不纯（有副作用，或会被其它的副作用影响）的 FuncOp 打上 `ImpureAttr`。
 
 在 SysY 中，由于不存在二级指针，一个函数不纯意味着以下三种情况之一：
 - 它访问了全局变量（读/写都算）；
@@ -125,7 +125,9 @@ CodeGen 生成的代码依旧有不正确之处。在运行其他 Pass 之前，
 
 **DCE**
 
-死代码删除。所有 `getUses()` 为空的，而且没有被标记为 `<impure>` 的 Op 都会被删除。这包括一些具有 Region 的 Op，例如 `IfOp`。
+死代码删除。首先决定每个指令是否需要 `<impure>`，其中 CallOp 的结果根据 Pureness 打上的标记决定。
+
+接下来，所有 `getUses()` 为空的，而且没有被标记为 `<impure>` 的 Op 都会被删除。这包括一些具有 Region 的 Op，例如 `IfOp`。
 
 这个 pass 会被反复调用，不论是在 CodeGen 刚结束的时候，还是 FlattenCFG 后，还是后端中。
 
@@ -149,7 +151,7 @@ CodeGen 生成的代码依旧有不正确之处。在运行其他 Pass 之前，
 
 **Lower**
 
-类似 LLVM 中的 legalization。将 IR 转化为汇编指令。
+类似 LLVM 中的 legalization。将 IR 转化为汇编指令，并进行指令选择。
 
 **InstCombine**
 
