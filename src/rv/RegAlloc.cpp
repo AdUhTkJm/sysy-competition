@@ -250,13 +250,18 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     // See if there's any preferred registers.
     int preferred = -1;
     for (auto use : op->getUses()) {
-      if (isa<ReadRegOp>(use) || isa<WriteRegOp>(use)) {
+      if (isa<WriteRegOp>(use)) {
         auto reg = use->getAttr<RegAttr>()->reg;
         if (!forbidden.count(reg)) {
           preferred = (int) reg;
           break;
         }
       }
+    }
+    if (isa<ReadRegOp>(op)) {
+      auto reg = op->getAttr<RegAttr>()->reg;
+      if (!forbidden.count(reg))
+        preferred = (int) reg;
     }
 
     if (preferred != -1) {
@@ -279,7 +284,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     assert(false);
   }
   
-  dumpAssignment(region, assignment);
+  // dumpAssignment(region, assignment);
 
   auto funcOp = region->getParent();
 
@@ -341,6 +346,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   });
 
   // Finally, after everything has been erased:
+  std::vector<PhiOp*> phis;
   runRewriter(funcOp, [&](PhiOp *op) {
     auto &ops = op->getOperands();
     auto &froms = op->getAttrs();
@@ -348,7 +354,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       // Find the block of the operand, and stick an Op at the end, 
       // before the terminator (`j`, `beq` etc.)
       auto src = ops[i].defining;
-      if (isa<PhiOp>(src) && src->getParent() == op->getParent()) {
+      if (isa<PhiOp>(src) && src->getParent() == op->getParent() && src != op) {
         // The swapping problem. Not sure how to deal with it.
         std::cerr << "swapping\n";
         assert(false);
@@ -361,17 +367,39 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         new RsAttr(getReg(src))
       });
     }
-    // All ops should have been lowered.
-    // If not, try print out what happened for debugging.
-    if (op->getUses().size() > 0) {
-      std::cerr << "=== bad uses of phi ===\n";
-      funcOp->dump(std::cerr);
-      for (auto use : op->getUses())
-        use->dump(std::cerr);
-    }
-    op->erase();
-    return true;
+    // Cannot erase here, in case another phi refers to this phi.
+    phis.push_back(op);
+    // Return false so that each phi will only be processed once.
+    return false;
   });
+
+  bool changed;
+  do {
+    changed = false;
+    std::vector<PhiOp*> newPhis;
+    for (auto x : phis) {
+      if (x->getUses().size() == 0) {
+        x->erase();
+        changed = true;
+        continue;
+      }
+      newPhis.push_back(x);
+    }
+    phis = newPhis;
+  } while (changed);
+  
+  if (!phis.empty()) {
+    std::cerr << "=== bad uses of phi ===\n";
+    funcOp->dump(std::cerr);
+    for (auto op : phis) {
+      // All ops should have been lowered.
+      // If not, try print out what happened for debugging.
+      if (op->getUses().size() > 0) {
+        for (auto use : op->getUses())
+          use->dump(std::cerr);
+      }
+    }
+  }
 
   for (auto bb : region->getBlocks()) {
     for (auto op : bb->getOps()) {

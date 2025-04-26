@@ -86,6 +86,11 @@ void Mem2Reg::fillPhi(BasicBlock *bb, BasicBlock *last) {
     // We meet a PhiOp. This means the promoted register might hold value `symbols[alloca]` when it reaches here.
     // So this PhiOp should have that value as operand as well.
     auto value = symbols[alloca];
+    // Found the same op. Seems alright to skip it - unsure.
+    if (value.defining == op) {
+      continue;
+    }
+
     op->pushOperand(value);
     assert(last);
     op->addAttr<FromAttr>(last);

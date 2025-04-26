@@ -68,6 +68,7 @@ void StrengthReduct::run() {
     if (i == 1) {
       converted++;
       op->replaceAllUsesWith(x.defining);
+      op->erase();
       return true;
     }
 
@@ -147,6 +148,7 @@ void StrengthReduct::run() {
     if (i == 1) {
       converted++;
       op->replaceAllUsesWith(x.defining);
+      op->erase();
       return true;
     }
 
