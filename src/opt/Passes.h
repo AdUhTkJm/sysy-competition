@@ -32,7 +32,7 @@ class Mem2Reg : public Pass {
   int missed = 0; // Unconvertible alloca's
 
   void runImpl(FuncOp *func);
-  void fillPhi(BasicBlock *bb);
+  void fillPhi(BasicBlock *bb, BasicBlock *last);
 
   // Maps AllocaOp* to Value (the real value of this alloca).
   using SymbolTable = std::map<Op*, Value>;

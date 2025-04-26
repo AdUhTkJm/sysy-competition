@@ -125,100 +125,45 @@ void dumpAssignment(Region *region, const std::map<Op*, Reg> &assignment) {
   }
 }
 
+// Order for leaf functions. Prioritize temporaries.
+static const Reg leafOrder[] = {
+  Reg::a0, Reg::a1, Reg::a2, Reg::a3,
+  Reg::a4, Reg::a5, Reg::a6, Reg::a7,
+
+  Reg::t0, Reg::t1, Reg::t2, Reg::t3,
+  Reg::t4, Reg::t5, Reg::t6,
+  
+  Reg::s0, Reg::s1, Reg::s2, Reg::s3, 
+  Reg::s4, Reg::s5, Reg::s6, Reg::s7,
+  Reg::s8, Reg::s9, Reg::s10, Reg::s11,
+};
+// Order for non-leaf functions.
+static const Reg normalOrder[] = {
+  Reg::s0, Reg::s1, Reg::s2, Reg::s3, 
+  Reg::s4, Reg::s5, Reg::s6, Reg::s7,
+  Reg::s8, Reg::s9, Reg::s10, Reg::s11,
+
+  Reg::t0, Reg::t1, Reg::t2, Reg::t3,
+  Reg::t4, Reg::t5, Reg::t6,
+
+  Reg::a0, Reg::a1, Reg::a2, Reg::a3,
+  Reg::a4, Reg::a5, Reg::a6, Reg::a7,
+};
+constexpr int regcount = 27;
+
 void RegAlloc::runImpl(Region *region, bool isLeaf) {
-  // Order for leaf functions. Prioritize temporaries.
-  static const Reg leafOrder[] = {
-    Reg::a0, Reg::a1, Reg::a2, Reg::a3,
-    Reg::a4, Reg::a5, Reg::a6, Reg::a7,
-
-    Reg::t0, Reg::t1, Reg::t2, Reg::t3,
-    Reg::t4, Reg::t5, Reg::t6,
-    
-    Reg::s0, Reg::s1, Reg::s2, Reg::s3, 
-    Reg::s4, Reg::s5, Reg::s6, Reg::s7,
-    Reg::s8, Reg::s9, Reg::s10, Reg::s11,
-  };
-  // Order for non-leaf functions.
-  static const Reg normalOrder[] = {
-    Reg::s0, Reg::s1, Reg::s2, Reg::s3, 
-    Reg::s4, Reg::s5, Reg::s6, Reg::s7,
-    Reg::s8, Reg::s9, Reg::s10, Reg::s11,
-
-    Reg::t0, Reg::t1, Reg::t2, Reg::t3,
-    Reg::t4, Reg::t5, Reg::t6,
-
-    Reg::a0, Reg::a1, Reg::a2, Reg::a3,
-    Reg::a4, Reg::a5, Reg::a6, Reg::a7,
-  };
   const Reg *order = isLeaf ? leafOrder : normalOrder;
-  constexpr int regcount = 27;
 
   Builder builder;
-
-  // Destruct phis before any other thing happens.
-  for (auto bb : region->getBlocks()) {
-    std::set<Op*> phis;
-    for (auto op : bb->getOps()) {
-      if (!isa<PhiOp>(op))
-        break;
-
-      phis.insert(op);
-    }
-    
-    // Swapping problem:
-    // succ:
-    //   a1 = phi(a0, b1)
-    //   b1 = phi(b0, a1)
-    
-    // The method is to generate 
-    // pred:
-    //   mv R0, b1
-    //   mv R1, a1
-    // succ:
-    //   mv a1, R0
-    //   mv b1, R1
-
-    // WriteReg prevents b1 -> R1, and ReadReg prevents a1 -> R0.
-    // So it's safe.
-
-    // Allocate a register for the phi, place a `writereg` before the basic block,
-    // and finally replace the phi with a `readreg`.
-    int i = 0;
-    for (auto op : phis) {
-      std::set<Value> values;
-      // 27 phis - are you crazy?
-      assert(i < regcount);
-
-      auto reg = order[i];
-      for (auto operand : op->getOperands()) {
-        if (values.count(operand))
-          continue;
-
-        values.insert(operand);
-
-        // Find the block of the operand, and stick an Op at the end, 
-        // before the terminator (`j`, `beq` etc.)
-        auto src = operand.defining;
-        // TODO: Probably it's not good to insert phi here. Do it in mem2reg.
-        auto bb = src->getParent();
-        auto terminator = *--bb->getOps().end();
-        builder.setBeforeOp(terminator);
-        builder.create<WriteRegOp>({ operand }, {
-          new RegAttr(reg)
-        });
-      }
-      builder.replace<ReadRegOp>(op, {
-        new RegAttr(reg)
-      });
-      i++;
-    }
-  }
 
   region->updateLiveness();
 
   // Produce interference graph.
   std::map<Op*, std::set<Op*>> interf;
   std::map<Op*, std::set<Reg>> indivForbidden;
+
+  // Values of readreg, or operands of writereg, are prioritzed.
+  std::set<Op*> prioritized;
 
   for (auto bb : region->getBlocks()) {
     // All live-ins must intefere with each other.
@@ -244,15 +189,29 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       }
       defined[op] = i;
 
-      // Write/read to hardware registers also (concepturally) creates a new value.
+      // Write/read to hardware registers also (conceptually) creates a new value.
       if (isa<WriteRegOp>(op)) {
         auto reg = op->getAttr<RegAttr>()->reg;
         regDefined[reg] = i;
+        prioritized.insert(op->getOperand().defining);
       }
       if (isa<ReadRegOp>(op)) {
         auto reg = op->getAttr<RegAttr>()->reg;
+        prioritized.insert(op);
         if (!regUsed.count(reg))
           regUsed[reg] = i;
+      }
+
+      // The result of phi will collide with the last instruction of its preds.
+      if (isa<PhiOp>(op)) {
+        for (auto operand : op->getOperands()) {
+          auto v = operand.defining;
+          auto terminator = v->getParent()->getLastOp();
+          for (auto x : terminator->getOperands()) {
+            interf[x.defining].insert(op);
+            interf[op].insert(x.defining);
+          }
+        }
       }
     }
 
@@ -313,6 +272,10 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
   // Sort by **descending** degree.
   std::sort(ops.begin(), ops.end(), [&](Op *a, Op *b) {
+    if (prioritized.count(a) && !prioritized.count(b))
+      return true;
+    if (prioritized.count(b) && !prioritized.count(a))
+      return false;
     return interf[a].size() > interf[b].size();
   });
   
@@ -416,6 +379,31 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       new RsAttr(Reg::sp),
       new IntAttr(offset)
     });
+    return true;
+  });
+
+  // Finally, after everything has been erased:
+  runRewriter(funcOp, [&](PhiOp *op) {
+    auto &ops = op->getOperands();
+    auto &froms = op->getAttrs();
+    for (size_t i = 0; i < ops.size(); i++) {
+      // Find the block of the operand, and stick an Op at the end, 
+      // before the terminator (`j`, `beq` etc.)
+      auto src = ops[i].defining;
+      if (isa<PhiOp>(src) && src->getParent() == op->getParent()) {
+        // The swapping problem. Not sure how to deal with it.
+        std::cerr << "swapping\n";
+        assert(false);
+      }
+      auto bb = cast<FromAttr>(froms[i])->bb;
+      auto terminator = *--bb->getOps().end();
+      builder.setBeforeOp(terminator);
+      builder.create<MvOp>({
+        new RdAttr(getReg(op)),
+        new RsAttr(getReg(src))
+      });
+    }
+    op->erase();
     return true;
   });
 

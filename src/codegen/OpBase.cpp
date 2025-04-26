@@ -27,6 +27,12 @@ std::string ElseAttr::toString() {
   return "<else = bb" + std::to_string(bbmap[bb]) + ">";
 }
 
+std::string FromAttr::toString() {
+  if (!bbmap.count(bb))
+    bbmap[bb] = bbid++;
+  return "<from = bb" + std::to_string(bbmap[bb]) + ">";
+}
+
 std::string IntArrayAttr::toString() {
   std::stringstream ss;
   ss << "<array = ";

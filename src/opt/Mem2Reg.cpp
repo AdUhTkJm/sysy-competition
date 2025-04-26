@@ -66,10 +66,10 @@ void Mem2Reg::runImpl(FuncOp *func) {
     }
   }
 
-  fillPhi(func->getRegion()->getFirstBlock());
+  fillPhi(func->getRegion()->getFirstBlock(), nullptr);
 }
 
-void Mem2Reg::fillPhi(BasicBlock *bb) {
+void Mem2Reg::fillPhi(BasicBlock *bb, BasicBlock *last) {
   Builder builder;
 
   for (auto op : bb->getOps()) {
@@ -87,6 +87,8 @@ void Mem2Reg::fillPhi(BasicBlock *bb) {
     // So this PhiOp should have that value as operand as well.
     auto value = symbols[alloca];
     op->pushOperand(value);
+    assert(last);
+    op->addAttr<FromAttr>(last);
     symbols[alloca] = op;
   }
 
@@ -134,14 +136,14 @@ void Mem2Reg::fillPhi(BasicBlock *bb) {
     if (auto branch = dyn_cast<BranchOp>(op)) {
       {
         SemanticScope scope(*this);
-        fillPhi(branch->getAttr<TargetAttr>()->bb);
+        fillPhi(branch->getAttr<TargetAttr>()->bb, bb);
       }
       SemanticScope scope(*this);
-      fillPhi(branch->getAttr<ElseAttr>()->bb);
+      fillPhi(branch->getAttr<ElseAttr>()->bb, bb);
     }
 
     if (auto jmp = dyn_cast<GotoOp>(op))
-      fillPhi(jmp->getAttr<TargetAttr>()->bb);
+      fillPhi(jmp->getAttr<TargetAttr>()->bb, bb);
   }
 
   for (auto [load, value] : loads) {

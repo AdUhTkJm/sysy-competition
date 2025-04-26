@@ -66,6 +66,15 @@ public:
   std::string toString();
 };
 
+class FromAttr : public AttrImpl<FromAttr, __LINE__> {
+public:
+  BasicBlock *bb;
+
+  FromAttr(BasicBlock *bb): bb(bb) {}
+
+  std::string toString();
+};
+
 class IntArrayAttr : public AttrImpl<IntArrayAttr, __LINE__> {
 public:
   int *vi;
