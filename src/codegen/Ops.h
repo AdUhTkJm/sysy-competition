@@ -65,6 +65,8 @@ OP(I2FOp);
 OP(MinusOp); // for input x, returns -x. Don't confuse with SubI/SubF.
 OP(MinusFOp);
 OP(NotOp);
+OP(LShiftImmOp);
+OP(RShiftImmOp);
 
 }
 

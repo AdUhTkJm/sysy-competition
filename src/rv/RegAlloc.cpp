@@ -92,7 +92,8 @@ bool hasRd(Op *op) {
     isa<LiOp>(op) ||
     isa<MvOp>(op) ||
     isa<ReadRegOp>(op) ||
-    isa<SlliwOp>(op);
+    isa<SlliwOp>(op) ||
+    isa<SrliwOp>(op);
 }
 
 // In OpBase.cpp
@@ -313,6 +314,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(AddiOp, UNARY);
   LOWER(LoadOp, UNARY);
   LOWER(SlliwOp, UNARY);
+  LOWER(SrliwOp, UNARY);
 
   //   writereg %1, <reg = a0>
   // becomes
@@ -358,6 +360,14 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         new RdAttr(getReg(op)),
         new RsAttr(getReg(src))
       });
+    }
+    // All ops should have been lowered.
+    // If not, try print out what happened for debugging.
+    if (op->getUses().size() > 0) {
+      std::cerr << "=== bad uses of phi ===\n";
+      funcOp->dump(std::cerr);
+      for (auto use : op->getUses())
+        use->dump(std::cerr);
     }
     op->erase();
     return true;

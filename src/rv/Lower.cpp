@@ -100,6 +100,16 @@ void Lower::run() {
     return true;
   });
 
+  runRewriter([&](LShiftImmOp *op) {
+    builder.replace<SlliwOp>(op, op->getOperands(), op->getAttrs());
+    return true;
+  });
+
+  runRewriter([&](RShiftImmOp *op) {
+    builder.replace<SrliwOp>(op, op->getOperands(), op->getAttrs());
+    return true;
+  });
+
   runRewriter([&](BranchOp *op) {
     auto cond = op->getOperand().defining;
 

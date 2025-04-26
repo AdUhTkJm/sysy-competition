@@ -1,0 +1,7 @@
+int main() {
+  int x = getint();
+  putint(x / 3);
+  putint(x / 5);
+  putint(x / 7);
+  return 0;
+}

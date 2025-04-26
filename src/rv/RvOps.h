@@ -27,6 +27,10 @@ namespace sys {
 
 namespace rv {
 
+// To add an op:
+//    1) Check RegAlloc.cpp, the list of LOWER(...)
+//    2) Check RegAlloc.cpp, the function hasRd().
+
 RVOP(LiOp);
 RVOP(AddOp);
 RVOP(AddiwOp);
@@ -35,6 +39,7 @@ RVOP(SubOp);
 RVOP(MulwOp);
 RVOP(DivwOp); // Signed; divu for unsigned.
 RVOP(SlliwOp); // Shift left.
+RVOP(SrliwOp); // Shift right.
 RVOP(BneOp);
 RVOP(BeqOp);
 RVOP(BltOp);

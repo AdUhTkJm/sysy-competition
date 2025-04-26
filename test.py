@@ -2,6 +2,9 @@
 import argparse;
 import subprocess as proc;
 import os;
+import hashlib;
+import pickle;
+from pathlib import Path;
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-g", "--gdb", action="store_true")
@@ -16,6 +19,127 @@ parser.add_argument("--asm", type=str)
 parser.add_argument("-t", "--test", type=str)
 
 args = parser.parse_args()
+
+SRC_DIR = Path("src")
+BUILD_DIR = Path("build")
+FINAL_BINARY = Path("bin") / "sysc"
+COMPILER = "clang++"
+AR = "ar"
+CFLAGS = ["-c", "-std=c++17", "-g"]
+LDFLAGS = []
+CACHE_FILE = BUILD_DIR / ".build_cache.pkl"
+
+def hash_file(path):
+  h = hashlib.sha256()
+  with open(path, 'rb') as f:
+    h.update(f.read())
+  return h.hexdigest()
+
+def find_files():
+  cpp_files = []
+  h_files = []
+  for path in SRC_DIR.rglob("*"):
+    if path.suffix == ".cpp":
+      cpp_files.append(path)
+    elif path.suffix == ".h":
+      h_files.append(path)
+  return cpp_files, h_files
+
+def load_cache():
+  if CACHE_FILE.exists():
+    with open(CACHE_FILE, "rb") as f:
+      return pickle.load(f)
+  return {}
+
+def save_cache(cache):
+  BUILD_DIR.mkdir(parents=True, exist_ok=True)
+  with open(CACHE_FILE, "wb") as f:
+    pickle.dump(cache, f)
+
+def needs_recompile(src_path, obj_path, cache, dependencies):
+  src_hash = hash_file(src_path)
+  dep_hashes = { str(dep): hash_file(dep) for dep in dependencies }
+
+  prev = cache.get(str(src_path))
+  if not prev:
+      return True
+  if prev['src_hash'] != src_hash:
+      return True
+  if prev['dep_hashes'] != dep_hashes:
+      return True
+  if not obj_path.exists():
+      return True
+  return False
+
+def get_includes(src_path):
+  includes = []
+  with open(src_path, "r") as f:
+    for line in f:
+      line = line.strip()
+      if line.startswith("#include \""):
+        header = line.split("\"")[1]
+        include_path = src_path.parent / header
+        if include_path.exists():
+          includes.append(include_path.resolve())
+  return includes
+
+def compile_cpp(src_path, obj_path):
+  obj_path.parent.mkdir(parents=True, exist_ok=True)
+  print(f"Compiling {src_path} -> {obj_path}")
+  proc.check_call([COMPILER] + CFLAGS + ["-o", str(obj_path), str(src_path)])
+
+def archive_objects(obj_files, lib_path):
+  if lib_path.exists():
+      lib_path.unlink()
+  print(f"Creating archive {lib_path}")
+  proc.check_call([AR, "rcs", str(lib_path)] + [str(obj) for obj in obj_files])
+
+def link_libraries(lib_files, output_binary):
+  print(f"Linking {output_binary}")
+  proc.check_call([COMPILER] + LDFLAGS + ["-o", str(output_binary)] + [str(lib) for lib in lib_files])
+
+def build():
+  cpp_files, _ = find_files()
+  cache = load_cache()
+
+  # Step 1: Compile .cpp to .o
+  obj_files = []
+  folder_changed = {}
+  for cpp in cpp_files:
+    rel_dir = cpp.relative_to(SRC_DIR).parent
+    obj_dir = BUILD_DIR / rel_dir
+    obj_path = obj_dir / (cpp.stem + ".o")
+
+    dependencies = get_includes(cpp)
+    if needs_recompile(cpp, obj_path, cache, dependencies):
+      compile_cpp(cpp, obj_path)
+      cache[str(cpp)] = {
+        'src_hash': hash_file(cpp),
+        'dep_hashes': {str(dep): hash_file(dep) for dep in dependencies},
+      }
+      folder_changed[rel_dir] = True
+    obj_files.append((rel_dir, obj_path))
+
+  # Step 2: Archive .o's in same folder into .a
+  folder_objs = {}
+  for rel_dir, obj in obj_files:
+    folder_objs.setdefault(rel_dir, []).append(obj)
+
+  lib_files = []
+  for folder, objs in folder_objs.items():
+    lib_path = BUILD_DIR / folder / (folder.name + ".a")
+    need_archive = folder_changed.get(folder, False) or not lib_path.exists()
+    if need_archive:
+      archive_objects(objs, lib_path)
+    else:
+      print(f"Skipping archive {lib_path}, no changes")
+    lib_files.append(lib_path)
+
+  # Step 3: Link all .a's into final binary
+  link_libraries(lib_files, FINAL_BINARY)
+
+  save_cache(cache)
+
 
 def run_asm(file: str):
   basename = os.path.splitext(os.path.basename(file))[0]
@@ -65,7 +189,7 @@ if args.asm:
   print(result.returncode)
   exit(0)
 
-proc.run(["make"], check=True)
+build()
 if args.test_all:
   names = os.listdir("test/official")
   for file in names:

@@ -31,6 +31,7 @@ void initPipeline(sys::PassManager &pm) {
 
   // ===== Structured control flow =====
 
+  pm.addPass<sys::StrengthReduct>();
   pm.addPass<sys::Pureness>();
   pm.addPass<sys::DCE>();
 

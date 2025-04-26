@@ -2,6 +2,9 @@
 #define PASSES_H
 
 #include "Pass.h"
+#include "../codegen/CodeGen.h"
+#include "../codegen/Attrs.h"
+
 #include <set>
 
 namespace sys {
@@ -84,6 +87,16 @@ public:
   DCE(ModuleOp *module): Pass(module) {}
     
   std::string name() { return "dce"; };
+  std::map<std::string, int> stats();
+  void run();
+};
+
+class StrengthReduct : public Pass {
+  int converted = 0;
+public:
+  StrengthReduct(ModuleOp *module): Pass(module) {}
+    
+  std::string name() { return "strength-reduction"; };
   std::map<std::string, int> stats();
   void run();
 };
