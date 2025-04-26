@@ -165,6 +165,10 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
           lastUsed[v.defining] = i;
       }
       defined[op] = i;
+      // Even though the op is not used, it still lives in the instruction that defines it.
+      // Actually this should be eliminated with DCE, but we need to take care of it.
+      if (!lastUsed.count(op))
+          lastUsed[op] = i + 1;
 
       // Might need to deal with this later, about regDefined etc.
       if (isa<WriteRegOp>(op)) {
@@ -275,7 +279,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     assert(false);
   }
   
-  // dumpAssignment(region, assignment);
+  dumpAssignment(region, assignment);
 
   auto funcOp = region->getParent();
 
@@ -469,6 +473,12 @@ void RegAlloc::proEpilogue(FuncOp *funcOp) {
   } else {
     builder.setToRegionStart(region);
     op = builder.create<SubSpOp>({ new IntAttr(offset += 4 * preserve.size()) });
+  }
+
+  // Round op to the nearest multiple of 16.
+  if (offset % 16 != 0) {
+    int &value = op->getAttr<IntAttr>()->value;
+    offset = value = offset / 16 * 16 + 16;
   }
 
   // Add function prologue, preserving the regs.
