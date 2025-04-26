@@ -104,6 +104,7 @@ class CodeGen {
   Options opts;
   Builder builder;
   SymbolTable symbols;
+  SymbolTable globals;
 
   void emit(ASTNode *node);
   Value emitExpr(ASTNode *node);

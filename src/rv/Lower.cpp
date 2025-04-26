@@ -86,6 +86,7 @@ void Lower::run() {
   REPLACE(RShiftImmOp, SraiwOp);
   REPLACE(RShiftImmLOp, SraiOp);
   REPLACE(GotoOp, JOp);
+  REPLACE(GetGlobalOp, LaOp);
 
   runRewriter([&](ModIOp *op) {
     auto denom = op->getOperand(0);
@@ -129,16 +130,14 @@ void Lower::run() {
   });
 
   runRewriter([&](sys::LoadOp *op) {
-    builder.replace<sys::rv::LoadOp>(op, op->getOperands(), {
-      new OffsetAttr(0)
-    });
+    auto load = builder.replace<sys::rv::LoadOp>(op, op->getOperands(), op->getAttrs());
+    load->addAttr<IntAttr>(0);
     return true;
   });
 
   runRewriter([&](sys::StoreOp *op) {
-    builder.replace<sys::rv::StoreOp>(op, op->getOperands(), {
-      new OffsetAttr(0)
-    });
+    auto store = builder.replace<sys::rv::StoreOp>(op, op->getOperands(), op->getAttrs());
+    store->addAttr<IntAttr>(0);
     return true;
   });
 

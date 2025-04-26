@@ -97,15 +97,6 @@ public:
   std::string toString() { return "<rs2 = " + showReg(reg) + ">"; }
 };
 
-class OffsetAttr : public AttrImpl<OffsetAttr, RVLINE> {
-public:
-  int offset;
-
-  OffsetAttr(int offset): offset(offset) {}
-
-  std::string toString() { return "<offset = " + std::to_string(offset) + ">"; }
-};
-
 }
 
 }

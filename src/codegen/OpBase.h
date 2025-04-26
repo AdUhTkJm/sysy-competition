@@ -220,6 +220,14 @@ public:
   }
 
   template<class T>
+  T *findAttr() {
+    for (auto x : attrs)
+      if (isa<T>(x))
+        return cast<T>(x);
+    return nullptr;
+  }
+
+  template<class T>
   void removeAttr() {
     for (auto it = attrs.begin(); it != attrs.end(); it++)
       if (isa<T>(*it)) {

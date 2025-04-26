@@ -29,9 +29,10 @@ namespace rv {
 
 // To add an op:
 //    1) Check RegAlloc.cpp, the list of LOWER(...)
-//    2) Check RegAlloc.cpp, the function hasRd().
+//    2) Check the function hasRd().
 
 RVOP(LiOp);
+RVOP(LaOp);
 RVOP(AddOp);
 RVOP(AddiwOp);
 RVOP(AddiOp); // Note that pointers can't be `addiw`'d.
@@ -61,6 +62,28 @@ RVOP(SubSpOp); // Allocate stack space: sub sp, sp, <IntAttr>
 RVOP(ReadRegOp); // Read from real register
 RVOP(WriteRegOp); // Write to real register
 RVOP(CallOp);
+
+inline bool hasRd(Op *op) {
+  return 
+    isa<AddOp>(op) ||
+    isa<SubOp>(op) ||
+    isa<MulwOp>(op) ||
+    isa<DivwOp>(op) ||
+    isa<MulOp>(op) ||
+    isa<DivOp>(op) ||
+    isa<sys::rv::LoadOp>(op) ||
+    isa<AddiwOp>(op) ||
+    isa<LiOp>(op) ||
+    isa<MvOp>(op) ||
+    isa<ReadRegOp>(op) ||
+    isa<SlliwOp>(op) ||
+    isa<SrliwOp>(op) ||
+    isa<SraiwOp>(op) ||
+    isa<SraiOp>(op) ||
+    isa<MulhOp>(op) ||
+    isa<MulhuOp>(op) ||
+    isa<LaOp>(op);
+}
 
 }
 

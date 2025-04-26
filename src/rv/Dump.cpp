@@ -127,6 +127,25 @@ void Dump::dump(std::ostream &os) {
       }
     }
   }
+
+  auto globals = module->findAll<GlobalOp>();
+
+  if (!globals.empty())
+    os << ".data\n";
+  for (auto global : globals) {
+    os << global->getAttr<NameAttr>()->name << ":\n";
+    // It must have been 4 bytes long for each element.
+    auto size = global->getAttr<SizeAttr>()->value;
+    assert(size >= 1);
+
+    if (auto intArr = global->findAttr<IntArrayAttr>()) {
+      os << "  .word " << intArr->vi[0];
+      for (size_t i = 1; i < size / 4; i++)
+        os << ", " << intArr->vi[i];
+      os << "\n";
+    }
+    // .float for FloatArray
+  }
 }
 
 void Dump::run() {

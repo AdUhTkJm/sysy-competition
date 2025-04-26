@@ -84,13 +84,9 @@ void Pureness::run() {
     predetermineImpure(func);
 
   // Every function that accesses globals is impure.
-  auto globals = module->findAll<GlobalOp>();
-  for (auto global : globals) {
-    for (auto use : global->getUses()) {
-      auto func = use->getParentOp<FuncOp>();
-      if (!func->hasAttr<ImpureAttr>())
-        func->addAttr<ImpureAttr>();
-    }
+  for (auto func : funcs) {
+    if (!func->hasAttr<ImpureAttr>() && !func->findAll<GetGlobalOp>().empty())
+      func->addAttr<ImpureAttr>();
   }
 
   // Propagate impureness across functions:

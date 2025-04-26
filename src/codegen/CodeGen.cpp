@@ -138,6 +138,15 @@ Value CodeGen::emitExpr(ASTNode *node) {
 
   if (auto ref = dyn_cast<VarRefNode>(node)) {
     if (!symbols.count(ref->name)) {
+      if (globals.count(ref->name)) {
+        auto addr = builder.create<GetGlobalOp>({
+          new NameAttr(ref->name)
+        });
+        return builder.create<LoadOp>({ addr }, {
+          new SizeAttr(getSize(ref->type))
+        });
+      }
+
       std::cerr << "cannot find symbol " << ref->name << "\n";
       assert(false);
     }
@@ -188,10 +197,11 @@ void CodeGen::emit(ASTNode *node) {
     SemanticScope scope(*this);
     auto fnTy = cast<FunctionType>(fn->type);
     for (int i = 0; i < fn->args.size(); i++) {
+      auto size = getSize(fnTy->params[i]);
       // Get the value of the argument and create a temp variable for it.
       auto arg = builder.create<GetArgOp>({ new IntAttr(i) });
-      auto addr = builder.create<AllocaOp>({ new SizeAttr(getSize(fnTy->params[i])) });
-      builder.create<StoreOp>({ arg, addr });
+      auto addr = builder.create<AllocaOp>({ new SizeAttr(size) });
+      builder.create<StoreOp>({ arg, addr }, { new SizeAttr(size) });
       symbols[fn->args[i]] = addr;
     }
 
@@ -209,9 +219,10 @@ void CodeGen::emit(ASTNode *node) {
       
       auto addr = builder.create<GlobalOp>({
         new SizeAttr(getSize(vardecl->type)),
-        new IntArrayAttr(value, size)
+        new IntArrayAttr(value, size),
+        new NameAttr(vardecl->name),
       });
-      symbols[vardecl->name] = addr;
+      globals[vardecl->name] = addr;
       return;
     }
     
@@ -234,7 +245,7 @@ void CodeGen::emit(ASTNode *node) {
 
           auto offset =  builder.create<IntOp>({ new IntAttr(baseSize * i) });
           auto place = builder.create<AddIOp>({ addr, offset });
-          builder.create<StoreOp>({ value, place });
+          builder.create<StoreOp>({ value, place }, { new SizeAttr(baseSize) });
         }
         return;
       }
@@ -297,9 +308,21 @@ void CodeGen::emit(ASTNode *node) {
 
   if (auto assign = dyn_cast<AssignNode>(node)) {
     auto l = cast<VarRefNode>(assign->l);
-    auto addr = symbols[l->name];
+    Value addr;
+    if (globals.count(l->name))
+      addr = builder.create<GetGlobalOp>({
+        new NameAttr(l->name)
+      });
+    else if (symbols.count(l->name))
+      addr = symbols[l->name];
+    else {
+      std::cerr << "assign to unknown name: " << l->name << "\n";
+      assert(false);
+    }
     auto value = emitExpr(assign->r);
-    builder.create<StoreOp>({ value, addr });
+    builder.create<StoreOp>({ value, addr }, {
+      new SizeAttr(getSize(assign->l->type))
+    });
     return;
   }
   

@@ -153,7 +153,7 @@ def run_asm(file: str):
   return proc.run([qemu, f"temp/{basename}"])
 
 def run(full_file: str, no_exec: bool):
-  file = os.path.splitext(full_file)[0]
+  basename = os.path.splitext(os.path.basename(full_file))[0]
 
   command = [f"{BUILD_DIR}/sysc", f"test/{full_file}"]
 
@@ -177,14 +177,14 @@ def run(full_file: str, no_exec: bool):
   if args.stats:
     command.append("--stats")
 
-  command.extend(["-o", f"temp/{file}.s"])
+  command.extend(["-o", f"temp/{basename}.s"])
   
   # Invoke SysY compiler.
   proc.run(command, check=True)
 
   if no_exec:
     return;
-  return run_asm(f"temp/{file}.s")
+  return run_asm(f"temp/{basename}.s")
 
 if args.asm:
   result = run_asm(args.asm)

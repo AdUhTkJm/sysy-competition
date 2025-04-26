@@ -81,27 +81,6 @@ std::map<std::string, int> RegAlloc::stats() {
   op->removeAttr<ElseAttr>(); \
   return true
 
-bool hasRd(Op *op) {
-  return 
-    isa<AddOp>(op) ||
-    isa<SubOp>(op) ||
-    isa<MulwOp>(op) ||
-    isa<DivwOp>(op) ||
-    isa<MulOp>(op) ||
-    isa<DivOp>(op) ||
-    isa<sys::rv::LoadOp>(op) ||
-    isa<AddiwOp>(op) ||
-    isa<LiOp>(op) ||
-    isa<MvOp>(op) ||
-    isa<ReadRegOp>(op) ||
-    isa<SlliwOp>(op) ||
-    isa<SrliwOp>(op) ||
-    isa<SraiwOp>(op) ||
-    isa<SraiOp>(op) ||
-    isa<MulhOp>(op) ||
-    isa<MulhuOp>(op);
-}
-
 // In OpBase.cpp
 std::ostream &operator<<(std::ostream &os, Value value);
 
