@@ -108,6 +108,10 @@ CodeGen 生成的代码依旧有不正确之处。在运行其他 Pass 之前，
 
 将函数里的所有 `alloca` 移到函数的最前方：不管原来这个 `alloca` 是处在 if 还是 while 中，它本来都应该只被执行一次。
 
+**ImplicitReturn**
+
+如果一个函数最后没有 `return` （例如这是个void函数），那么在它的最后加上 `return`。这会保证后端生成 ret 指令。
+
 ### 分析 Pass
 
 **Pureness**
@@ -178,6 +182,9 @@ CodeGen 生成的代码依旧有不正确之处。在运行其他 Pass 之前，
 被合并的指令包括：
 
 - li + add => addi
+- li + addw => addiw
+- addi + sw => sw （改变offset）
+- 去除 `%2 = addi %1, 0`
 
 **RegAlloc**
 

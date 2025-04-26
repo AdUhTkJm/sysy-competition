@@ -28,6 +28,16 @@ public:
   void run();
 };
 
+// Adds an implicit return if that's not present.
+class ImplicitReturn : public Pass {
+public:
+  ImplicitReturn(ModuleOp *module): Pass(module) {}
+    
+  std::string name() { return "implicit-return"; };
+  std::map<std::string, int> stats() { return {}; };
+  void run();
+};
+
 // Converts alloca's to SSA values.
 // This must run on flattened CFG, otherwise `break` and `continue` are hard to deal with.
 class Mem2Reg : public Pass {

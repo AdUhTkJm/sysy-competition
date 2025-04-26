@@ -28,6 +28,7 @@ void initRvPipeline(sys::PassManager &pm) {
 
 void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::MoveAlloca>();
+  pm.addPass<sys::ImplicitReturn>();
 
   // ===== Structured control flow =====
 

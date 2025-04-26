@@ -244,7 +244,7 @@ void CodeGen::emit(ASTNode *node) {
             : builder.create<IntOp>({ new IntAttr(0) });
 
           auto offset =  builder.create<IntOp>({ new IntAttr(baseSize * i) });
-          auto place = builder.create<AddIOp>({ addr, offset });
+          auto place = builder.create<AddLOp>({ addr, offset });
           builder.create<StoreOp>({ value, place }, { new SizeAttr(baseSize) });
         }
         return;

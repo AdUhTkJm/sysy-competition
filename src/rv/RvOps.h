@@ -34,9 +34,11 @@ namespace rv {
 RVOP(LiOp);
 RVOP(LaOp);
 RVOP(AddOp);
+RVOP(AddwOp);
 RVOP(AddiwOp);
 RVOP(AddiOp); // Note that pointers can't be `addiw`'d.
 RVOP(SubOp);
+RVOP(SubwOp);
 RVOP(MulwOp);
 RVOP(MulOp);
 RVOP(DivwOp); // Signed; divu for unsigned.
@@ -66,13 +68,16 @@ RVOP(CallOp);
 inline bool hasRd(Op *op) {
   return 
     isa<AddOp>(op) ||
+    isa<AddiwOp>(op) ||
+    isa<AddwOp>(op) ||
+    isa<AddiOp>(op) ||
     isa<SubOp>(op) ||
+    isa<SubwOp>(op) ||
     isa<MulwOp>(op) ||
-    isa<DivwOp>(op) ||
     isa<MulOp>(op) ||
+    isa<DivwOp>(op) ||
     isa<DivOp>(op) ||
     isa<sys::rv::LoadOp>(op) ||
-    isa<AddiwOp>(op) ||
     isa<LiOp>(op) ||
     isa<MvOp>(op) ||
     isa<ReadRegOp>(op) ||

@@ -13,6 +13,7 @@ std::map<std::string, Token::Type> keywords = {
   { "return", Token::Return },
   { "int", Token::Int },
   { "float", Token::Float },
+  { "void", Token::Void },
   { "const", Token::Const },
 };
 

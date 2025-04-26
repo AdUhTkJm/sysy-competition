@@ -21,7 +21,7 @@ void rewriteAlloca(FuncOp *func) {
     return;
 
   // All alloca's are in the first block.
-  size_t offsetBp = 0; // Offset from base pointer (but we don't use base pointer)
+  size_t offset = 0; // Offset from sp.
   size_t total = 0; // Total stack frame size
   std::vector<AllocaOp*> allocas;
   for (auto op : block->getOps()) {
@@ -34,9 +34,6 @@ void rewriteAlloca(FuncOp *func) {
   }
 
   for (auto op : allocas) {
-    // Offset from sp.
-    auto offset = offsetBp - total;
-
     // Translate itself into `sp + offset`.
     builder.setBeforeOp(op);
     auto spValue = builder.create<ReadRegOp>({
@@ -50,7 +47,7 @@ void rewriteAlloca(FuncOp *func) {
     op->replaceAllUsesWith(add);
 
     size_t size = op->getAttr<SizeAttr>()->value;
-    offsetBp += size;
+    offset += size;
     op->erase();
   }
 
@@ -72,9 +69,9 @@ void Lower::run() {
   Builder builder;
 
   REPLACE(IntOp, LiOp);
-  REPLACE(AddIOp, AddOp);
+  REPLACE(AddIOp, AddwOp);
   REPLACE(AddLOp, AddOp);
-  REPLACE(SubIOp, SubOp);
+  REPLACE(SubIOp, SubwOp);
   REPLACE(SubLOp, SubOp);
   REPLACE(MulIOp, MulwOp);
   REPLACE(MulLOp, MulOp);

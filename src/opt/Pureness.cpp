@@ -14,7 +14,7 @@ bool hasStoresTo(Op *op) {
       return true;
 
     // It's a new address. Find all stores there.
-    if (isa<AddIOp>(use)) {
+    if (isa<AddIOp>(use) || isa<AddLOp>(use)) {
       for (auto u : use->getUses())
         if (hasStoresTo(u))
           return true;
