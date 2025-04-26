@@ -228,6 +228,45 @@ Type *Sema::infer(ASTNode *node) {
     return node->type = fnTy->ret;
   }
 
+  if (auto access = dyn_cast<ArrayAccessNode>(node)) {
+    auto arrTy = cast<ArrayType>(symbols[access->array]);
+    access->arrTy = arrTy;
+    std::vector<int> dimsNew;
+    for (int i = access->indices.size(); i < arrTy->dims.size(); i++)
+      dimsNew.push_back(arrTy->dims[i]);
+    
+    for (auto x : access->indices) {
+      auto ty = infer(x);
+      assert(isa<IntType>(ty));
+    }
+
+    auto resultTy = dimsNew.size()
+      ? (Type*) ctx.create<ArrayType>(arrTy->base, dimsNew)
+      : arrTy->base;
+    return node->type = resultTy;
+  }
+
+  if (auto write = dyn_cast<ArrayAssignNode>(node)) {
+    auto arrTy = cast<ArrayType>(symbols[write->array]);
+    auto baseTy = arrTy->base;
+    assert(write->indices.size() == arrTy->dims.size());
+    write->arrTy = arrTy;
+
+    auto valueTy = infer(write->value);
+
+    if (isa<FloatType>(baseTy) && isa<IntType>(valueTy)) {
+      write->value = new UnaryNode(UnaryNode::Float2Int, write->value);
+      write->value->type = ctx.create<IntType>();
+    }
+
+    if (isa<IntType>(baseTy) && isa<FloatType>(valueTy)) {
+      write->value = new UnaryNode(UnaryNode::Int2Float, write->value);
+      write->value->type = ctx.create<FloatType>();
+    }
+
+    return node->type = ctx.create<VoidType>();
+  }
+
   std::cerr << "cannot infer node " << node->getID() << "\n";
   assert(false);
 }
@@ -236,8 +275,8 @@ Sema::Sema(ASTNode *node, TypeContext &ctx): ctx(ctx) {
   auto intTy = ctx.create<IntType>();
   auto floatTy = ctx.create<FloatType>();
   auto voidTy = ctx.create<VoidType>();
-  auto intPtrTy = ctx.create<PointerType>(intTy);
-  auto floatPtrTy = ctx.create<PointerType>(floatTy);
+  auto intPtrTy = ctx.create<ArrayType>(intTy, std::vector { 1 });
+  auto floatPtrTy = ctx.create<ArrayType>(floatTy, std::vector { 1 });
 
   using Args = std::vector<Type*>;
   Args empty;

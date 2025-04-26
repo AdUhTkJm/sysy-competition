@@ -167,6 +167,39 @@ Value CodeGen::emitExpr(ASTNode *node) {
     return callOp;
   }
 
+  if (auto access = dyn_cast<ArrayAccessNode>(node)) {
+    auto arrTy = cast<ArrayType>(access->arrTy);
+
+    // Calculate a series of stride.
+    std::vector<int> sizes;
+    auto size = getSize(arrTy);
+    for (int i = 0; i < arrTy->dims.size(); i++)
+      sizes.push_back(size /= arrTy->dims[i]);
+    
+    Value addr;
+    if (globals.count(access->array))
+      addr = builder.create<GetGlobalOp>({
+        new NameAttr(access->array)
+      });
+    else if (symbols.count(access->array))
+      addr = symbols[access->array];
+    for (int i = 0; i < access->indices.size(); i++) {
+      auto index = emitExpr(access->indices[i]);
+      auto strideVal = builder.create<IntOp>({ new IntAttr(sizes[i]) });
+      auto stride = builder.create<MulIOp>({ index, strideVal });
+      addr = builder.create<AddLOp>({ addr, stride });
+    }
+    // This is not a value, but just an address.
+    // Directly return the address (for, e.g. function arguments)
+    if (arrTy->dims.size() > access->indices.size())
+      return addr;
+
+    // Store the value in addr.
+    return builder.create<LoadOp>({ addr }, {
+      new SizeAttr(getSize(arrTy->base))
+    });
+  }
+
   std::cerr << "cannot codegen node type " << node->getID() << "\n";
   assert(false);
 }
@@ -322,6 +355,36 @@ void CodeGen::emit(ASTNode *node) {
     auto value = emitExpr(assign->r);
     builder.create<StoreOp>({ value, addr }, {
       new SizeAttr(getSize(assign->l->type))
+    });
+    return;
+  }
+
+  if (auto write = dyn_cast<ArrayAssignNode>(node)) {
+    auto value = emitExpr(write->value);
+    auto arrTy = cast<ArrayType>(write->arrTy);
+
+    // Calculate a series of stride.
+    std::vector<int> sizes;
+    auto size = getSize(arrTy);
+    for (int i = 0; i < write->indices.size(); i++)
+      sizes.push_back(size /= arrTy->dims[i]);
+    
+    Value addr;
+    if (globals.count(write->array))
+      addr = builder.create<GetGlobalOp>({
+        new NameAttr(write->array)
+      });
+    else if (symbols.count(write->array))
+      addr = symbols[write->array];
+    for (int i = 0; i < write->indices.size(); i++) {
+      auto index = emitExpr(write->indices[i]);
+      auto strideVal = builder.create<IntOp>({ new IntAttr(sizes[i]) });
+      auto stride = builder.create<MulIOp>({ index, strideVal });
+      addr = builder.create<AddLOp>({ addr, stride });
+    }
+    // Store the value in addr.
+    builder.create<StoreOp>({ value, addr }, {
+      new SizeAttr(getSize(arrTy->base))
     });
     return;
   }

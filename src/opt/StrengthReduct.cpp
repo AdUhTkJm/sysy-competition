@@ -44,8 +44,16 @@ void StrengthReduct::run() {
     auto x = op->getOperand(0);
     auto y = op->getOperand(1);
 
+    // Const fold if possible.
+    if (isa<IntOp>(x.defining) && isa<IntOp>(y.defining)) {
+      auto vx = x.defining->getAttr<IntAttr>()->value;
+      auto vy = y.defining->getAttr<IntAttr>()->value;
+      builder.replace<IntOp>(op, { new IntAttr(vx * vy) });
+      return true;
+    }
+
     // Canonicalize.
-    if (isa<IntOp>(x.defining)) {
+    if (isa<IntOp>(x.defining) && !isa<IntOp>(y.defining)) {
       builder.replace<MulIOp>(op, { y, x });
       return true;
     }
@@ -118,8 +126,16 @@ void StrengthReduct::run() {
     auto x = op->getOperand(0);
     auto y = op->getOperand(1);
 
+    // Const fold if possible.
+    if (isa<IntOp>(x.defining) && isa<IntOp>(y.defining)) {
+      auto vx = x.defining->getAttr<IntAttr>()->value;
+      auto vy = y.defining->getAttr<IntAttr>()->value;
+      builder.replace<IntOp>(op, { new IntAttr(vx / vy) });
+      return true;
+    }
+
     // Canonicalize.
-    if (isa<IntOp>(x.defining)) {
+    if (isa<IntOp>(x.defining) && !isa<IntOp>(y.defining)) {
       builder.replace<DivIOp>(op, { y, x });
       return true;
     }

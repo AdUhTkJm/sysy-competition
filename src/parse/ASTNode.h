@@ -19,9 +19,6 @@ public:
 
   int getID() const { return id; }
 
-  virtual void walk(ASTWalker walker) = 0;
-  virtual std::string toString() const = 0;
-
   ASTNode(int id): id(id) {}
 };
 
@@ -41,8 +38,6 @@ public:
 
   IntNode(int value): value(value) {}
   
-  void walk(ASTWalker walker);
-  std::string toString() const;
 };
 
 class FloatNode : public ASTNodeImpl<FloatNode, __LINE__> {
@@ -50,9 +45,6 @@ public:
   float value;
 
   FloatNode(float value): value(value) {}
-  
-  void walk(ASTWalker walker);
-  std::string toString() const;
 };
 
 class BlockNode : public ASTNodeImpl<BlockNode, __LINE__> {
@@ -60,9 +52,6 @@ public:
   std::vector<ASTNode*> nodes;
 
   BlockNode(const decltype(nodes) &n): nodes(n) {}
-
-  void walk(ASTWalker walker);
-  std::string toString() const;
 };
 
 class VarDeclNode : public ASTNodeImpl<VarDeclNode, __LINE__> {
@@ -74,9 +63,6 @@ public:
 
   VarDeclNode(const std::string &name, ASTNode *init, bool mut = true, bool global = false):
     name(name), init(init), mut(mut), global(global) {}
-  
-  void walk(ASTWalker walker);
-  std::string toString() const;
 };
 
 class VarRefNode : public ASTNodeImpl<VarRefNode, __LINE__> {
@@ -84,9 +70,6 @@ public:
   std::string name;
 
   VarRefNode(const std::string &name): name(name) {}
-
-  void walk(ASTWalker walker);
-  std::string toString() const;
 };
 
 // Note that we allow defining multiple variables in a single statement,
@@ -97,9 +80,6 @@ public:
   std::vector<VarDeclNode*> nodes;
 
   TransparentBlockNode(const decltype(nodes) &n): nodes(n) {}
-
-  void walk(ASTWalker walker);
-  std::string toString() const;
 };
 
 class BinaryNode : public ASTNodeImpl<BinaryNode, __LINE__> {
@@ -114,9 +94,6 @@ public:
 
   BinaryNode(decltype(kind) k, ASTNode *l, ASTNode *r):
     kind(k), l(l), r(r) {}
-  
-  void walk(ASTWalker walker);
-  std::string toString() const;
 };
 
 class UnaryNode : public ASTNodeImpl<UnaryNode, __LINE__> {
@@ -129,9 +106,6 @@ public:
 
   UnaryNode(decltype(kind) k, ASTNode *node):
     kind(k), node(node) {}
-  
-  void walk(ASTWalker walker);
-  std::string toString() const;
 };
 
 class FnDeclNode : public ASTNodeImpl<FnDeclNode, __LINE__> {
@@ -142,9 +116,6 @@ public:
 
   FnDeclNode(std::string name, const decltype(args) &a, BlockNode *body):
     name(name), args(a), body(body) {}
-
-  void walk(ASTWalker walker);
-  std::string toString() const;
 };
 
 class ReturnNode : public ASTNodeImpl<ReturnNode, __LINE__> {
@@ -153,9 +124,6 @@ public:
   std::string func;
 
   ReturnNode(const std::string &func, ASTNode *node): node(node), func(func) {}
-
-  void walk(ASTWalker walker);
-  std::string toString() const;
 };
 
 class IfNode : public ASTNodeImpl<IfNode, __LINE__> {
@@ -164,9 +132,6 @@ public:
 
   IfNode(ASTNode *cond, ASTNode *ifso, ASTNode *ifnot):
     cond(cond), ifso(ifso), ifnot(ifnot) {}
-
-  void walk(ASTWalker walker);
-  std::string toString() const;
 };
 
 class AssignNode : public ASTNodeImpl<AssignNode, __LINE__> {
@@ -174,9 +139,6 @@ public:
   ASTNode *l, *r;
 
   AssignNode(ASTNode *l, ASTNode *r): l(l), r(r) {}
-
-  void walk(ASTWalker walker);
-  std::string toString() const;
 };
 
 class WhileNode : public ASTNodeImpl<WhileNode, __LINE__> {
@@ -184,9 +146,6 @@ public:
   ASTNode *cond, *body;
 
   WhileNode(ASTNode *cond, ASTNode *body): cond(cond), body(body) {}
-
-  void walk(ASTWalker walker);
-  std::string toString() const;
 };
 
 // Size is to be deduced by type.
@@ -199,9 +158,6 @@ public:
 
   ConstArrayNode(int *vi): vi(vi) {}
   ConstArrayNode(float *vf): vf(vf) {}
-
-  void walk(ASTWalker walker);
-  std::string toString() const;
 };
 
 class LocalArrayNode : public ASTNodeImpl<LocalArrayNode, __LINE__> {
@@ -209,34 +165,27 @@ public:
   ASTNode **va;
 
   LocalArrayNode(ASTNode **va): va(va) {}
-  
-  void walk(ASTWalker walker);
-  std::string toString() const;
 };
 
 class ArrayAccessNode : public ASTNodeImpl<ArrayAccessNode, __LINE__> {
 public:
-  ASTNode *array;
-  ASTNode *index;
+  std::string array;
+  std::vector<ASTNode*> indices;
+  Type *arrTy = nullptr; // Filled in Sema.
 
-  ArrayAccessNode(ASTNode *array, ASTNode *index):
-    array(array), index(index) {}
-  
-  void walk(ASTWalker walker);
-  std::string toString() const;
+  ArrayAccessNode(const std::string &array, const std::vector<ASTNode*> &indices):
+    array(array), indices(indices) {}
 };
 
 class ArrayAssignNode : public ASTNodeImpl<ArrayAssignNode, __LINE__> {
 public:
-  ASTNode *array;
+  std::string array;
   std::vector<ASTNode*> indices;
   ASTNode *value;
+  Type *arrTy = nullptr; // Filled in Sema.
 
-  ArrayAssignNode(ASTNode *array, const std::vector<ASTNode*> &indices, ASTNode *value):
+  ArrayAssignNode(const std::string &array, const std::vector<ASTNode*> &indices, ASTNode *value):
     array(array), indices(indices), value(value) {}
-  
-  void walk(ASTWalker walker);
-  std::string toString() const;
 };
 
 class CallNode : public ASTNodeImpl<CallNode, __LINE__> {
@@ -246,9 +195,6 @@ public:
 
   CallNode(const std::string &func, const std::vector<ASTNode*> &args):
     func(func), args(args) {}
-
-  void walk(ASTWalker walker);
-  std::string toString() const;
 };
 
 };

@@ -201,6 +201,25 @@ ASTNode *Parser::primary() {
       return new CallNode(vs, args);
     }
 
+    if (test(Token::LBrak)) {
+      // Read from array.
+
+      std::vector<ASTNode*> indices;
+      do {
+        indices.push_back(expr());
+        expect(Token::RBrak);
+      } while (test(Token::LBrak));
+
+      // This is actually an assign node.
+      if (test(Token::Assign)) {
+        auto value = expr();
+        // Don't expect semicolon here. It'll be expected in stmt().
+        return new ArrayAssignNode(vs, indices, value);
+      }
+
+      return new ArrayAccessNode(vs, indices);
+    }
+
     return new VarRefNode(vs);
   }
 
@@ -426,10 +445,13 @@ FnDeclNode *Parser::fnDecl() {
       expect(Token::RBrak);
     }
 
+    if (isPointer)
+      // Add an implicit [1] to the array type.
+      dims.insert(dims.begin(), 1);
+    
     if (dims.size() != 0)
       ty = new ArrayType(ty, dims);
-    if (isPointer)
-      ty = ctx.create<PointerType>(ty);
+    
 
     params.push_back(ty);
 
@@ -511,9 +533,12 @@ ConstValue Parser::earlyFold(ASTNode *node) {
   }
 
   if (auto access = dyn_cast<ArrayAccessNode>(node)) {
-    auto array = earlyFold(access->array);
-    int index = earlyFold(access->index).getInt();
-    return array[index];
+    auto array = symbols[access->array];
+    ConstValue v = array;
+    for (auto index : access->indices)
+      v = array[earlyFold(index).getInt()];
+    
+    return v;
   }
 
   std::cerr << "not constexpr: " << node->getID() << "\n";
