@@ -46,6 +46,7 @@ class RegAlloc : public Pass {
   int spilled = 0;
 
   void runImpl(Region *region, bool isLeaf);
+  void tidyup(Region *region);
 public:
   RegAlloc(ModuleOp *module): Pass(module) {}
 

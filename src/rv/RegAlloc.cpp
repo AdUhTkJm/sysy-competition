@@ -162,23 +162,14 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   std::map<Op*, std::set<Op*>> interf;
   std::map<Op*, std::set<Reg>> indivForbidden;
 
-  // Values of readreg, or operands of writereg, are prioritzed.
-  std::set<Op*> prioritized;
+  // Values of readreg, or operands of writereg, or phis (mvs), are prioritzed.
+  std::map<Op*, int> priority;
+  // The `key` is preferred to have the same value as `value`.
+  std::map<Op*, Op*> prefer;
 
   for (auto bb : region->getBlocks()) {
-    // All live-ins must intefere with each other.
-    for (auto v1 : bb->getLiveIn()) {
-      for (auto v2 : bb->getLiveIn()) {
-        if (v1 != v2) {
-          interf[v1].insert(v2);
-          interf[v2].insert(v1);
-        }
-      }
-    }
-
     // Scan through the block and see the place where the value's last used.
     std::map<Op*, int> lastUsed, defined;
-    std::map<Reg, int> regUsed, regDefined;
     const auto &ops = bb->getOps();
     auto it = ops.end();
     for (int i = (int) ops.size() - 1; i >= 0; i--) {
@@ -189,48 +180,24 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       }
       defined[op] = i;
 
-      // Write/read to hardware registers also (conceptually) creates a new value.
+      // Might need to deal with this later, about regDefined etc.
       if (isa<WriteRegOp>(op)) {
-        auto reg = op->getAttr<RegAttr>()->reg;
-        regDefined[reg] = i;
-        prioritized.insert(op->getOperand().defining);
+        priority[op->getOperand().defining] = 1;
       }
       if (isa<ReadRegOp>(op)) {
-        auto reg = op->getAttr<RegAttr>()->reg;
-        prioritized.insert(op);
-        if (!regUsed.count(reg))
-          regUsed[reg] = i;
+        priority[op] = 1;
       }
-
-      // The result of phi will collide with the last instruction of its preds.
       if (isa<PhiOp>(op)) {
-        for (auto operand : op->getOperands()) {
-          auto v = operand.defining;
-          auto terminator = v->getParent()->getLastOp();
-          for (auto x : terminator->getOperands()) {
-            interf[x.defining].insert(op);
-            interf[op].insert(x.defining);
-          }
+        priority[op] = 2;
+        for (auto x : op->getOperands()) {
+          priority[x.defining] = 1;
+          prefer[x.defining] = op;
         }
       }
     }
 
-    // If we can't find where the register comes from, then assume it's from liveIn
-    for (auto [reg, x] : regUsed) {
-      if (!regDefined.count(reg))
-        regDefined[reg] = -1;
-    }
-    // If we can't find where the register goes to, then assume it goes to the next block
-    for (auto [reg, x] : regDefined) {
-      if (!regUsed.count(reg))
-        regUsed[reg] = ops.size();
-    }
-
-    // For all liveIns, they are defined at place -1.
-    for (auto op : bb->getLiveIn())
-      defined[op] = -1;
-
     // For all liveOuts, they are last-used at place size().
+    // If they aren't defined in this block, then `defined[op]` will be zero, which is intended.
     for (auto op : bb->getLiveOut())
       lastUsed[op] = ops.size();
 
@@ -254,11 +221,6 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
           interf[op2].insert(op1);
         }
       }
-
-      for (auto [reg, v2] : regUsed) {
-        if (overlap(defined[op1], v1, regDefined[reg], v2))
-          indivForbidden[op1].insert(reg);
-      }
     }
   }
 
@@ -272,11 +234,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
   // Sort by **descending** degree.
   std::sort(ops.begin(), ops.end(), [&](Op *a, Op *b) {
-    if (prioritized.count(a) && !prioritized.count(b))
-      return true;
-    if (prioritized.count(b) && !prioritized.count(a))
-      return false;
-    return interf[a].size() > interf[b].size();
+    auto pa = priority[a];
+    auto pb = priority[b];
+    return pa == pb ? interf[a].size() > interf[b].size() : pa > pb;
   });
   
   std::map<Op*, Reg> assignment;
@@ -286,6 +246,15 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     for (auto v1 : interf[op]) {
       if (assignment.count(v1))
         forbidden.insert(assignment[v1]);
+    }
+
+    if (prefer.count(op)) {
+      auto ref = prefer[op];
+      // Try to allocate the same register as `ref`.
+      if (assignment.count(ref) && !forbidden.count(assignment[ref])) {
+        assignment[op] = assignment[ref];
+        continue;
+      }
     }
 
     // See if there's any preferred registers.
@@ -414,7 +383,15 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     }
   }
 
+  tidyup(region);
+}
+
+void RegAlloc::tidyup(Region *region) {
+  Builder builder;
+  auto funcOp = region->getParent();
+
   // Now branches are still having both TargetAttr and ElseAttr.
+  // Replace them (perform split when necessary), so that they only have one target.
   REPLACE_BRANCH(BltOp, BgeOp);
   REPLACE_BRANCH(BeqOp, BneOp);
   REPLACE_BRANCH(BnezOp, BezOp);
@@ -427,6 +404,15 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       return false;
 
     if (me->nextBlock() == target) {
+      op->erase();
+      return true;
+    }
+    return false;
+  });
+
+  // Eliminate useless MvOp.
+  runRewriter(funcOp, [&](MvOp *op) {
+    if (op->getAttr<RdAttr>()->reg == op->getAttr<RsAttr>()->reg) {
       op->erase();
       return true;
     }

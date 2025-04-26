@@ -308,6 +308,7 @@ void Region::updatePreds() {
   for (auto bb : bbs) {
     bb->preds.clear();
     bb->succs.clear();
+    bb->reachables.clear();
   }
 
   for (auto bb : bbs) {
@@ -327,7 +328,22 @@ void Region::updatePreds() {
   for (auto bb : bbs) {
     for (auto pred : bb->getPreds())
       pred->succs.insert(bb);
+    bb->reachables.insert(bb);
   }
+
+  bool changed;
+  do {
+    changed = false;
+    for (auto bb : bbs) {
+      auto old = bb->reachables;
+      for (auto x : bb->reachables) {
+        for (auto succ : x->succs) {
+          auto [it, absent] = bb->reachables.insert(succ);
+          changed |= absent;
+        }
+      }
+    }
+  } while (changed);
 }
 
 // Use the simple data-flow approach, rather than the Tarjan one.
@@ -461,11 +477,14 @@ void Region::updateLiveness() {
 
   bool changed;
   do {
+    showLiveIn();
     changed = false;
     for (auto bb : bbs) {
       auto liveInOld = bb->liveIn;
 
-      // LiveOut(B) = \bigcup_{S\in succ(B)} (LiveIn(S) - PhiDefs(S)) \cup PhiUses(B) 
+      // LiveOut(B) = \bigcup_{S\in succ(B)} (LiveIn(S) - PhiDefs(S)) \cup PhiUses(S)
+      // We don't need to include all PhiUses. 
+      // We only want to include uses with `from` blocks that are reachable from here.
       std::set<Op*> liveOut;
       for (auto succ : bb->getSuccs()) {
         std::set_difference(
@@ -473,10 +492,14 @@ void Region::updateLiveness() {
           phis[succ].begin(), phis[succ].end(),
           std::inserter(liveOut, liveOut.end())
         );
-      }
-      for (auto phi : phis[bb]) {
-        for (auto value : phi->getOperands())
-          liveOut.insert(value.defining);
+        for (auto phi : phis[succ]) {
+          auto &ops = phi->getOperands();
+          auto &attrs = phi->getAttrs();
+          for (size_t i = 0; i < ops.size(); i++) {
+            if (bb->reachable(cast<FromAttr>(attrs[i])->bb))
+              liveOut.insert(ops[i].defining);
+          }
+        }
       }
 
       bb->liveOut = liveOut;
@@ -502,6 +525,7 @@ void Region::updateLiveness() {
 }
 
 void Region::showLiveIn() {
+  std::cerr << "===== live info starts =====\n";
   for (auto bb : bbs) {
     std::cerr << "=== block ===\n";
     for (auto x : bb->getOps()) {
@@ -520,6 +544,7 @@ void Region::showLiveIn() {
     }
     std::cerr << "\n\n";
   }
+  std::cerr << "===== live info ends =====\n\n\n";
 }
 
 void Region::dump(std::ostream &os, int depth) {

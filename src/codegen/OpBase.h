@@ -80,6 +80,7 @@ class BasicBlock {
   Region::iterator place;
   std::set<BasicBlock*> preds;
   std::set<BasicBlock*> succs;
+  std::set<BasicBlock*> reachables;
   // Note these are dominatORs, which mean `this` is dominatED by the elements.
   std::set<BasicBlock*> doms;
   // Dominance frontiers. `this` dominatES all blocks which are preds of the elements.
@@ -114,9 +115,12 @@ public:
   const auto &getDominanceFrontier() { return domFront; }
   const auto &getLiveIn() { return liveIn; }
   const auto &getLiveOut() { return liveOut; }
+  const auto &getReachables() { return reachables; }
   
   BasicBlock *getIdom() { return idom; }
   BasicBlock *nextBlock();
+
+  bool reachable(BasicBlock *bb) { return reachables.count(bb); }
 
   // Inserts before `at`.
   void insert(iterator at, Op *op);
