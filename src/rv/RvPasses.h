@@ -2,6 +2,7 @@
 #define RV_PASSES_H
 
 #include "../opt/Pass.h"
+#include "RvAttrs.h"
 
 namespace sys {
 
@@ -45,8 +46,12 @@ public:
 class RegAlloc : public Pass {
   int spilled = 0;
 
+  std::map<FuncOp*, std::set<Reg>> usedRegisters;
+
   void runImpl(Region *region, bool isLeaf);
   void tidyup(Region *region);
+  // Create both prologue and epilogue of a function.
+  void proEpilogue(FuncOp *funcOp);
 public:
   RegAlloc(ModuleOp *module): Pass(module) {}
 

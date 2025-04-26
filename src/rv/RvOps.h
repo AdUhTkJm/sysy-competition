@@ -30,6 +30,7 @@ namespace rv {
 RVOP(LiOp);
 RVOP(AddOp);
 RVOP(AddiwOp);
+RVOP(AddiOp); // Note that pointers can't be `addiw`'d.
 RVOP(SubOp);
 RVOP(MulwOp);
 RVOP(DivwOp); // Signed; divu for unsigned.

@@ -20,6 +20,10 @@ int getCount(BasicBlock *bb) {
   return bbcount[bb];
 }
 
+std::ostream &operator<<(std::ostream &os, Reg reg) {
+  return os << showReg(reg);
+}
+
 void dumpOp(Op *op, std::ostream &os) {
   std::string name;
   auto &opname = op->getName();
@@ -32,12 +36,35 @@ void dumpOp(Op *op, std::ostream &os) {
   // Vary opname based on the size attribute.
   // TODO.
   if (isa<sys::rv::StoreOp>(op)) {
-    assert(false);
+    auto size = op->getAttr<SizeAttr>()->value;
+    switch (size) {
+    case 4:
+      name = "sw";
+      break;
+    default:
+      assert(false);
+    }
+    // Dump as `sw a0, 4(a1)`
+    auto rs = op->getAttr<RsAttr>()->reg;
+    auto rs2 = op->getAttr<Rs2Attr>()->reg;
+    auto offset = op->getAttr<IntAttr>()->value;
+    os << name << " " << rs << ", " << offset << "(" << rs2 << ")\n";
     return;
   }
 
   if (isa<sys::rv::LoadOp>(op)) {
-    assert(false);
+    auto size = op->getAttr<SizeAttr>()->value;
+    switch (size) {
+    case 4:
+      name = "lw";
+      break;
+    default:
+      assert(false);
+    }
+    auto rd = op->getAttr<RdAttr>()->reg;
+    auto rs = op->getAttr<RsAttr>()->reg;
+    auto offset = op->getAttr<IntAttr>()->value;
+    os << name << " " << rd << ", " << offset << "(" << rs << ")\n";
     return;
   }
 
@@ -46,17 +73,17 @@ void dumpOp(Op *op, std::ostream &os) {
   
   if (op->hasAttr<RdAttr>()) {
     auto rd = op->getAttr<RdAttr>()->reg;
-    ss << showReg(rd) << ", ";
+    ss << rd << ", ";
   }
 
   if (op->hasAttr<RsAttr>()) {
     auto rs = op->getAttr<RsAttr>()->reg;
-    ss << showReg(rs) << ", ";
+    ss << rs << ", ";
   }
 
   if (op->hasAttr<Rs2Attr>()) {
     auto rs2 = op->getAttr<Rs2Attr>()->reg;
-    ss << showReg(rs2) << ", ";
+    ss << rs2 << ", ";
   }
 
   if (op->hasAttr<IntAttr>()) {

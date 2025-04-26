@@ -12,9 +12,21 @@ parser.add_argument("-r", "--dump-mid-ir", action="store_true")
 parser.add_argument("--arm", action="store_true")
 parser.add_argument("-a", "--test-all", action="store_true")
 parser.add_argument("-n", "--no-execute", action="store_true")
+parser.add_argument("--asm", type=str)
 parser.add_argument("-t", "--test", type=str)
 
 args = parser.parse_args()
+
+def run_asm(file: str):
+  basename = os.path.splitext(os.path.basename(file))[0]
+
+  # Invoke gcc.
+  gcc = "aarch64-linux-gnu-gcc" if args.arm else "riscv64-linux-gnu-gcc"
+  proc.run([gcc, file, "test/official/sylib.c", "-static", "-o", f"temp/{basename}"], check=True)
+
+  # Run the file.
+  qemu = "qemu-aarch64-static" if args.arm else "qemu-riscv64-static"
+  return proc.run([qemu, f"temp/{basename}"])
 
 def run(full_file: str, no_exec: bool):
   file = os.path.splitext(full_file)[0]
@@ -46,15 +58,12 @@ def run(full_file: str, no_exec: bool):
 
   if no_exec:
     return;
-  
-  # Invoke gcc.
-  gcc = "aarch64-linux-gnu-gcc" if args.arm else "riscv64-linux-gnu-gcc"
-  proc.run([gcc, f"temp/{file}.s", "test/official/sylib.c", "-static", "-o", f"temp/{file}"], check=True)
+  return run_asm(f"temp/{file}.s")
 
-  # Run the file.
-  qemu = "qemu-aarch64-static" if args.arm else "qemu-riscv64-static"
-  return proc.run([qemu, f"temp/{file}"])
-
+if args.asm:
+  result = run_asm(args.asm)
+  print(result.returncode)
+  exit(0)
 
 proc.run(["make"], check=True)
 if args.test_all:

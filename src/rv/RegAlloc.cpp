@@ -224,7 +224,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     }
   }
 
-  dumpInterf(region, interf, indivForbidden);
+  // dumpInterf(region, interf, indivForbidden);
 
   // Now time to allocate.
 
@@ -289,7 +289,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     assert(false);
   }
   
-  dumpAssignment(region, assignment);
+  // dumpAssignment(region, assignment);
 
   auto funcOp = region->getParent();
 
@@ -310,6 +310,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(BnezOp, UNARY);
   LOWER(BezOp, UNARY);
   LOWER(AddiwOp, UNARY);
+  LOWER(AddiOp, UNARY);
   LOWER(LoadOp, UNARY);
   LOWER(SlliwOp, UNARY);
 
@@ -334,20 +335,6 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     auto rd = getReg(op);
     auto mv = builder.replace<MvOp>(op, { rs });
     assignment[mv] = rd;
-    return true;
-  });
-
-  //   subsp <4>
-  // becomes
-  //   addi <rd = sp> <rs = sp> <-4>
-  // As RdAttr is supplied, though `assignment[]` won't have the new op recorded, it's fine.
-  runRewriter(funcOp, [&](SubSpOp *op) {
-    int offset = op->getAttr<IntAttr>()->value;
-    builder.replace<AddiwOp>(op, {
-      new RdAttr(Reg::sp),
-      new RsAttr(Reg::sp),
-      new IntAttr(offset)
-    });
     return true;
   });
 
@@ -382,8 +369,6 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         op->addAttr<RdAttr>(getReg(op));
     }
   }
-
-  tidyup(region);
 }
 
 void RegAlloc::tidyup(Region *region) {
@@ -420,11 +405,190 @@ void RegAlloc::tidyup(Region *region) {
   });
 }
 
+static std::set<Reg> callerSaved = {
+  Reg::t0, Reg::t1, Reg::t2, Reg::t3,
+  Reg::t4, Reg::t5, Reg::t6,
+
+  Reg::a0, Reg::a1, Reg::a2, Reg::a3,
+  Reg::a4, Reg::a5, Reg::a6, Reg::a7,  
+};
+
+static std::set<Reg> calleeSaved = {
+  Reg::s0, Reg::s1, Reg::s2, Reg::s3, 
+  Reg::s4, Reg::s5, Reg::s6, Reg::s7,
+  Reg::s8, Reg::s9, Reg::s10, Reg::s11,
+};
+
+void save(Builder builder, const std::vector<Reg> &regs, int offset) {
+  for (auto reg : regs) {
+    builder.create<sys::rv::StoreOp>({
+      /*value=*/new RsAttr(reg),
+      /*addr=*/new Rs2Attr(Reg::sp),
+      /*offset=*/new IntAttr(offset -= 4),
+      /*size=*/new SizeAttr(4)
+    });
+  }
+}
+
+void load(Builder builder, const std::vector<Reg> &regs, int offset) {
+  for (auto reg : regs) {
+    builder.create<sys::rv::LoadOp>({
+      /*value=*/new RdAttr(reg),
+      /*addr=*/new RsAttr(Reg::sp),
+      /*offset=*/new IntAttr(offset -= 4),
+      /*size=*/new SizeAttr(4)
+    });
+  }
+}
+
+bool isExtern(const std::string &name) {
+  static std::set<std::string> externs = {
+    "getint",
+    "getch",
+    "getfloat",
+    "getarray",
+    "getfarray",
+    "putint",
+    "putch",
+    "putfloat",
+    "putarray",
+    "putfarray",
+  };
+  return externs.count(name);
+}
+
+void RegAlloc::proEpilogue(FuncOp *funcOp) {
+  Builder builder;
+  auto usedRegs = usedRegisters[funcOp];
+  auto region = funcOp->getRegion();
+
+  // Always preserve return address.
+  std::vector<Reg> preserve { Reg::ra };
+  for (auto x : usedRegs) {
+    if (calleeSaved.count(x))
+      preserve.push_back(x);
+  }
+
+  // If there's a SubSpOp, then it must be at the top of the first block.
+  auto op = region->getFirstBlock()->getFirstOp();
+  int offset = 0;
+  if (isa<SubSpOp>(op)) {
+    offset = op->getAttr<IntAttr>()->value;
+    op->removeAttr<IntAttr>();
+    op->addAttr<IntAttr>(offset += 4 * preserve.size());
+  } else {
+    builder.setToRegionStart(region);
+    op = builder.create<SubSpOp>({ new IntAttr(offset += 4 * preserve.size()) });
+  }
+
+  // Add function prologue, preserving the regs.
+  builder.setAfterOp(op);
+  save(builder, preserve, offset);
+
+  // Similarly add function epilogue.
+  if (offset != 0) {
+    auto rets = funcOp->findAll<RetOp>();
+    auto bb = region->appendBlock();
+    for (auto ret : rets)
+      builder.replace<JOp>(ret, { new TargetAttr(bb) });
+
+    builder.setToBlockStart(bb);
+    load(builder, preserve, offset);
+    builder.create<SubSpOp>({ new IntAttr(-offset) });
+    builder.create<RetOp>();
+  }
+
+  // For each call, preserve caller-preserved ones.
+  std::vector<Reg> callPreserve;
+  for (auto x : usedRegs) {
+    if (callerSaved.count(x))
+      callPreserve.push_back(x);
+  }
+
+  if (!callPreserve.empty()) {
+    auto calls = funcOp->findAll<CallOp>();
+    for (auto call : calls) {
+      std::vector<Reg> caller;
+      auto callName = call->getAttr<NameAttr>()->name;
+      // Surely we don't need to preserve arguments.
+      // TODO: handle this.
+      break;
+      
+      if (isExtern(callName))
+        caller = callPreserve;
+      else {
+        // If we know what registers that function would use,
+        // then we only need to preserve those registers that get tampered with.
+        auto calledFunc = findFunction(callName);
+        for (auto r : callPreserve) {
+          if (usedRegisters[calledFunc].count(r))
+            caller.push_back(r);
+        }
+      }
+
+      int offset = caller.size() * 4;
+
+      builder.setBeforeOp(call);
+      builder.create<SubSpOp>({ new IntAttr(offset) });
+      save(builder, caller, offset);
+
+      builder.setAfterOp(call);
+      load(builder, caller, offset);
+      builder.create<SubSpOp>({ new IntAttr(-offset) });
+    }
+  }
+
+  //   subsp <4>
+  // becomes
+  //   addi <rd = sp> <rs = sp> <-4>
+  runRewriter(funcOp, [&](SubSpOp *op) {
+    int offset = op->getAttr<IntAttr>()->value;
+    if (offset <= 2048 && offset > -2048) {
+      builder.replace<AddiOp>(op, {
+        new RdAttr(Reg::sp),
+        new RsAttr(Reg::sp),
+        new IntAttr(-offset)
+      });
+    } else {
+      builder.create<LiOp>({
+        new RdAttr(Reg::t0),
+        new IntAttr(offset)
+      });
+      builder.replace<SubOp>(op, {
+        new RdAttr(Reg::sp),
+        new RsAttr(Reg::sp),
+        new Rs2Attr(Reg::t0)
+      });
+    }
+    return true;
+  });
+}
+
 void RegAlloc::run() {
   auto funcs = module->findAll<FuncOp>();
 
   for (auto func : funcs) {
     auto calls = func->findAll<sys::rv::CallOp>();
     runImpl(func->getRegion(), calls.size() == 0);
+  }
+
+  // Have a look at what registers are used inside each function.
+  for (auto func : funcs) {
+    auto &set = usedRegisters[func];
+    for (auto bb : func->getRegion()->getBlocks()) {
+      for (auto op : bb->getOps()) {
+        if (op->hasAttr<RdAttr>())
+          set.insert(op->getAttr<RdAttr>()->reg);
+        if (op->hasAttr<RsAttr>())
+          set.insert(op->getAttr<RsAttr>()->reg);
+        if (op->hasAttr<Rs2Attr>())
+          set.insert(op->getAttr<Rs2Attr>()->reg);
+      }
+    }
+  }
+
+  for (auto func : funcs) {
+    proEpilogue(func);
+    tidyup(func->getRegion());
   }
 }

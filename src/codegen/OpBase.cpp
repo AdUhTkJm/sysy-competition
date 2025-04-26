@@ -477,7 +477,6 @@ void Region::updateLiveness() {
 
   bool changed;
   do {
-    showLiveIn();
     changed = false;
     for (auto bb : bbs) {
       auto liveInOld = bb->liveIn;
@@ -521,7 +520,7 @@ void Region::updateLiveness() {
     }
   } while (changed);
 
-  showLiveIn();
+  // showLiveIn();
 }
 
 void Region::showLiveIn() {
