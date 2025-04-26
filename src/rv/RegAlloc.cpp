@@ -309,6 +309,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(SrliwOp, UNARY);
   LOWER(SraiwOp, UNARY);
   LOWER(SraiOp, UNARY);
+  LOWER(SeqzOp, UNARY);
+  LOWER(SnezOp, UNARY);
 
   //   writereg %1, <reg = a0>
   // becomes

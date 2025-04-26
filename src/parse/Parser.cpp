@@ -159,14 +159,16 @@ void *Parser::getArrayInit(const std::vector<int> &dims, bool expectFloat, bool 
     if (!doFold)
       ((ASTNode**) vi)[offset(place)] = expr();
     else if (expectFloat)
-        ((float*) vi)[offset(place)] = earlyFold(expr()).getFloat();
+      ((float*) vi)[offset(place)] = earlyFold(expr()).getFloat();
     else
       ((int*) vi)[offset(place)] = earlyFold(expr()).getInt();
 
     place[place.size() - 1]++;
 
     // Automatically carry.
-    carry(place);
+    // But don't carry if the next token is `}`, because it will carry at that time.
+    if (!peek(Token::RBrace))
+      carry(place);
     if (!test(Token::Comma) && !peek(Token::RBrace))
       expect(Token::RBrace);
   } while (addAt != dims.size());
@@ -228,18 +230,31 @@ ASTNode *Parser::primary() {
   assert(false);
 }
 
+ASTNode *Parser::unary() {
+  if (test(Token::Minus))
+    return new UnaryNode(UnaryNode::Minus, unary());
+
+  if (test(Token::Plus))
+    return unary();
+
+  if (test(Token::Not))
+    return new UnaryNode(UnaryNode::Not, unary());
+
+  return primary();
+}
+
 ASTNode *Parser::mul() {
-  auto n = primary();
+  auto n = unary();
   while (peek(Token::Mul, Token::Div, Token::Mod)) {
     switch (consume().type) {
     case Token::Mul:
-      n = new BinaryNode(BinaryNode::Mul, n, primary());
+      n = new BinaryNode(BinaryNode::Mul, n, unary());
       break;
     case Token::Div:
-      n = new BinaryNode(BinaryNode::Div, n, primary());
+      n = new BinaryNode(BinaryNode::Div, n, unary());
       break;
     case Token::Mod:
-      n = new BinaryNode(BinaryNode::Mod, n, primary());
+      n = new BinaryNode(BinaryNode::Mod, n, unary());
       break;
     default:
       assert(false);

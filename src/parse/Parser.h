@@ -90,6 +90,7 @@ class Parser {
   ConstValue earlyFold(ASTNode *node);
 
   ASTNode *primary();
+  ASTNode *unary();
   ASTNode *mul();
   ASTNode *add();
   ASTNode *rel();

@@ -19,7 +19,7 @@ parser.add_argument("-r", "--dump-mid-ir", action="store_true")
 parser.add_argument("--arm", action="store_true")
 parser.add_argument("-n", "--no-execute", action="store_true")
 parser.add_argument("-d", "--directory", type=str)
-parser.add_argument("--timeout", type=float, default=1)
+parser.add_argument("--timeout", type=float, default=0.5)
 parser.add_argument("--asm", type=str)
 parser.add_argument("-t", "--test", type=str)
 
@@ -229,10 +229,14 @@ def test_all():
           [f"{BUILD_DIR}/sysc", str(sy_path), "-o", str(asm_path)],
           check=True,
           stdout=proc.PIPE,
-          stderr=proc.STDOUT
+          stderr=proc.STDOUT,
+          timeout=args.timeout
         )
       except proc.CalledProcessError as e:
         failures.append((sy_path, f"Compile failed: {e.output.decode().strip()}"))
+        continue
+      except proc.TimeoutExpired:
+        failures.append((sy_path, f"Compiler timeout ({args.timeout:.2f}s)"))
         continue
         
       if not asm_path.exists():
@@ -296,6 +300,7 @@ def test_all():
   
   if failures:
     print("\nFailed cases:")
+    failures = sorted(failures, key=lambda x: x[0])
     for path, reason in failures:
       print(f"- {path}")
       first_line = reason.split('\n')[0].strip()
@@ -315,5 +320,5 @@ if __name__ == "__main__":
 
   if args.test:
     result = run(args.test, args.no_execute)
-    if not args.no_execute:
+    if result is not None:
       print("Return value:", result.returncode)

@@ -192,8 +192,34 @@ Type *Sema::infer(ASTNode *node) {
     return node->type = ctx.create<VoidType>();
   }
 
-  if (isa<ConstArrayNode>(node) || isa<LocalArrayNode>(node)) {
+  if (isa<ConstArrayNode>(node)) {
     assert(node->type);
+    return node->type;
+  }
+
+  if (auto arr = dyn_cast<LocalArrayNode>(node)) {
+    assert(node->type);
+    auto arrTy = cast<ArrayType>(node->type);
+    auto baseTy = arrTy->base;
+    auto size = arrTy->getSize();
+    for (int i = 0; i < size; i++) {
+      auto &x = arr->va[i];
+      if (!x)
+        continue;
+      auto ty = infer(x);
+
+      if (isa<FloatType>(ty) && isa<IntType>(baseTy)) {
+        x = new UnaryNode(UnaryNode::Float2Int, x);
+        x->type = ctx.create<IntType>();
+        continue;
+      }
+
+      if (isa<IntType>(ty) && isa<FloatType>(baseTy)) {
+        x = new UnaryNode(UnaryNode::Int2Float, x);
+        x->type = ctx.create<FloatType>();
+        continue;
+      }
+    }
     return node->type;
   }
 

@@ -55,6 +55,8 @@ RVOP(BltOp);
 RVOP(BgeOp);
 RVOP(BezOp);
 RVOP(BnezOp);
+RVOP(SeqzOp); // Set equal to zero (pseudo, 2 ops)
+RVOP(SnezOp); // Set not equal to zero (pseudo, 2 ops)
 RVOP(JOp);
 RVOP(MvOp);
 RVOP(RetOp);
@@ -85,6 +87,8 @@ inline bool hasRd(Op *op) {
     isa<SrliwOp>(op) ||
     isa<SraiwOp>(op) ||
     isa<SraiOp>(op) ||
+    isa<SeqzOp>(op) ||
+    isa<SnezOp>(op) ||
     isa<MulhOp>(op) ||
     isa<MulhuOp>(op) ||
     isa<LaOp>(op);

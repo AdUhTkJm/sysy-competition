@@ -84,6 +84,16 @@ void Lower::run() {
   REPLACE(RShiftImmLOp, SraiOp);
   REPLACE(GotoOp, JOp);
   REPLACE(GetGlobalOp, LaOp);
+  REPLACE(NotOp, SeqzOp);
+
+  runRewriter([&](MinusOp *op) {
+    auto value = op->getOperand();
+    
+    builder.setBeforeOp(op);
+    auto zero = builder.create<LiOp>({ new IntAttr(0) });
+    builder.replace<SubOp>(op, { zero, value }, op->getAttrs());
+    return true;
+  });
 
   runRewriter([&](ModIOp *op) {
     auto denom = op->getOperand(0);

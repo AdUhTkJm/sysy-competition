@@ -3,6 +3,7 @@
 #include "Attrs.h"
 #include "OpBase.h"
 #include "Ops.h"
+#include <cstring>
 #include <iostream>
 
 using namespace sys;
@@ -245,10 +246,28 @@ void CodeGen::emit(ASTNode *node) {
 
   if (auto vardecl = dyn_cast<VarDeclNode>(node)) {
     if (vardecl->global) {
-      int *value = vardecl->init ? cast<ConstArrayNode>(vardecl->init)->vi : new int(0);
+      if (vardecl->init && isa<IntNode>(vardecl->init)) {
+        int value = cast<IntNode>(vardecl->init)->value;
+        // Treat the single integer as an array.
+        auto addr = builder.create<GlobalOp>({
+          new SizeAttr(getSize(vardecl->type)),
+          new IntArrayAttr(new int(value), 1),
+          new NameAttr(vardecl->name),
+        });
+        globals[vardecl->name] = addr;
+        return;
+      }
+
       auto size = 1;
       if (auto arrayTy = dyn_cast<ArrayType>(vardecl->type))
         size = arrayTy->getSize();
+      int *value;
+      if (vardecl->init)
+        value = cast<ConstArrayNode>(vardecl->init)->vi;
+      else {
+        value = new int[size];
+        memset(value, 0, sizeof(int) * size);
+      }
       
       auto addr = builder.create<GlobalOp>({
         new SizeAttr(getSize(vardecl->type)),
