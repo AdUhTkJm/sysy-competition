@@ -39,6 +39,7 @@ protected:
   }
 
   FuncOp *findFunction(const std::string &name);
+  static bool isExtern(const std::string &name);
 public:
   Pass(ModuleOp *module): module(module) {}
   virtual ~Pass() {}

@@ -17,6 +17,8 @@ bool DCE::isImpure(Op *op) {
 
   if (isa<CallOp>(op)) {
     auto name = op->getAttr<NameAttr>()->name;
+    if (isExtern(name))
+      return true;
     return findFunction(name)->hasAttr<ImpureAttr>();
   }
 

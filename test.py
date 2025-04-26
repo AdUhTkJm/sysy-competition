@@ -22,7 +22,7 @@ args = parser.parse_args()
 
 SRC_DIR = Path("src")
 BUILD_DIR = Path("build")
-FINAL_BINARY = Path("bin") / "sysc"
+FINAL_BINARY = BUILD_DIR / "sysc"
 COMPILER = "clang++"
 AR = "ar"
 CFLAGS = ["-c", "-std=c++17", "-g"]
@@ -155,13 +155,15 @@ def run_asm(file: str):
 def run(full_file: str, no_exec: bool):
   file = os.path.splitext(full_file)[0]
 
-  command = ["bin/sysc", f"test/{full_file}"]
+  command = [f"{BUILD_DIR}/sysc", f"test/{full_file}"]
 
   if args.gdb:
     command = ["gdb", "--args", *command]
+    no_exec = True
   
   if args.valgrind:
     command = ["valgrind", *command]
+    no_exec = True
   
   if args.dump_mid_ir:
     command.append("--dump-mid-ir")
@@ -186,7 +188,7 @@ def run(full_file: str, no_exec: bool):
 
 if args.asm:
   result = run_asm(args.asm)
-  print(result.returncode)
+  print("Return value: ", result.returncode)
   exit(0)
 
 build()
@@ -204,4 +206,4 @@ if args.test_all:
 if args.test:
   result = run(args.test, args.no_execute)
   if not args.no_execute:
-    print(result.returncode)
+    print("Return value: ", result.returncode)

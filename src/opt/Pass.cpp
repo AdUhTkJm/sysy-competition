@@ -5,19 +5,37 @@
 
 using namespace sys;
 
-FuncOp *Pass::findFunction(const std::string &name) {
-  static std::map<std::string, FuncOp*> cache;
+bool Pass::isExtern(const std::string &name) {
+  static std::set<std::string> externs = {
+    "getint",
+    "getch",
+    "getfloat",
+    "getarray",
+    "getfarray",
+    "putint",
+    "putch",
+    "putfloat",
+    "putarray",
+    "putfarray",
+  };
+  return externs.count(name);
+}
 
-  if (cache.empty()) {
-    auto region = module->getRegion();
-    auto block = region->getFirstBlock();
-    for (auto op : block->getOps()) {
-      if (auto func = dyn_cast<FuncOp>(op))
-        cache[op->getAttr<NameAttr>()->name] = func;
-    }
+FuncOp *Pass::findFunction(const std::string &name) {
+  std::map<std::string, FuncOp*> funcs;
+
+  auto region = module->getRegion();
+  auto block = region->getFirstBlock();
+  for (auto op : block->getOps()) {
+    if (auto func = dyn_cast<FuncOp>(op))
+      funcs[op->getAttr<NameAttr>()->name] = func;
   }
   
-  return cache.count(name) ? cache[name] : nullptr;
+  if (!funcs.count(name)) {
+    std::cerr << "unknown function: " << name << "\n";
+    assert(false);
+  }
+  return funcs[name];
 }
 
 PassManager::~PassManager() {

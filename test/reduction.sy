@@ -1,7 +1,10 @@
 int main() {
   int x = getint();
   putint(x / 3);
+  putch(10);
   putint(x / 5);
+  putch(10);
   putint(x / 7);
+  putch(10);
   return 0;
 }

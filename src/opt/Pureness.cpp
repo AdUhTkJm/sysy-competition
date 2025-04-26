@@ -71,7 +71,11 @@ void Pureness::run() {
   for (auto call : calls) {
     auto func = call->getParentOp<FuncOp>();
     auto calledName = call->getAttr<NameAttr>()->name;
-    callGraph[func].insert(findFunction(calledName));
+    if (!isExtern(calledName))
+      callGraph[func].insert(findFunction(calledName));
+    else if (!func->hasAttr<ImpureAttr>())
+      // External functions are impure.
+      func->addAttr<ImpureAttr>();
   }
 
   // Predetermine all other factors that make a function impure,

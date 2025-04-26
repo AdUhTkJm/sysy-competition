@@ -35,6 +35,11 @@ OP(SubFOp);
 OP(MulFOp);
 OP(DivFOp);
 OP(ModFOp);
+OP(AddLOp);
+OP(SubLOp);
+OP(MulLOp);
+OP(DivLOp);
+OP(ModLOp);
 OP(EqOp);
 OP(NeOp);
 OP(LtOp);
@@ -67,6 +72,9 @@ OP(MinusFOp);
 OP(NotOp);
 OP(LShiftImmOp);
 OP(RShiftImmOp);
+OP(RShiftImmLOp); // Shift for 64 bit.
+OP(MulshOp);
+OP(MuluhOp);
 
 }
 

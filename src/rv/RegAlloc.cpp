@@ -87,13 +87,19 @@ bool hasRd(Op *op) {
     isa<SubOp>(op) ||
     isa<MulwOp>(op) ||
     isa<DivwOp>(op) ||
+    isa<MulOp>(op) ||
+    isa<DivOp>(op) ||
     isa<sys::rv::LoadOp>(op) ||
     isa<AddiwOp>(op) ||
     isa<LiOp>(op) ||
     isa<MvOp>(op) ||
     isa<ReadRegOp>(op) ||
     isa<SlliwOp>(op) ||
-    isa<SrliwOp>(op);
+    isa<SrliwOp>(op) ||
+    isa<SraiwOp>(op) ||
+    isa<SraiOp>(op) ||
+    isa<MulhOp>(op) ||
+    isa<MulhuOp>(op);
 }
 
 // In OpBase.cpp
@@ -302,7 +308,11 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(AddOp, BINARY);
   LOWER(SubOp, BINARY);
   LOWER(MulwOp, BINARY);
+  LOWER(MulhOp, BINARY);
+  LOWER(MulhuOp, BINARY);
+  LOWER(MulOp, BINARY);
   LOWER(DivwOp, BINARY);
+  LOWER(DivOp, BINARY);
   LOWER(BneOp, BINARY);
   LOWER(BeqOp, BINARY);
   LOWER(BltOp, BINARY);
@@ -315,6 +325,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(LoadOp, UNARY);
   LOWER(SlliwOp, UNARY);
   LOWER(SrliwOp, UNARY);
+  LOWER(SraiwOp, UNARY);
+  LOWER(SraiOp, UNARY);
 
   //   writereg %1, <reg = a0>
   // becomes
@@ -449,22 +461,6 @@ void load(Builder builder, const std::vector<Reg> &regs, int offset) {
       /*size=*/new SizeAttr(4)
     });
   }
-}
-
-bool isExtern(const std::string &name) {
-  static std::set<std::string> externs = {
-    "getint",
-    "getch",
-    "getfloat",
-    "getarray",
-    "getfarray",
-    "putint",
-    "putch",
-    "putfloat",
-    "putarray",
-    "putfarray",
-  };
-  return externs.count(name);
 }
 
 void RegAlloc::proEpilogue(FuncOp *funcOp) {

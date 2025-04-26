@@ -37,9 +37,15 @@ RVOP(AddiwOp);
 RVOP(AddiOp); // Note that pointers can't be `addiw`'d.
 RVOP(SubOp);
 RVOP(MulwOp);
+RVOP(MulOp);
 RVOP(DivwOp); // Signed; divu for unsigned.
+RVOP(DivOp);
 RVOP(SlliwOp); // Shift left.
-RVOP(SrliwOp); // Shift right.
+RVOP(SrliwOp); // Shift right, unsigned.
+RVOP(SraiOp); // Shift right (64 bit), signed.
+RVOP(SraiwOp); // Shift right, signed.
+RVOP(MulhOp); // Higher bits of mul, signed.
+RVOP(MulhuOp); // Higher bits of mul, unsigned.
 RVOP(BneOp);
 RVOP(BeqOp);
 RVOP(BltOp);

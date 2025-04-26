@@ -61,33 +61,31 @@ void rewriteAlloca(FuncOp *func) {
   });
 }
 
+#define REPLACE(BeforeTy, AfterTy) \
+  runRewriter([&](BeforeTy *op) { \
+    builder.replace<AfterTy>(op, op->getOperands(), op->getAttrs()); \
+    return true; \
+  });
+
+
 void Lower::run() {
   Builder builder;
 
-  runRewriter([&](IntOp *op) {
-    builder.replace<LiOp>(op, op->getAttrs());
-    return true;
-  });
-
-  runRewriter([&](AddIOp *op) {
-    builder.replace<AddOp>(op, op->getOperands(), op->getAttrs());
-    return true;
-  });
-
-  runRewriter([&](SubIOp *op) {
-    builder.replace<SubOp>(op, op->getOperands(), op->getAttrs());
-    return true;
-  });
-
-  runRewriter([&](MulIOp *op) {
-    builder.replace<MulwOp>(op, op->getOperands(), op->getAttrs());
-    return true;
-  });
-
-  runRewriter([&](DivIOp *op) {
-    builder.replace<DivwOp>(op, op->getOperands(), op->getAttrs());
-    return true;
-  });
+  REPLACE(IntOp, LiOp);
+  REPLACE(AddIOp, AddOp);
+  REPLACE(AddLOp, AddOp);
+  REPLACE(SubIOp, SubOp);
+  REPLACE(SubLOp, SubOp);
+  REPLACE(MulIOp, MulwOp);
+  REPLACE(MulLOp, MulOp);
+  REPLACE(MulshOp, MulhOp);
+  REPLACE(MuluhOp, MulhuOp);
+  REPLACE(DivIOp, DivwOp);
+  REPLACE(DivLOp, DivOp);
+  REPLACE(LShiftImmOp, SlliwOp);
+  REPLACE(RShiftImmOp, SraiwOp);
+  REPLACE(RShiftImmLOp, SraiOp);
+  REPLACE(GotoOp, JOp);
 
   runRewriter([&](ModIOp *op) {
     auto denom = op->getOperand(0);
@@ -97,16 +95,6 @@ void Lower::run() {
     auto quot = builder.create<DivwOp>(op->getOperands(), op->getAttrs());
     auto mul = builder.create<MulwOp>({ quot, nom });
     builder.replace<SubOp>(op, { denom, mul });
-    return true;
-  });
-
-  runRewriter([&](LShiftImmOp *op) {
-    builder.replace<SlliwOp>(op, op->getOperands(), op->getAttrs());
-    return true;
-  });
-
-  runRewriter([&](RShiftImmOp *op) {
-    builder.replace<SrliwOp>(op, op->getOperands(), op->getAttrs());
     return true;
   });
 
@@ -137,11 +125,6 @@ void Lower::run() {
     }
 
     builder.replace<BnezOp>(op, op->getOperands(), op->getAttrs());
-    return true;
-  });
-
-  runRewriter([&](GotoOp *op) {
-    builder.replace<JOp>(op, op->getAttrs());
     return true;
   });
 
