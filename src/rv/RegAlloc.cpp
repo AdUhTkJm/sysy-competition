@@ -135,23 +135,29 @@ static const Reg normalOrder[] = {
   Reg::a0, Reg::a1, Reg::a2, Reg::a3,
   Reg::a4, Reg::a5, Reg::a6, Reg::a7,
 };
-constexpr int regcount = 27;
+constexpr int leafRegCnt = 27;
+constexpr int normalRegCnt = 27;
 
 void RegAlloc::runImpl(Region *region, bool isLeaf) {
   const Reg *order = isLeaf ? leafOrder : normalOrder;
+  const int regcount = isLeaf ? leafRegCnt : normalRegCnt;
 
   Builder builder;
 
   region->updateLiveness();
 
-  // Produce interference graph.
+  // Interference graph.
   std::map<Op*, std::set<Op*>> interf;
+  // The individual registers unavailable for each Op.
   std::map<Op*, std::set<Reg>> indivForbidden;
 
   // Values of readreg, or operands of writereg, or phis (mvs), are prioritzed.
   std::map<Op*, int> priority;
   // The `key` is preferred to have the same value as `value`.
   std::map<Op*, Op*> prefer;
+
+  // The current registers "live".
+  std::set<Reg> liveRegs;
 
   for (auto bb : region->getBlocks()) {
     // Scan through the block and see the place where the value's last used.
@@ -232,9 +238,10 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   std::map<Op*, Reg> assignment;
 
   for (auto op : ops) {
-    std::set<Reg> forbidden = indivForbidden[op];
+    std::set<Reg> forbidden;
     for (auto v1 : interf[op]) {
-      if (assignment.count(v1))
+      // In the whole function, `sp` and `zero` are read-only.
+      if (assignment.count(v1) && assignment[v1] != Reg::sp && assignment[v1] != Reg::zero)
         forbidden.insert(assignment[v1]);
     }
 
@@ -479,13 +486,13 @@ void load(Builder builder, const std::vector<Reg> &regs, int offset) {
   }
 }
 
-void RegAlloc::proEpilogue(FuncOp *funcOp) {
+void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
   Builder builder;
   auto usedRegs = usedRegisters[funcOp];
   auto region = funcOp->getRegion();
 
-  // Always preserve return address.
-  std::vector<Reg> preserve { Reg::ra };
+  // Preserve return address if this calls another function.
+  std::vector<Reg> preserve;
   for (auto x : usedRegs) {
     if (calleeSaved.count(x))
       preserve.push_back(x);
@@ -493,17 +500,18 @@ void RegAlloc::proEpilogue(FuncOp *funcOp) {
 
   // If there's a SubSpOp, then it must be at the top of the first block.
   auto op = region->getFirstBlock()->getFirstOp();
-  int offset = 0;
+  int offset = isLeaf ? 0 : 8; // For `ra`, we need to use `sd`.
   if (isa<SubSpOp>(op)) {
     offset = op->getAttr<IntAttr>()->value;
     op->removeAttr<IntAttr>();
     op->addAttr<IntAttr>(offset += 4 * preserve.size());
-  } else {
+  } else if (!preserve.empty()) {
     builder.setToRegionStart(region);
     op = builder.create<SubSpOp>({ new IntAttr(offset += 4 * preserve.size()) });
   }
 
   // Round op to the nearest multiple of 16.
+  // This won't be entered in the special case where offset == 0.
   if (offset % 16 != 0) {
     int &value = op->getAttr<IntAttr>()->value;
     offset = value = offset / 16 * 16 + 16;
@@ -512,6 +520,14 @@ void RegAlloc::proEpilogue(FuncOp *funcOp) {
   // Add function prologue, preserving the regs.
   builder.setAfterOp(op);
   save(builder, preserve, offset);
+  if (!isLeaf) {
+    builder.create<sys::rv::StoreOp>({
+      /*value=*/new RsAttr(Reg::ra),
+      /*addr=*/new Rs2Attr(Reg::sp),
+      /*offset=*/new IntAttr(0),
+      /*size=*/new SizeAttr(8)
+    });
+  }
 
   // Similarly add function epilogue.
   if (offset != 0) {
@@ -521,7 +537,16 @@ void RegAlloc::proEpilogue(FuncOp *funcOp) {
       builder.replace<JOp>(ret, { new TargetAttr(bb) });
 
     builder.setToBlockStart(bb);
+
     load(builder, preserve, offset);
+    if (!isLeaf) {
+      builder.create<sys::rv::LoadOp>({
+        /*value=*/new RdAttr(Reg::ra),
+        /*addr=*/new RsAttr(Reg::sp),
+        /*offset=*/new IntAttr(0),
+        /*size=*/new SizeAttr(8)
+      });
+    }
     builder.create<SubSpOp>({ new IntAttr(-offset) });
     builder.create<RetOp>();
   }
@@ -594,9 +619,12 @@ void RegAlloc::proEpilogue(FuncOp *funcOp) {
 
 void RegAlloc::run() {
   auto funcs = module->findAll<FuncOp>();
+  std::set<FuncOp*> leaves;
 
   for (auto func : funcs) {
     auto calls = func->findAll<sys::rv::CallOp>();
+    if (calls.size() == 0)
+      leaves.insert(func);
     runImpl(func->getRegion(), calls.size() == 0);
   }
 
@@ -616,7 +644,7 @@ void RegAlloc::run() {
   }
 
   for (auto func : funcs) {
-    proEpilogue(func);
+    proEpilogue(func, leaves.count(func));
     tidyup(func->getRegion());
   }
 }

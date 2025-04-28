@@ -6,5 +6,5 @@ int fib(int n) {
 }
 
 int main() {
-  return fib(6);
+  return fib(8);
 }

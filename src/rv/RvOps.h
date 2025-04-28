@@ -13,13 +13,11 @@
     Ty(): OpImpl({}) { \
       setName("rv."#Ty); \
     } \
-    Ty(const std::vector<Attr*> &attrs): OpImpl({}) { \
+    Ty(const std::vector<Attr*> &attrs): OpImpl({}, attrs) { \
       setName("rv."#Ty); \
-      this->attrs = attrs; \
     } \
-    Ty(const std::vector<Value> &values, const std::vector<Attr*> &attrs): OpImpl(values) { \
+    Ty(const std::vector<Value> &values, const std::vector<Attr*> &attrs): OpImpl(values, attrs) { \
       setName("rv."#Ty); \
-      this->attrs = attrs; \
     } \
   }
 

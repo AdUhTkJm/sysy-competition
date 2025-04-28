@@ -39,6 +39,9 @@ void dumpOp(Op *op, std::ostream &os) {
   if (isa<sys::rv::StoreOp>(op)) {
     auto size = op->getAttr<SizeAttr>()->value;
     switch (size) {
+    case 8:
+      name = "sd";
+      break;
     case 4:
       name = "sw";
       break;
@@ -56,6 +59,9 @@ void dumpOp(Op *op, std::ostream &os) {
   if (isa<sys::rv::LoadOp>(op)) {
     auto size = op->getAttr<SizeAttr>()->value;
     switch (size) {
+    case 8:
+      name = "ld";
+      break;
     case 4:
       name = "lw";
       break;

@@ -76,6 +76,16 @@ Op::Op(int id, const std::vector<Value> &values):
   }
 }
 
+Op::Op(int id, const std::vector<Value> &values, const std::vector<Attr*> &attrs):
+  id(id), result(this), attrs(attrs) {
+  for (auto x : values) {
+    operands.push_back(x);
+    x.defining->uses.insert(this);
+  }
+  for (auto attr : attrs)
+    attr->refcnt++;
+}
+
 void indent(std::ostream &os, int n) {
   for (int j = 0; j < n; j++)
     os << ' ';
@@ -138,8 +148,11 @@ void Op::erase() {
   
   parent->remove(place);
   removeAllOperands();
-  // We can't delete Attr* because they'll be referenced elsewhere.
-  // Memory leak? Who cares.
+  
+  for (auto attr : attrs) {
+    if (!--attr->refcnt)
+      delete attr;
+  }
   delete this;
 }
 

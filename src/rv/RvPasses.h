@@ -51,7 +51,7 @@ class RegAlloc : public Pass {
   void runImpl(Region *region, bool isLeaf);
   void tidyup(Region *region);
   // Create both prologue and epilogue of a function.
-  void proEpilogue(FuncOp *funcOp);
+  void proEpilogue(FuncOp *funcOp, bool isLeaf);
 public:
   RegAlloc(ModuleOp *module): Pass(module) {}
 

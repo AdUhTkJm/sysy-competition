@@ -1,3 +1,4 @@
+#include "RvAttrs.h"
 #include "RvPasses.h"
 #include "RvOps.h"
 
@@ -91,6 +92,15 @@ void InstCombine::run() {
       op->replaceAllUsesWith(op->getOperand().defining);
       op->erase();
       return true;
+    }
+    return false;
+  });
+  
+  // Only run this after all int-related fold completes.
+  // Rewrite `li a0, 0` into reading from `zero`.
+  runRewriter([&](LiOp *op) {
+    if (op->getAttr<IntAttr>()->value == 0) {
+      builder.replace<ReadRegOp>(op, { new RegAttr(Reg::zero)} );
     }
     return false;
   });

@@ -90,6 +90,15 @@ public:
   std::string toString() { return "<impure>"; }
 };
 
+class ArgCountAttr : public AttrImpl<ArgCountAttr, __LINE__> {
+public:
+  int count;
+
+  ArgCountAttr(int count): count(count) {}
+
+  std::string toString() { return "<" + std::to_string(count) + ">"; }
+};
+
 }
 
 #endif

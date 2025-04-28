@@ -143,6 +143,9 @@ public:
 
 class Attr {
   const int id;
+  int refcnt = 0;
+
+  friend class Op;
 public:
   int getID() const { return id; }
   Attr(int id): id(id) {}
@@ -191,6 +194,7 @@ public:
   operator Value() const { return result; }
 
   Op(int id, const std::vector<Value> &values);
+  Op(int id, const std::vector<Value> &values, const std::vector<Attr*> &attrs);
 
   Region *appendRegion();
   BasicBlock *createFirstBlock();
@@ -231,6 +235,7 @@ public:
   void removeAttr() {
     for (auto it = attrs.begin(); it != attrs.end(); it++)
       if (isa<T>(*it)) {
+        (*it)->refcnt--;
         attrs.erase(it);
         return;
       }
@@ -239,6 +244,7 @@ public:
   template<class T, class... Args>
   void addAttr(Args... args) {
     auto attr = new T(std::forward<Args>(args)...);
+    attr->refcnt++;
     attrs.push_back(attr);
   }
 
@@ -277,6 +283,8 @@ public:
   }
 
   OpImpl(const std::vector<Value> &values): Op(OpID, values) {}
+  OpImpl(const std::vector<Value> &values, const std::vector<Attr*> &attrs):
+    Op(OpID, values, attrs) {}
 };
 
 template<class T, int AttrID>
