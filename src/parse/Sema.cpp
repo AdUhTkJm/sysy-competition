@@ -6,6 +6,7 @@
 #include <cassert>
 #include <iostream>
 #include <vector>
+#include <set>
 
 using namespace sys;
 
@@ -81,7 +82,15 @@ Type *Sema::infer(ASTNode *node) {
       return binary->type = ctx.create<FloatType>();
     }
 
-    if (isa<FloatType>(lty) && isa<FloatType>(rty))
+    std::set<decltype(binary->kind)> intops {
+      BinaryNode::And,
+      BinaryNode::Or,
+      BinaryNode::Eq,
+      BinaryNode::Ne,
+      BinaryNode::Le,
+      BinaryNode::Lt,
+    };
+    if (isa<FloatType>(lty) && isa<FloatType>(rty) && !intops.count(binary->kind))
       return node->type = ctx.create<FloatType>();
 
     if (lty != rty) {

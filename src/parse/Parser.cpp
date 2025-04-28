@@ -320,8 +320,24 @@ ASTNode *Parser::eq() {
   return n;
 }
 
+ASTNode *Parser::land() {
+  auto n = eq();
+  while (test(Token::And))
+    n = new BinaryNode(BinaryNode::And, n, eq());
+  
+  return n;
+}
+
+ASTNode *Parser::lor() {
+  auto n = land();
+  while (test(Token::Or))
+    n = new BinaryNode(BinaryNode::Or, n, land());
+  
+  return n;
+}
+
 ASTNode *Parser::expr() {
-  return eq();
+  return lor();
 }
 
 ASTNode *Parser::stmt() {

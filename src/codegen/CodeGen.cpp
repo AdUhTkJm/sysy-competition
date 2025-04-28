@@ -52,6 +52,75 @@ int CodeGen::getSize(Type *ty) {
   return 8;
 }
 Value CodeGen::emitBinary(BinaryNode *node) {
+  // TODO: for float, we need to test zero in a different way.
+  if (node->kind == BinaryNode::And) {
+    auto alloca = builder.create<AllocaOp>({ new SizeAttr(4) });
+    //   l && r
+    // becomes
+    //   if (l)
+    //     %1 = not_zero r
+    //     store %1, %alloca
+    //   else
+    //     store 0, %alloca
+    //   load %alloca
+    auto l = emitExpr(node->l);
+    auto branch = builder.create<IfOp>({ l });
+    {
+      auto ifso = branch->appendRegion();
+      auto block = ifso->appendBlock();
+      Builder::Guard guard(builder);
+
+      builder.setToBlockStart(block);
+      auto r = emitExpr(node->r);
+      auto snez = builder.create<SetNotZeroOp>({ r });
+      builder.create<StoreOp>({ snez, alloca }, { new SizeAttr(4) });
+    }
+    {
+      auto ifnot = branch->appendRegion();
+      auto block = ifnot->appendBlock();
+      Builder::Guard guard(builder);
+
+      builder.setToBlockStart(block);
+      auto zero = builder.create<IntOp>({ new IntAttr(0) });
+      builder.create<StoreOp>({ zero, alloca }, { new SizeAttr(4) });
+    }
+    return builder.create<LoadOp>({ alloca }, { new SizeAttr(4) });
+  }
+
+  if (node->kind == BinaryNode::Or) {
+    auto alloca = builder.create<AllocaOp>({ new SizeAttr(4) });
+    //   l || r
+    // becomes
+    //   if (l)
+    //     store 1, %alloca
+    //   else
+    //     %1 = not_zero r
+    //     store %1, %alloca
+    //   load %alloca
+    auto l = emitExpr(node->l);
+    auto branch = builder.create<IfOp>({ l });
+    {
+      auto ifso = branch->appendRegion();
+      auto block = ifso->appendBlock();
+      Builder::Guard guard(builder);
+
+      builder.setToBlockStart(block);
+      auto one = builder.create<IntOp>({ new IntAttr(1) });
+      builder.create<StoreOp>({ one, alloca }, { new SizeAttr(4) });
+    }
+    {
+      auto ifnot = branch->appendRegion();
+      auto block = ifnot->appendBlock();
+      Builder::Guard guard(builder);
+
+      builder.setToBlockStart(block);
+      auto r = emitExpr(node->r);
+      auto sez = builder.create<SetNotZeroOp>({ r });
+      builder.create<StoreOp>({ sez, alloca }, { new SizeAttr(4) });
+    }
+    return builder.create<LoadOp>({ alloca }, { new SizeAttr(4) });
+  }
+
   auto l = emitExpr(node->l);
   auto r = emitExpr(node->r);
   if (isa<IntType>(node->type)) {
@@ -75,7 +144,6 @@ Value CodeGen::emitBinary(BinaryNode *node) {
     case BinaryNode::Le:
       return builder.create<LeOp>({ l, r });
     default:
-      std::cerr << "unsupported binary " << node->kind << "\n";
       assert(false);
     }
   } else {

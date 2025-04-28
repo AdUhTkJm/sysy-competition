@@ -1,0 +1,18 @@
+int f() {
+  putint(1);
+  return 1;
+}
+
+int g() {
+  putint(2);
+  return 0;
+}
+
+int main() {
+  int total = 0;
+  if (f() && g())
+    total = total + 1;
+  while (g() && f())
+    total = total + 1;
+  return total;
+}

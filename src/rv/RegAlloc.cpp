@@ -340,6 +340,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(BltOp, BINARY);
   LOWER(BgeOp, BINARY);
   LOWER(StoreOp, BINARY);
+  LOWER(XorOp, BINARY);
+  LOWER(SltOp, BINARY);
   
   LOWER(LoadOp, UNARY);
   LOWER(AddiwOp, UNARY);
@@ -350,6 +352,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(SraiOp, UNARY);
   LOWER(SeqzOp, UNARY);
   LOWER(SnezOp, UNARY);
+  LOWER(SltiOp, UNARY);
 
   // Remove all operands of calls and returns.
   // The "operands" are only formal and carry no real meaning.

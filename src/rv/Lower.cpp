@@ -85,6 +85,7 @@ void Lower::run() {
   REPLACE(GotoOp, JOp);
   REPLACE(GetGlobalOp, LaOp);
   REPLACE(NotOp, SeqzOp);
+  REPLACE(SetNotZeroOp, SnezOp);
 
   runRewriter([&](MinusOp *op) {
     auto value = op->getOperand();
@@ -135,6 +136,35 @@ void Lower::run() {
     builder.setBeforeOp(op);
     auto zero = builder.create<ReadRegOp>({ new RegAttr(Reg::zero) });
     builder.replace<BneOp>(op, { cond, zero }, op->getAttrs());
+    return true;
+  });
+
+  // Delay these after selection of BranchOp.
+  REPLACE(LtOp, SltOp);
+
+  runRewriter([&](EqOp *op) {
+    builder.setBeforeOp(op);
+    // 'xor' is a keyword of C++.
+    auto xorOp = builder.create<XorOp>(op->getOperands(), op->getAttrs());
+    builder.replace<SeqzOp>(op,{ xorOp });
+    return true;
+  });
+
+  runRewriter([&](NeOp *op) {
+    builder.setBeforeOp(op);
+    // 'xor' is a keyword of C++.
+    auto xorOp = builder.create<XorOp>(op->getOperands(), op->getAttrs());
+    builder.replace<SnezOp>(op,{ xorOp });
+    return true;
+  });
+
+  runRewriter([&](LeOp *op) {
+    builder.setBeforeOp(op);
+    auto l = op->getOperand(0);
+    auto r = op->getOperand(1);
+    // Turn (l <= r) into !(r < l).
+    auto xorOp = builder.create<SltOp>({ r, l }, op->getAttrs());
+    builder.replace<SeqzOp>(op,{ xorOp });
     return true;
   });
 

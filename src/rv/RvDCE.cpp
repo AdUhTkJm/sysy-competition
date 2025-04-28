@@ -46,11 +46,14 @@ void RvDCE::runOnRegion(Region *region) {
 
 void RvDCE::run() {
   auto funcs = module->findAll<FuncOp>();
-  // TODO: run until nothing changes
-  for (auto func : funcs)
-    runOnRegion(func->getRegion());
 
-  elim = removeable.size();
-  for (auto op : removeable)
-    op->erase();
+  do {
+    removeable.clear();
+    for (auto func : funcs)
+      runOnRegion(func->getRegion());
+
+    elim += removeable.size();
+    for (auto op : removeable)
+      op->erase();
+  } while (removeable.size());
 }

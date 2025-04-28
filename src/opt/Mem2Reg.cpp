@@ -123,15 +123,8 @@ void Mem2Reg::fillPhi(BasicBlock *bb, BasicBlock *last) {
       if (!converted.count(alloca))
         continue;
   
-      // Undefined behaviour in source program. Terminate.
+      // It's possible for arrays - in which case it isn't undefined behaviour.
       if (!symbols.count(alloca)) {
-        std::cerr << "warning: alloca not initialized:\n  ";
-        alloca->dump(std::cerr);
-        std::cerr << "its uses:\n";
-        for (auto x : alloca->getUses()) {
-          std::cerr << "  ";
-          x->dump(std::cerr);
-        }
         symbols[alloca] = builder.create<IntOp>({ new IntAttr(0) });
       }
       
