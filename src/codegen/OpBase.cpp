@@ -250,6 +250,17 @@ void BasicBlock::erase() {
   delete this;
 }
 
+std::vector<Op*> BasicBlock::getPhis() {
+  std::vector<Op*> phis;
+  for (auto op : ops) {
+    if (!isa<PhiOp>(op))
+      break;
+
+    phis.push_back(op);
+  }
+  return phis;
+}
+
 BasicBlock *Region::insert(BasicBlock *at) {
   assert(at->parent == this);
 

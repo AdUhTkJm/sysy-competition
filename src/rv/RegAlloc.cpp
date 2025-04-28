@@ -4,6 +4,7 @@
 #include "../codegen/CodeGen.h"
 #include "../codegen/Attrs.h"
 #include <iostream>
+#include <iterator>
 
 using namespace sys;
 using namespace sys::rv;
@@ -65,8 +66,8 @@ std::map<std::string, int> RegAlloc::stats() {
       return true; \
     } \
     if (me->nextBlock() == ifnot) { \
-      target = ifnot; \
-      END_REPLACE; \
+      /* No changes needed. */\
+      return false; \
     } \
     GENERATE_J; \
     END_REPLACE; \
@@ -85,20 +86,13 @@ std::map<std::string, int> RegAlloc::stats() {
 std::ostream &operator<<(std::ostream &os, Value value);
 
 // For debug purposes
-void dumpInterf(Region *region, const std::map<Op*, std::set<Op*>> &interf, const std::map<Op*, std::set<Reg>> &forbidden) {
+void dumpInterf(Region *region, const std::map<Op*, std::set<Op*>> &interf) {
   region->dump(std::cerr, /*depth=*/1);
   std::cerr << "\n\n===== interference graph =====\n\n";
   for (auto [k, v] : interf) {
     std::cerr << k->getResult() << ": ";
     for (auto op : v)
       std::cerr << op->getResult() << " ";
-    std::cerr << "\n";
-  }
-  std::cerr << "\n\n===== forbidden regs =====\n\n";
-  for (auto [k, v] : forbidden) {
-    std::cerr << k->getResult() << ": ";
-    for (auto reg : v)
-      std::cerr << showReg(reg) << " ";
     std::cerr << "\n";
   }
 }
@@ -111,6 +105,9 @@ void dumpAssignment(Region *region, const std::map<Op*, Reg> &assignment) {
   }
 }
 
+// We use a dedicated register as the "spill" register, for simplicity.
+static const Reg spillReg = Reg::s11;
+
 // Order for leaf functions. Prioritize temporaries.
 static const Reg leafOrder[] = {
   Reg::a0, Reg::a1, Reg::a2, Reg::a3,
@@ -121,13 +118,13 @@ static const Reg leafOrder[] = {
   
   Reg::s0, Reg::s1, Reg::s2, Reg::s3, 
   Reg::s4, Reg::s5, Reg::s6, Reg::s7,
-  Reg::s8, Reg::s9, Reg::s10, Reg::s11,
+  Reg::s8, Reg::s9, Reg::s10, // Reg::s11,
 };
 // Order for non-leaf functions.
 static const Reg normalOrder[] = {
   Reg::s0, Reg::s1, Reg::s2, Reg::s3, 
   Reg::s4, Reg::s5, Reg::s6, Reg::s7,
-  Reg::s8, Reg::s9, Reg::s10, Reg::s11,
+  Reg::s8, Reg::s9, Reg::s10, // Reg::s11,
 
   Reg::t0, Reg::t1, Reg::t2, Reg::t3,
   Reg::t4, Reg::t5, Reg::t6,
@@ -139,8 +136,8 @@ static const Reg argRegs[] = {
   Reg::a0, Reg::a1, Reg::a2, Reg::a3,
   Reg::a4, Reg::a5, Reg::a6, Reg::a7,
 };
-constexpr int leafRegCnt = 27;
-constexpr int normalRegCnt = 27;
+constexpr int leafRegCnt = 26;
+constexpr int normalRegCnt = 26;
 
 void RegAlloc::runImpl(Region *region, bool isLeaf) {
   const Reg *order = isLeaf ? leafOrder : normalOrder;
@@ -224,7 +221,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     }
   }
 
-  // dumpInterf(region, interf, indivForbidden);
+  dumpInterf(region, interf);
 
   // Now time to allocate.
 
@@ -373,60 +370,188 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   });
 
   // Finally, after everything has been erased:
-  std::vector<PhiOp*> phis;
-  runRewriter(funcOp, [&](PhiOp *op) {
-    auto &ops = op->getOperands();
-    auto &froms = op->getAttrs();
-    for (size_t i = 0; i < ops.size(); i++) {
-      // Find the block of the operand, and stick an Op at the end, 
-      // before the terminator (`j`, `beq` etc.)
-      auto src = ops[i].defining;
-      if (isa<PhiOp>(src) && src->getParent() == op->getParent() && src != op) {
-        // The swapping problem. Not sure how to deal with it.
-        std::cerr << "swapping\n";
-        assert(false);
-      }
-      auto bb = cast<FromAttr>(froms[i])->bb;
-      auto terminator = *--bb->getOps().end();
-      builder.setBeforeOp(terminator);
-      builder.create<MvOp>({
-        new RdAttr(getReg(op)),
-        new RsAttr(getReg(src))
-      });
-    }
-    // Cannot erase here, in case another phi refers to this phi.
-    phis.push_back(op);
-    // Return false so that each phi will only be processed once.
-    return false;
-  });
+  // Destruct phi.
+  std::vector<Op*> allPhis;
+  auto bbs = region->getBlocks();
 
-  bool changed;
-  do {
-    changed = false;
-    std::vector<PhiOp*> newPhis;
-    for (auto x : phis) {
-      if (x->getUses().size() == 0) {
-        x->erase();
-        changed = true;
-        continue;
-      }
-      newPhis.push_back(x);
-    }
-    phis = newPhis;
-  } while (changed);
-  
-  if (!phis.empty()) {
-    std::cerr << "=== bad uses of phi ===\n";
-    funcOp->dump(std::cerr);
-    for (auto op : phis) {
-      // All ops should have been lowered.
-      // If not, try print out what happened for debugging.
-      if (op->getUses().size() > 0) {
-        for (auto use : op->getUses())
-          use->dump(std::cerr);
+  // Split edges.
+  for (auto bb : bbs) {
+    // If a block has multiple successors with phi, then we split the edges. As an example:
+    // 
+    // bb0:
+    //   %0 = ...
+    //   %1 = ...
+    //   br %1 <bb1> <bb2>
+    // bb1:
+    //   phi %2, %0, ...
+    // bb2:
+    //   phi %3, %0, ...
+    //
+    // If we naively create a move at the end of bb0, then it's wrong.
+    // We need to rewrite it into
+    //
+    // bb0:
+    //   br %1 <bb3> <bb4>
+    // bb3:
+    //   j bb1
+    // bb4:
+    //   j bb2
+    // ...
+    //
+    // To actually make it work.
+    if (bb->getSuccs().size() <= 1)
+      continue;
+
+    // Note that we need to split even if there's no phi in one of the blocks.
+    // This is because the registers of branch operation can be clobbered if that's not done.
+    // Consider:
+    //   b %1, <bb1>, <bb2>
+    // bb1:
+    //   %3 = phi ...
+    // It is entirely possible for %3 to have the same register as %1.
+    
+    auto edge1 = region->insertAfter(bb);
+    auto edge2 = region->insertAfter(bb);
+    auto bbTerm = bb->getLastOp();
+
+    // Create edge for target branch.
+    auto target = bbTerm->getAttr<TargetAttr>();
+    auto oldTarget = target->bb;
+    target->bb = edge1;
+
+    builder.setToBlockEnd(edge1);
+    builder.create<JOp>({ new TargetAttr(oldTarget) });
+
+    // Create edge for else branch.
+    auto ifnot = bbTerm->getAttr<ElseAttr>();
+    auto oldElse = ifnot->bb;
+    ifnot->bb = edge2;
+
+    builder.setToBlockEnd(edge2);
+    builder.create<JOp>({ new TargetAttr(oldElse) });
+
+    // Rename the blocks of the phis.
+    for (auto succ : bb->getSuccs()) {
+      for (auto phis : succ->getPhis()) {
+        for (auto attr : phis->getAttrs()) {
+          auto from = cast<FromAttr>(attr);
+          if (from->bb != bb)
+            continue;
+          if (succ == oldTarget)
+            from->bb = edge1;
+          if (succ == oldElse)
+            from->bb = edge2;
+        }
       }
     }
   }
+
+  for (auto bb : bbs) {
+    auto phis = bb->getPhis();
+
+    std::vector<Op*> moves;
+    for (auto phi : phis) {
+      auto &ops = phi->getOperands();
+      auto &attrs = phi->getAttrs();
+      for (size_t i = 0; i < ops.size(); i++) {
+        auto bb = cast<FromAttr>(attrs[i])->bb;
+        auto terminator = *--bb->getOps().end();
+        builder.setBeforeOp(terminator);
+        auto mv = builder.create<MvOp>({
+          new RdAttr(getReg(phi)),
+          new RsAttr(getReg(ops[i].defining))
+        });
+        moves.push_back(mv);
+      }
+    }
+
+    // Detect circular copies.
+    std::map<Reg, Reg> moveMap;
+    std::map<std::pair<Reg, Reg>, Op*> moveOpMap;
+    std::set<Reg> srcs;
+    std::set<Reg> dsts;
+
+    for (auto mv : moves) {
+      auto src = mv->getAttr<RdAttr>()->reg;
+      auto dst = mv->getAttr<RsAttr>()->reg;
+      moveMap[src] = dst;
+      moveOpMap[std::pair {src, dst}] = mv;
+      srcs.insert(src);
+      dsts.insert(dst);
+    }
+
+    // Registers that currently hold valid values.
+    std::set<Reg> valid = srcs;
+
+    std::set<Reg> visited;
+    // Unwanted moves.
+    std::vector<Op*> toErase;
+
+    // Detect cycles.
+    for (auto mv : moves) {
+      auto src = mv->getAttr<RdAttr>()->reg;
+      auto dst = mv->getAttr<RsAttr>()->reg;
+      if (visited.count(src))
+        continue;
+
+      std::vector<Reg> chain;
+      std::vector<Op*> ops;
+
+      Reg cur = src;
+
+      // Walk the chain of copying.
+      while (moveMap.count(cur) && !visited.count(cur)) {
+        visited.insert(cur);
+        chain.push_back(cur);
+        ops.push_back(moveOpMap[std::pair { cur, moveMap[cur] }]);
+        cur = moveMap[cur];
+      }
+
+      if (chain.size() <= 1 || cur != chain.front())
+        continue;
+
+      // The chain is actually a cycle.
+      // It has to have at least 2 arguments (as self-loop is not acceptable).
+      std::cerr << "remark: cycle detected\n";
+
+      // Break cycle using a temp register, say the spill register s11.
+      Reg first = chain.front();
+      builder.setBeforeOp(mv);
+      builder.create<MvOp>({
+        new RdAttr(spillReg),
+        new RsAttr(first)
+      });
+
+      for (size_t i = 1; i < chain.size(); ++i) {
+        builder.create<MvOp>({
+          new RdAttr(chain[i - 1]),
+          new RsAttr(chain[i])
+        });
+      }
+
+      builder.create<MvOp>({
+        new RdAttr(chain.back()),
+        new RsAttr(spillReg)
+      });
+
+      // The original moves are now for removal.
+      std::copy(ops.begin(), ops.end(), std::back_inserter(toErase));
+    }
+
+    for (auto mv : toErase)
+      mv->erase();
+
+    // Copy the local phis into `allPhis` for removal.
+    std::copy(phis.begin(), phis.end(), std::back_inserter(allPhis));
+  }
+
+  // Erase all phi's properly. There might be cross-reference across blocks.
+  // So we need to remove all operands first.
+  for (auto phi : allPhis)
+    phi->removeAllOperands();
+
+  for (auto phi : allPhis)
+    phi->erase();
 
   for (auto bb : region->getBlocks()) {
     for (auto op : bb->getOps()) {

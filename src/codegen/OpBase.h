@@ -116,6 +116,8 @@ public:
   const auto &getLiveIn() { return liveIn; }
   const auto &getLiveOut() { return liveOut; }
   const auto &getReachables() { return reachables; }
+
+  std::vector<Op*> getPhis();
   
   BasicBlock *getIdom() { return idom; }
   BasicBlock *nextBlock();
