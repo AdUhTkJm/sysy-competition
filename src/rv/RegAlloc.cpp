@@ -137,6 +137,19 @@ static const Reg argRegs[] = {
   Reg::a0, Reg::a1, Reg::a2, Reg::a3,
   Reg::a4, Reg::a5, Reg::a6, Reg::a7,
 };
+static const std::set<Reg> callerSaved = {
+  Reg::t0, Reg::t1, Reg::t2, Reg::t3,
+  Reg::t4, Reg::t5, Reg::t6,
+
+  Reg::a0, Reg::a1, Reg::a2, Reg::a3,
+  Reg::a4, Reg::a5, Reg::a6, Reg::a7,  
+};
+
+static const std::set<Reg> calleeSaved = {
+  Reg::s0, Reg::s1, Reg::s2, Reg::s3, 
+  Reg::s4, Reg::s5, Reg::s6, Reg::s7,
+  Reg::s8, Reg::s9, Reg::s10, Reg::s11,
+};
 constexpr int leafRegCnt = 26;
 constexpr int normalRegCnt = 26;
 
@@ -145,6 +158,22 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   const int regcount = isLeaf ? leafRegCnt : normalRegCnt;
 
   Builder builder;
+  
+  std::map<Op*, Reg> assignment;
+
+  auto funcOp = region->getParent();
+
+  // First of all, add 15 precolored placeholders before each call.
+  // This denotes that a CallOp clobbers those 15 registers.
+  runRewriter(funcOp, [&](CallOp *op) {
+    builder.setBeforeOp(op);
+    for (auto reg : callerSaved) {
+      auto placeholder = builder.create<PlaceHolderOp>();
+      assignment[placeholder] = reg;
+    }
+    // Do it only once.
+    return false;
+  });
 
   region->updateLiveness();
 
@@ -155,8 +184,6 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   std::map<Op*, int> priority;
   // The `key` is preferred to have the same value as `value`.
   std::map<Op*, Op*> prefer;
-  
-  std::map<Op*, Reg> assignment;
 
   for (auto bb : region->getBlocks()) {
     // Scan through the block and see the place where the value's last used.
@@ -293,8 +320,6 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   
   // dumpAssignment(region, assignment);
 
-  auto funcOp = region->getParent();
-
   auto getReg = [&](Op *op) {
     return assignment.count(op) ? assignment[op] : order[0];
   };
@@ -341,6 +366,12 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       return false;
     
     op->removeAllOperands();
+    return true;
+  });
+
+  // Remove placeholders inserted previously.
+  runRewriter(funcOp, [&](PlaceHolderOp *op) {
+    op->erase();
     return true;
   });
 
@@ -622,27 +653,13 @@ void RegAlloc::tidyup(Region *region) {
   });
 }
 
-static std::set<Reg> callerSaved = {
-  Reg::t0, Reg::t1, Reg::t2, Reg::t3,
-  Reg::t4, Reg::t5, Reg::t6,
-
-  Reg::a0, Reg::a1, Reg::a2, Reg::a3,
-  Reg::a4, Reg::a5, Reg::a6, Reg::a7,  
-};
-
-static std::set<Reg> calleeSaved = {
-  Reg::s0, Reg::s1, Reg::s2, Reg::s3, 
-  Reg::s4, Reg::s5, Reg::s6, Reg::s7,
-  Reg::s8, Reg::s9, Reg::s10, Reg::s11,
-};
-
 void save(Builder builder, const std::vector<Reg> &regs, int offset) {
   for (auto reg : regs) {
     builder.create<sys::rv::StoreOp>({
       /*value=*/new RsAttr(reg),
       /*addr=*/new Rs2Attr(Reg::sp),
-      /*offset=*/new IntAttr(offset -= 4),
-      /*size=*/new SizeAttr(4)
+      /*offset=*/new IntAttr(offset -= 8),
+      /*size=*/new SizeAttr(8)
     });
   }
 }
@@ -652,8 +669,8 @@ void load(Builder builder, const std::vector<Reg> &regs, int offset) {
     builder.create<sys::rv::LoadOp>({
       /*value=*/new RdAttr(reg),
       /*addr=*/new RsAttr(Reg::sp),
-      /*offset=*/new IntAttr(offset -= 4),
-      /*size=*/new SizeAttr(4)
+      /*offset=*/new IntAttr(offset -= 8),
+      /*size=*/new SizeAttr(8)
     });
   }
 }

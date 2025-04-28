@@ -9,6 +9,27 @@
 
 using namespace sys;
 
+PointerType *Sema::decay(ArrayType *arrTy) {
+  std::vector<int> dims;
+  for (int i = 1; i < arrTy->dims.size(); i++)
+    dims.push_back(arrTy->dims[i]);
+  if (!dims.size())
+    return ctx.create<PointerType>(arrTy->base);
+  return ctx.create<PointerType>(ctx.create<ArrayType>(arrTy->base, dims));
+}
+
+ArrayType *Sema::raise(PointerType *ptr) {
+  std::vector<int> dims { 1 };
+  Type *base;
+  if (auto pointee = dyn_cast<ArrayType>(ptr->pointee)) {
+    for (auto x : pointee->dims)
+      dims.push_back(x);
+    base = pointee->base;
+  } else
+    base = ptr->pointee;
+  return ctx.create<ArrayType>(base, dims);
+}
+
 Type *Sema::infer(ASTNode *node) {
   if (auto fn = dyn_cast<FnDeclNode>(node)) {
     assert(fn->type);
@@ -145,6 +166,12 @@ Type *Sema::infer(ASTNode *node) {
       std::cerr << "cannot find symbol " << ref->name << "\n";
       assert(false);
     }
+    auto ty = symbols[ref->name];
+
+    // Decay.
+    if (auto arrTy = dyn_cast<ArrayType>(ty))
+      return node->type = decay(arrTy);
+    
     return node->type = symbols[ref->name];
   }
 
@@ -242,17 +269,7 @@ Type *Sema::infer(ASTNode *node) {
         continue;
       }
 
-      if (isa<ArrayType>(ty) && isa<ArrayType>(argTy)) {
-        // No implicit cast needed.
-        // You say the dimensions might not coincide? That's acceptable.
-        // It's just a reinterpret_cast.
-        continue;
-      }
-
-      if (ty != argTy) {
-        std::cerr << "bad function argument\n";
-        assert(false);
-      }
+      // Both pointers / arrays.
     }
     if (!symbols.count(call->func)) {
       std::cerr << "cannot find function " << call->func << "\n";
@@ -262,7 +279,13 @@ Type *Sema::infer(ASTNode *node) {
   }
 
   if (auto access = dyn_cast<ArrayAccessNode>(node)) {
-    auto arrTy = cast<ArrayType>(symbols[access->array]);
+    auto realTy = symbols[access->array];
+    ArrayType *arrTy;
+    if (isa<ArrayType>(realTy))
+      arrTy = cast<ArrayType>(realTy);
+    else
+      arrTy = raise(cast<PointerType>(realTy));
+    
     access->arrTy = arrTy;
     std::vector<int> dimsNew;
     for (int i = access->indices.size(); i < arrTy->dims.size(); i++)
@@ -274,13 +297,19 @@ Type *Sema::infer(ASTNode *node) {
     }
 
     auto resultTy = dimsNew.size()
-      ? (Type*) ctx.create<ArrayType>(arrTy->base, dimsNew)
+      ? (Type*) decay(ctx.create<ArrayType>(arrTy->base, dimsNew))
       : arrTy->base;
     return node->type = resultTy;
   }
 
   if (auto write = dyn_cast<ArrayAssignNode>(node)) {
-    auto arrTy = cast<ArrayType>(symbols[write->array]);
+    auto realTy = symbols[write->array];
+    ArrayType *arrTy;
+    if (isa<ArrayType>(realTy))
+      arrTy = cast<ArrayType>(realTy);
+    else
+      arrTy = raise(cast<PointerType>(realTy));
+
     auto baseTy = arrTy->base;
     assert(write->indices.size() == arrTy->dims.size());
     write->arrTy = arrTy;

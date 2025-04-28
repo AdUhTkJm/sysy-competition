@@ -2,6 +2,7 @@
 #define SEMA_H
 
 #include "ASTNode.h"
+#include "Type.h"
 #include "TypeContext.h"
 #include <map>
 #include <string>
@@ -22,6 +23,9 @@ class Sema {
     SemanticScope(Sema &sema): sema(sema), symbols(sema.symbols) {}
     ~SemanticScope() { sema.symbols = symbols; }
   };
+
+  PointerType *decay(ArrayType *arrTy);
+  ArrayType *raise(PointerType *ptr);
 
   Type *infer(ASTNode *node);
 public:

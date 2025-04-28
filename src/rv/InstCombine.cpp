@@ -62,6 +62,42 @@ void InstCombine::run() {
     return false;
   });
 
+  runRewriter([&](SubOp *op) {
+    auto x = op->getOperand(0).defining;
+    auto y = op->getOperand(1).defining;
+    // Note we can't fold on `x`.
+
+    if (isa<LiOp>(y) && inRange(y)) {
+      auto val = -y->getAttr<IntAttr>()->value;
+      if (!inRange(val))
+        return false;
+
+      combined++;
+      builder.replace<AddiOp>(op, { x }, { new IntAttr(val) });
+      return true;
+    }
+
+    return false;
+  });
+
+  runRewriter([&](SubwOp *op) {
+    auto x = op->getOperand(0).defining;
+    auto y = op->getOperand(1).defining;
+    // Note we can't fold on `x`.
+
+    if (isa<LiOp>(y) && inRange(y)) {
+      auto val = -y->getAttr<IntAttr>()->value;
+      if (!inRange(val))
+        return false;
+
+      combined++;
+      builder.replace<AddiwOp>(op, { x }, { new IntAttr(val) });
+      return true;
+    }
+
+    return false;
+  });
+
   runRewriter([&](StoreOp *op) {
     auto value = op->getOperand(0);
     auto addr = op->getOperand(1).defining;

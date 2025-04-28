@@ -463,14 +463,12 @@ FnDeclNode *Parser::fnDecl() {
       dims.push_back(earlyFold(expr()).getInt());
       expect(Token::RBrak);
     }
-
-    if (isPointer)
-      // Add an implicit [1] to the array type.
-      dims.insert(dims.begin(), 1);
     
     if (dims.size() != 0)
       ty = new ArrayType(ty, dims);
-    
+
+    if (isPointer)
+      ty = new PointerType(ty);
 
     params.push_back(ty);
 

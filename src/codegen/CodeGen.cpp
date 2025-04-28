@@ -142,8 +142,6 @@ Value CodeGen::emitExpr(ASTNode *node) {
         auto addr = builder.create<GetGlobalOp>({
           new NameAttr(ref->name)
         });
-        if (isa<ArrayType>(node->type))
-          return addr;
         return builder.create<LoadOp>({ addr }, {
           new SizeAttr(getSize(ref->type))
         });
@@ -153,8 +151,6 @@ Value CodeGen::emitExpr(ASTNode *node) {
       assert(false);
     }
     auto from = symbols[ref->name];
-    if (isa<ArrayType>(node->type))
-      return from;
     auto load = builder.create<LoadOp>({ from }, {
       new SizeAttr(getSize(ref->type))
     });
@@ -306,6 +302,13 @@ void CodeGen::emit(ASTNode *node) {
           auto place = builder.create<AddLOp>({ addr, offset });
           builder.create<StoreOp>({ value, place }, { new SizeAttr(baseSize) });
         }
+
+        // An extra layer of indirection is needed for further reference.
+        auto arrayPtr = builder.create<AllocaOp>({
+          new SizeAttr(8)
+        });
+        builder.create<StoreOp>({ addr, arrayPtr }, { new SizeAttr(8) });
+        symbols[vardecl->name] = arrayPtr;
         return;
       }
 
