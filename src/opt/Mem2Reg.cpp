@@ -1,6 +1,7 @@
 #include "Passes.h"
 #include "../codegen/CodeGen.h"
 #include "../codegen/Attrs.h"
+#include <iterator>
 
 using namespace sys;
 
@@ -50,19 +51,28 @@ void Mem2Reg::runImpl(FuncOp *func) {
         bbs.insert(use->getParent());
     }
 
-    std::set<BasicBlock*> needed;
-    for (auto bb : bbs) {
-      for (auto one : bb->getDominanceFrontier())
-        needed.insert(one);
-    }
+    std::vector<BasicBlock*> worklist;
+    std::copy(bbs.begin(), bbs.end(), std::back_inserter(worklist));
 
-    for (auto bb : needed) {
-      // Insert a PhiOp at the dominance frontier of each StoreOp, as described above.
-      // The PhiOp is broken; we only record which AllocaOp it's from.
-      // We'll fill it in later.
-      builder.setToBlockStart(bb);
-      auto phi = builder.create<PhiOp>();
-      phiFrom[phi] = alloca;
+    std::set<BasicBlock*> visited;
+
+    while (!worklist.empty()) {
+      auto bb = worklist.back();
+      worklist.pop_back();
+
+      for (auto dom : bb->getDominanceFrontier()) {
+        if (visited.count(dom))
+          continue;
+        visited.insert(dom);
+
+        // Insert a PhiOp at the dominance frontier of each StoreOp, as described above.
+        // The PhiOp is broken; we only record which AllocaOp it's from.
+        // We'll fill it in later.
+        builder.setToBlockStart(dom);
+        auto phi = builder.create<PhiOp>();
+        phiFrom[phi] = alloca;
+        worklist.push_back(dom);
+      }
     }
   }
 
@@ -138,6 +148,13 @@ void Mem2Reg::fillPhi(BasicBlock *bb, BasicBlock *last) {
       symbols[alloca] = value;
 
       stores.push_back(store);
+    }
+
+    if (auto phi = dyn_cast<PhiOp>(op)) {
+      if (!phiFrom.count(phi))
+        continue;
+      auto alloca = phiFrom[phi];
+      symbols[alloca] = phi;
     }
 
     if (auto branch = dyn_cast<BranchOp>(op)) {

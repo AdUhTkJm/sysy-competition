@@ -414,27 +414,33 @@ void Region::updateDoms() {
     }
   } while (changed);
 
-  // Update idom. The immediate dominator is the one that is dominated by all others.
   for (auto bb : bbs) {
+    // Start block has no idom
+    if (bb == start)
+      continue;
+    
     const auto &doms = bb->doms;
-    for (auto x : doms) {
-      if (x == bb)
+    for (auto candidate : doms) {
+      if (candidate == bb)
         continue;
-      bool dominated = true;
+
+      bool isIdom = true;
       for (auto other : doms) {
-        if (other != x && x->doms.count(other)) {
-          dominated = false;
+        if (other == bb || other == candidate)
+          continue;
+        if (other->doms.count(candidate)) { 
+          // `candidate` dominates another block, so not immediate
+          isIdom = false;
           break;
         }
       }
-
-      if (dominated) {
-        bb->idom = x;
+      if (isIdom) {
+        bb->idom = candidate;
         break;
       }
     }
-    assert(bb == start || bb->idom);
-  }
+    assert(bb->idom); // Only start block can have no idom
+}
 
   // Update dominance frontier.
   for (auto bb : bbs)
@@ -570,16 +576,33 @@ void Region::showLiveIn() {
   std::cerr << "===== live info ends =====\n\n\n";
 }
 
+static int getBlockID(BasicBlock *bb) {
+  if (!bbmap.count(bb))
+    bbmap[bb] = bbid++;
+  return bbmap[bb];
+}
+
 void Region::dump(std::ostream &os, int depth) {
   assert(depth >= 1);
   
   os << "{\n";
   for (auto it = bbs.begin(); it != bbs.end(); it++) {
     if (bbs.size() != 1) {
+      auto bb = *it;
       indent(os, depth * 2 - 2);
-      if (!bbmap.count(*it))
-        bbmap[*it] = bbid++;
-      os << "bb" << bbmap[*it] << ":\n";
+      os << "bb" << getBlockID(bb) << ":     // preds = [ ";
+      for (auto x : bb->getPreds())
+        os << getBlockID(x) << " ";
+      
+      os << "]; dom frontier = [ ";
+      for (auto x : bb->getDominanceFrontier())
+        os << getBlockID(x) << " ";
+      
+      os << "]";
+      
+      if (bb->idom)
+        os << "; idom = " << getBlockID(bb->idom);
+      os << "\n";
     }
     auto &bb = *it;
     for (auto &x : bb->getOps())
