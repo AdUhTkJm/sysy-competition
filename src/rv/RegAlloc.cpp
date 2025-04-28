@@ -5,6 +5,7 @@
 #include "../codegen/Attrs.h"
 #include <iostream>
 #include <iterator>
+#include <vector>
 
 using namespace sys;
 using namespace sys::rv;
@@ -221,7 +222,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     }
   }
 
-  dumpInterf(region, interf);
+  // dumpInterf(region, interf);
 
   // Now time to allocate.
 
@@ -564,6 +565,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 void RegAlloc::tidyup(Region *region) {
   Builder builder;
   auto funcOp = region->getParent();
+  region->updatePreds();
 
   // Now branches are still having both TargetAttr and ElseAttr.
   // Replace them (perform split when necessary), so that they only have one target.

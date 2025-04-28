@@ -50,7 +50,7 @@ Token Lexer::nextToken() {
         // Hexadecimal, skip '0x'
         loc += 2;
         while (std::isdigit(input[loc]) || ('a' <= tolower(input[loc]) && tolower(input[loc]) <= 'f')) {
-          value = value * 16 + (std::isdigit(input[loc]) ? input[loc] - '0' : tolower(input[loc]) - 'a');
+          value = value * 16 + (std::isdigit(input[loc]) ? input[loc] - '0' : tolower(input[loc]) - 'a' + 10);
           loc++;
         }
         return value;

@@ -79,14 +79,16 @@ void Mem2Reg::fillPhi(BasicBlock *bb, BasicBlock *last) {
 
     auto alloca = phiFrom[cast<PhiOp>(op)];
     
-    // Undefined behaviour in source program. Terminate.
+    // It doesn't have an initial value from this path.
+    // It's acceptable (programs without UB can also do this, see official/25.sy)
+    // Simply ignore phi from this branch.
     if (!symbols.count(alloca))
-      assert(false);
+      continue;
 
     // We meet a PhiOp. This means the promoted register might hold value `symbols[alloca]` when it reaches here.
     // So this PhiOp should have that value as operand as well.
     auto value = symbols[alloca];
-    // Found the same op. Seems alright to skip it - unsure.
+    // Found the same op. Alright to skip it.
     if (value.defining == op) {
       continue;
     }

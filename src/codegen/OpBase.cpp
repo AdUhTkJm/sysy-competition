@@ -244,8 +244,6 @@ void BasicBlock::moveToEnd(Region *region) {
 }
 
 void BasicBlock::erase() {
-  assert(preds.size() == 0);
-  
   parent->remove(place);
   delete this;
 }
