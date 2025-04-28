@@ -19,9 +19,12 @@ class BasicBlock;
 class Value {
 public:
   Op *defining;
+  enum Type {
+    unit, i32, i64, f32
+  } ty;
 
   Value() {} // uninitialized, for std::map
-  Value(Op *from): defining(from) {}
+  Value(Op *from);
 
   bool operator==(Value x) const { return defining == x.defining; }
   bool operator!=(Value x) const { return defining != x.defining; }
@@ -166,7 +169,7 @@ protected:
   std::vector<Attr*> attrs;
   BasicBlock *parent;
   BasicBlock::iterator place;
-  Value result;
+  Value::Type resultTy;
 
   friend class Builder;
   friend class BasicBlock;
@@ -192,11 +195,11 @@ public:
   void pushOperand(Value v);
   void removeAllOperands();
 
-  Value getResult() const { return result; }
-  operator Value() const { return result; }
+  Value getResult() { return Value(this); }
+  Value::Type getResultType() const { return resultTy; }
 
-  Op(int id, const std::vector<Value> &values);
-  Op(int id, const std::vector<Value> &values, const std::vector<Attr*> &attrs);
+  Op(int id, Value::Type resultTy, const std::vector<Value> &values);
+  Op(int id, Value::Type resultTy, const std::vector<Value> &values, const std::vector<Attr*> &attrs);
 
   Region *appendRegion();
   BasicBlock *createFirstBlock();
@@ -284,9 +287,9 @@ public:
     return op->getID() == OpID;
   }
 
-  OpImpl(const std::vector<Value> &values): Op(OpID, values) {}
-  OpImpl(const std::vector<Value> &values, const std::vector<Attr*> &attrs):
-    Op(OpID, values, attrs) {}
+  OpImpl(Value::Type resultTy, const std::vector<Value> &values): Op(OpID, resultTy, values) {}
+  OpImpl(Value::Type resultTy, const std::vector<Value> &values, const std::vector<Attr*> &attrs):
+    Op(OpID, resultTy, values, attrs) {}
 };
 
 template<class T, int AttrID>

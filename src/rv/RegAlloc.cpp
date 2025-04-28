@@ -316,8 +316,6 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(BgeOp, BINARY);
   LOWER(StoreOp, BINARY);
   
-  LOWER(BnezOp, UNARY);
-  LOWER(BezOp, UNARY);
   LOWER(LoadOp, UNARY);
   LOWER(AddiwOp, UNARY);
   LOWER(AddiOp, UNARY);
@@ -599,7 +597,6 @@ void RegAlloc::tidyup(Region *region) {
   // Replace them (perform split when necessary), so that they only have one target.
   REPLACE_BRANCH(BltOp, BgeOp);
   REPLACE_BRANCH(BeqOp, BneOp);
-  REPLACE_BRANCH(BnezOp, BezOp);
 
   // Also, eliminate useless JOp.
   runRewriter(funcOp, [&](JOp *op) {

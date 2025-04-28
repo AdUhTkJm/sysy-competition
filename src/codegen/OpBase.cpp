@@ -68,16 +68,19 @@ BasicBlock *BasicBlock::nextBlock() {
   return *++it;
 }
 
-Op::Op(int id, const std::vector<Value> &values):
-  id(id), result(this) {
+Value::Value(Op *from):
+  defining(from), ty(from->getResultType()) {}
+
+Op::Op(int id, Value::Type resultTy, const std::vector<Value> &values):
+  id(id), resultTy(resultTy) {
   for (auto x : values) {
     operands.push_back(x);
     x.defining->uses.insert(this);
   }
 }
 
-Op::Op(int id, const std::vector<Value> &values, const std::vector<Attr*> &attrs):
-  id(id), result(this), attrs(attrs) {
+Op::Op(int id, Value::Type resultTy, const std::vector<Value> &values, const std::vector<Attr*> &attrs):
+  id(id), resultTy(resultTy), attrs(attrs) {
   for (auto x : values) {
     operands.push_back(x);
     x.defining->uses.insert(this);
@@ -185,7 +188,7 @@ std::ostream &operator<<(std::ostream &os, Value value) {
 
 void Op::dump(std::ostream &os, int depth) {
   indent(os, depth * 2);
-  os << result << " = " << opname;
+  os << getResult() << " = " << opname;
   for (auto &operand : operands)
     os << " " << operand;
   for (auto attr : attrs)

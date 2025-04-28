@@ -4,22 +4,26 @@
 #include "../codegen/OpBase.h"
 
 // Don't forget that we actually rely on OpID, and __LINE__ can duplicate with codegen/Ops.h.
-#define RVOP(Ty) \
+#define RVOPBASE(ValueTy, Ty) \
   class Ty : public OpImpl<Ty, __LINE__ + 524288> { \
   public: \
-    Ty(const std::vector<Value> &values): OpImpl(values) { \
+    Ty(const std::vector<Value> &values): OpImpl(ValueTy, values) { \
       setName("rv."#Ty); \
     } \
-    Ty(): OpImpl({}) { \
+    Ty(): OpImpl(ValueTy, {}) { \
       setName("rv."#Ty); \
     } \
-    Ty(const std::vector<Attr*> &attrs): OpImpl({}, attrs) { \
+    Ty(const std::vector<Attr*> &attrs): OpImpl(ValueTy, {}, attrs) { \
       setName("rv."#Ty); \
     } \
-    Ty(const std::vector<Value> &values, const std::vector<Attr*> &attrs): OpImpl(values, attrs) { \
+    Ty(const std::vector<Value> &values, const std::vector<Attr*> &attrs): OpImpl(ValueTy, values, attrs) { \
       setName("rv."#Ty); \
     } \
   }
+
+#define RVOP(Ty) RVOPBASE(Value::i32, Ty)
+#define RVOPL(Ty) RVOPBASE(Value::i64, Ty)
+#define RVOPF(Ty) RVOPBASE(Value::f32, Ty)
 
 namespace sys {
 
@@ -30,20 +34,20 @@ namespace rv {
 //    2) Check the function hasRd().
 
 RVOP(LiOp);
-RVOP(LaOp);
-RVOP(AddOp);
+RVOPL(LaOp);
+RVOPL(AddOp);
 RVOP(AddwOp);
 RVOP(AddiwOp);
-RVOP(AddiOp); // Note that pointers can't be `addiw`'d.
-RVOP(SubOp);
+RVOPL(AddiOp); // Note that pointers can't be `addiw`'d.
+RVOPL(SubOp);
 RVOP(SubwOp);
 RVOP(MulwOp);
-RVOP(MulOp);
+RVOPL(MulOp);
 RVOP(DivwOp); // Signed; divu for unsigned.
-RVOP(DivOp);
+RVOPL(DivOp);
 RVOP(SlliwOp); // Shift left.
 RVOP(SrliwOp); // Shift right, unsigned.
-RVOP(SraiOp); // Shift right (64 bit), signed.
+RVOPL(SraiOp); // Shift right (64 bit), signed.
 RVOP(SraiwOp); // Shift right, signed.
 RVOP(MulhOp); // Higher bits of mul, signed.
 RVOP(MulhuOp); // Higher bits of mul, unsigned.
@@ -51,8 +55,6 @@ RVOP(BneOp);
 RVOP(BeqOp);
 RVOP(BltOp);
 RVOP(BgeOp);
-RVOP(BezOp);
-RVOP(BnezOp);
 RVOP(SeqzOp); // Set equal to zero (pseudo, 2 ops)
 RVOP(SnezOp); // Set not equal to zero (pseudo, 2 ops)
 RVOP(JOp);

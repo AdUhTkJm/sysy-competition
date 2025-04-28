@@ -132,7 +132,9 @@ void Lower::run() {
       return true;
     }
 
-    builder.replace<BnezOp>(op, op->getOperands(), op->getAttrs());
+    builder.setBeforeOp(op);
+    auto zero = builder.create<ReadRegOp>({ new RegAttr(Reg::zero) });
+    builder.replace<BneOp>(op, { cond, zero }, op->getAttrs());
     return true;
   });
 
