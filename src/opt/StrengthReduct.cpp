@@ -39,6 +39,10 @@ Multiplier chooseMultiplier(int d) {
 
 void StrengthReduct::run() {
   Builder builder;
+  
+  // ===================
+  // Rewrite MulOp.
+  // ===================
 
   runRewriter([&](MulIOp *op) {
     auto x = op->getOperand(0);
@@ -122,6 +126,10 @@ void StrengthReduct::run() {
     }
     return false;
   });
+
+  // ===================
+  // Rewrite DivOp.
+  // ===================
 
   runRewriter([&](DivIOp *op) {
     auto x = op->getOperand(0);

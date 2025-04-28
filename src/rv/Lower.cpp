@@ -151,11 +151,13 @@ void Lower::run() {
   runRewriter([&](ReturnOp *op) {
     builder.setBeforeOp(op);
 
-    // Don't create a op for an empty `return`.
-    if (op->getOperands().size())
-      builder.create<WriteRegOp>(op->getOperands(), {
+    if (op->getOperands().size()) {
+      auto virt = builder.create<WriteRegOp>(op->getOperands(), {
         new RegAttr(Reg::a0)
       });
+      builder.replace<RetOp>(op, { virt });
+      return true;
+    }
     
     builder.replace<RetOp>(op);
     return true;
@@ -172,10 +174,19 @@ void Lower::run() {
     // TODO: spilling
     assert(args.size() <= 8);
 
+    std::vector<Value> argsNew;
     for (int i = 0; i < args.size(); i++)
-      builder.create<WriteRegOp>({ args[i] }, { new RegAttr(regs[i]) });
+      argsNew.push_back(
+      builder.create<WriteRegOp>({ args[i] },
+       {
+            new RegAttr(regs[i])
+          })
+      );
 
-    builder.create<sys::rv::CallOp>({ op->getAttr<NameAttr>() });
+    builder.create<sys::rv::CallOp>(argsNew, { 
+      op->getAttr<NameAttr>(),
+      new ArgCountAttr(args.size())
+    });
 
     // Read result from a0.
     builder.replace<ReadRegOp>(op, { new RegAttr(Reg::a0) });

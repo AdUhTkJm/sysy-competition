@@ -163,7 +163,7 @@ Value CodeGen::emitExpr(ASTNode *node) {
     for (auto arg : call->args)
       args.push_back(emitExpr(arg));
     auto callOp = builder.create<CallOp>(args, {
-      new NameAttr(call->func)
+      new NameAttr(call->func),
     });
     return callOp;
   }
@@ -220,16 +220,18 @@ void CodeGen::emit(ASTNode *node) {
   }
 
   if (auto fn = dyn_cast<FnDeclNode>(node)) {
-    auto funcOp = builder.create<FuncOp>();
+    auto fnTy = cast<FunctionType>(fn->type);
+    auto funcOp = builder.create<FuncOp>({
+      new NameAttr(fn->name),
+      new ArgCountAttr(fnTy->params.size())
+    });
     auto bb = funcOp->createFirstBlock();
-    funcOp->addAttr<NameAttr>(fn->name);
 
     Builder::Guard guard(builder);
     builder.setToBlockStart(bb);
 
     // Function arguments are in the same scope with body.
     SemanticScope scope(*this);
-    auto fnTy = cast<FunctionType>(fn->type);
     for (int i = 0; i < fn->args.size(); i++) {
       auto size = getSize(fnTy->params[i]);
       // Get the value of the argument and create a temp variable for it.

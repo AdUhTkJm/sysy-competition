@@ -135,6 +135,10 @@ static const Reg normalOrder[] = {
   Reg::a0, Reg::a1, Reg::a2, Reg::a3,
   Reg::a4, Reg::a5, Reg::a6, Reg::a7,
 };
+static const Reg argRegs[] = {
+  Reg::a0, Reg::a1, Reg::a2, Reg::a3,
+  Reg::a4, Reg::a5, Reg::a6, Reg::a7,
+};
 constexpr int leafRegCnt = 27;
 constexpr int normalRegCnt = 27;
 
@@ -148,16 +152,13 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
   // Interference graph.
   std::map<Op*, std::set<Op*>> interf;
-  // The individual registers unavailable for each Op.
-  std::map<Op*, std::set<Reg>> indivForbidden;
 
   // Values of readreg, or operands of writereg, or phis (mvs), are prioritzed.
   std::map<Op*, int> priority;
   // The `key` is preferred to have the same value as `value`.
   std::map<Op*, Op*> prefer;
-
-  // The current registers "live".
-  std::set<Reg> liveRegs;
+  
+  std::map<Op*, Reg> assignment;
 
   for (auto bb : region->getBlocks()) {
     // Scan through the block and see the place where the value's last used.
@@ -171,18 +172,21 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
           lastUsed[v.defining] = i;
       }
       defined[op] = i;
+
       // Even though the op is not used, it still lives in the instruction that defines it.
       // Actually this should be eliminated with DCE, but we need to take care of it.
       if (!lastUsed.count(op))
           lastUsed[op] = i + 1;
 
-      // Might need to deal with this later, about regDefined etc.
+      // Precolor.
       if (isa<WriteRegOp>(op)) {
-        priority[op->getOperand().defining] = 1;
+        assignment[op] = op->getAttr<RegAttr>()->reg;
+        priority[op] = 1;
       }
       if (isa<ReadRegOp>(op)) {
         priority[op] = 1;
       }
+
       if (isa<PhiOp>(op)) {
         priority[op] = 2;
         for (auto x : op->getOperands()) {
@@ -234,8 +238,6 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     auto pb = priority[b];
     return pa == pb ? interf[a].size() > interf[b].size() : pa > pb;
   });
-  
-  std::map<Op*, Reg> assignment;
 
   for (auto op : ops) {
     std::set<Reg> forbidden;
@@ -327,6 +329,24 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(SraiOp, UNARY);
   LOWER(SeqzOp, UNARY);
   LOWER(SnezOp, UNARY);
+
+  // Remove all operands of calls and returns.
+  // The "operands" are only formal and carry no real meaning.
+  runRewriter(funcOp, [&](CallOp *op) {
+    if (!op->getOperands().size())
+      return false;
+
+    op->removeAllOperands();
+    return true;
+  });
+
+  runRewriter(funcOp, [&](RetOp *op) {
+    if (!op->getOperands().size())
+      return false;
+    
+    op->removeAllOperands();
+    return true;
+  });
 
   //   writereg %1, <reg = a0>
   // becomes

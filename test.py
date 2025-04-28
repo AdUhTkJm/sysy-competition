@@ -269,13 +269,13 @@ def test_all():
         qemu = "qemu-aarch64-static" if args.arm else "qemu-riscv64-static"
         result = proc.run(
           f"{qemu} {str(exe_path)}",
-          input=input_data,
+          input=None if not input_data else input_data.encode('utf-8'),
           stdout=proc.PIPE,
           stderr=proc.DEVNULL,
           timeout=args.timeout,
           shell=True
         )
-        actual_out: str = result.stdout.decode('utf-8')
+        actual_out: str = result.stdout.decode('utf-8').strip()
         actual = f"{actual_out}\n{result.returncode}".strip()
       except proc.TimeoutExpired:
         failures.append((sy_path, f"Timeout ({args.timeout:.2f}s)"))
@@ -288,7 +288,7 @@ def test_all():
         expected = f.read().strip()
         
       if actual != expected:
-        failures.append((sy_path, f"Output mismatch: {actual}"))
+        failures.append((sy_path, f"Output mismatch:\n{actual}"))
       else:
         passed += 1
   
@@ -303,8 +303,11 @@ def test_all():
     failures = sorted(failures, key=lambda x: x[0])
     for path, reason in failures:
       print(f"- {path}")
-      first_line = reason.split('\n')[0].strip()
-      print(f"  Reason: {first_line}")
+      if reason.startswith("Output mismatch"):
+        print(f"  Reason: {reason}")
+      else:
+        first_line = reason.split('\n')[0].strip()
+        print(f"  Reason: {first_line}")
 
 
 if __name__ == "__main__":
