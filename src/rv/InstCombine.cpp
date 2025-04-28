@@ -78,6 +78,21 @@ void InstCombine::run() {
     return false;
   });
 
+  runRewriter([&](LoadOp *op) {
+    auto addr = op->getOperand(0).defining;
+    if (isa<AddiOp>(addr)) {
+      auto offset = addr->getAttr<IntAttr>()->value;
+      auto &currentOffset = op->getAttr<IntAttr>()->value;
+      if (inRange(offset + currentOffset)) {
+        currentOffset += offset;
+        auto base = addr->getOperand();
+        builder.replace<LoadOp>(op, { base }, op->getAttrs());
+        return true;
+      }
+    }
+    return false;
+  });
+
   runRewriter([&](AddiwOp *op) {
     if (op->getAttr<IntAttr>()->value == 0) {
       op->replaceAllUsesWith(op->getOperand().defining);

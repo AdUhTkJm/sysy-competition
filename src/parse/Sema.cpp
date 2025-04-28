@@ -285,6 +285,11 @@ Type *Sema::infer(ASTNode *node) {
     assert(write->indices.size() == arrTy->dims.size());
     write->arrTy = arrTy;
 
+    for (auto x : write->indices) {
+      auto ty = infer(x);
+      assert(isa<IntType>(ty));
+    }
+
     auto valueTy = infer(write->value);
 
     if (isa<FloatType>(baseTy) && isa<IntType>(valueTy)) {

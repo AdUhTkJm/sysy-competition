@@ -47,11 +47,10 @@ int CodeGen::getSize(Type *ty) {
   if (isa<IntType>(ty) || isa<FloatType>(ty))
     return 4;
   if (auto arrTy = dyn_cast<ArrayType>(ty))
-    return arrTy->getSize() * getSize(arrTy->base);
+    return getSize(arrTy->base) * arrTy->getSize();
   
   return 8;
 }
-
 Value CodeGen::emitBinary(BinaryNode *node) {
   auto l = emitExpr(node->l);
   auto r = emitExpr(node->r);
@@ -143,6 +142,8 @@ Value CodeGen::emitExpr(ASTNode *node) {
         auto addr = builder.create<GetGlobalOp>({
           new NameAttr(ref->name)
         });
+        if (isa<ArrayType>(node->type))
+          return addr;
         return builder.create<LoadOp>({ addr }, {
           new SizeAttr(getSize(ref->type))
         });
@@ -152,6 +153,8 @@ Value CodeGen::emitExpr(ASTNode *node) {
       assert(false);
     }
     auto from = symbols[ref->name];
+    if (isa<ArrayType>(node->type))
+      return from;
     auto load = builder.create<LoadOp>({ from }, {
       new SizeAttr(getSize(ref->type))
     });
@@ -173,7 +176,7 @@ Value CodeGen::emitExpr(ASTNode *node) {
 
     // Calculate a series of stride.
     std::vector<int> sizes;
-    auto size = getSize(arrTy);
+    auto size = getSize(arrTy->base) * arrTy->getSize();
     for (int i = 0; i < arrTy->dims.size(); i++)
       sizes.push_back(size /= arrTy->dims[i]);
     
@@ -183,7 +186,9 @@ Value CodeGen::emitExpr(ASTNode *node) {
         new NameAttr(access->array)
       });
     else if (symbols.count(access->array))
-      addr = symbols[access->array];
+      addr = builder.create<LoadOp>({
+        symbols[access->array]
+      }, { new SizeAttr(getSize(arrTy->base)) });
     for (int i = 0; i < access->indices.size(); i++) {
       auto index = emitExpr(access->indices[i]);
       auto strideVal = builder.create<IntOp>({ new IntAttr(sizes[i]) });
@@ -386,7 +391,7 @@ void CodeGen::emit(ASTNode *node) {
 
     // Calculate a series of stride.
     std::vector<int> sizes;
-    auto size = getSize(arrTy);
+    auto size = getSize(arrTy->base) * arrTy->getSize();
     for (int i = 0; i < write->indices.size(); i++)
       sizes.push_back(size /= arrTy->dims[i]);
     
@@ -396,7 +401,9 @@ void CodeGen::emit(ASTNode *node) {
         new NameAttr(write->array)
       });
     else if (symbols.count(write->array))
-      addr = symbols[write->array];
+      addr = builder.create<LoadOp>({
+        symbols[write->array]
+      }, { new SizeAttr(getSize(arrTy->base)) });
     for (int i = 0; i < write->indices.size(); i++) {
       auto index = emitExpr(write->indices[i]);
       auto strideVal = builder.create<IntOp>({ new IntAttr(sizes[i]) });

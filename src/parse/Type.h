@@ -40,6 +40,13 @@ public:
   std::string toString() const override { return "void"; }
 };
 
+class PointerType : public TypeImpl<PointerType, __LINE__> {
+public:
+  Type *pointee;
+
+  std::string toString() const override { return pointee->toString() + "*"; }
+};
+
 class FunctionType : public TypeImpl<FunctionType, __LINE__> {
 public:
   Type *ret;

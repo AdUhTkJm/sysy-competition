@@ -25,7 +25,6 @@ void Mem2Reg::runImpl(FuncOp *func) {
   // We need to put PhiOp at places where a StoreOp doesn't dominate,
   // because it means at least 2 possible values.
   auto allocas = func->findAll<AllocaOp>();
-  std::copy(allocas.begin(), allocas.end(), std::inserter(converted, converted.end()));
   for (auto alloca : allocas) {
     bool good = true;
 
@@ -43,6 +42,7 @@ void Mem2Reg::runImpl(FuncOp *func) {
       continue;
     }
     count++;
+    converted.insert(alloca);
 
     // Now find all blocks where stores reside in. Use set to de-duplicate.
     std::set<BasicBlock*> bbs;

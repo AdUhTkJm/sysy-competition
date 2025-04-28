@@ -4,7 +4,7 @@
 
 这个编译器吸收了一些我的另一个编译器项目[Moonbit 编译器](https://github.com/AdUhTkJm/moonbit-mlir)的经验。这里的 `parse/TypeContext.h` 管理内存的方式就来自这个项目（不过实际上 interning 也是很常用的技术）。
 
-每个 Op 都有恰好一个返回值，不定数量的操作数（`Value`，对 `Op*` 的一层包装），一些子作用域 (`Region*`，实际上是基本块的容器)，以及一些属性 (`Attr*`)。Op 本身并不对任何东西进行检查，但 Pass 会假定某些 Op 具有特定的操作个数和属性（例如 `AddIOp` 有恰好两个操作数）。为了简化工作，值都不具有类型，而类型有关的信息会在 CodeGen 阶段作为属性生成。
+每个 Op 都有恰好一个返回值，不定数量的操作数（`Value`，对 `Op*` 的一层包装），一些子作用域 (`Region*`，实际上是基本块的容器)，以及一些属性 (`Attr*`)。Op 本身并不对任何东西进行检查，但 Pass 会假定某些 Op 具有特定的操作个数和属性（例如 `AddIOp` 有恰好两个操作数）。
 
 这样灵活的 Op 使得编写 Lowering 的工作更加简单。比起将它转译为某种类似 MCInst 的东西，我可以直接在已有的 Op 上改写。同时，这也方便了 Pass 的编写，使得在 Pass 运行过程中没有任何额外的不变量需要保持。这是和 LLVM 较大的不同之处。
 
@@ -184,6 +184,7 @@ CodeGen 生成的代码依旧有不正确之处。在运行其他 Pass 之前，
 - li + add => addi
 - li + addw => addiw
 - addi + sw => sw （改变offset）
+- addi + lw => lw （改变offset）
 - 去除 `%2 = addi %1, 0`
 
 **RegAlloc**

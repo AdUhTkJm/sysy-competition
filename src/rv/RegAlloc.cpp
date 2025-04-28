@@ -566,7 +566,7 @@ void RegAlloc::tidyup(Region *region) {
   region->updatePreds();
 
   // Replace blocks with only a single `j` as terminator.
-  std::vector<BasicBlock*> singleJ;
+  std::vector<BasicBlock*> single;
   for (auto bb : region->getBlocks()) {
     if (!(bb->getOps().size() == 1 && isa<JOp>(bb->getLastOp())))
       continue;
@@ -585,12 +585,12 @@ void RegAlloc::tidyup(Region *region) {
     }
 
     // For removal.
-    singleJ.push_back(bb);
+    single.push_back(bb);
   }
 
   // Erase all those single-j's.
   region->updatePreds();
-  for (auto bb : singleJ)
+  for (auto bb : single)
     bb->erase();
 
   // Now branches are still having both TargetAttr and ElseAttr.
@@ -669,17 +669,19 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
     if (calleeSaved.count(x))
       preserve.push_back(x);
   }
+  if (!isLeaf)
+    preserve.push_back(Reg::ra);
 
   // If there's a SubSpOp, then it must be at the top of the first block.
   auto op = region->getFirstBlock()->getFirstOp();
-  int offset = isLeaf ? 0 : 8; // For `ra`, we need to use `sd`.
+  int offset = 0;
   if (isa<SubSpOp>(op)) {
     offset = op->getAttr<IntAttr>()->value;
     op->removeAttr<IntAttr>();
-    op->addAttr<IntAttr>(offset += 4 * preserve.size());
+    op->addAttr<IntAttr>(offset += 8 * preserve.size());
   } else if (!preserve.empty()) {
     builder.setToRegionStart(region);
-    op = builder.create<SubSpOp>({ new IntAttr(offset += 4 * preserve.size()) });
+    op = builder.create<SubSpOp>({ new IntAttr(offset += 8 * preserve.size()) });
   }
 
   // Round op to the nearest multiple of 16.
@@ -692,14 +694,6 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
   // Add function prologue, preserving the regs.
   builder.setAfterOp(op);
   save(builder, preserve, offset);
-  if (!isLeaf) {
-    builder.create<sys::rv::StoreOp>({
-      /*value=*/new RsAttr(Reg::ra),
-      /*addr=*/new Rs2Attr(Reg::sp),
-      /*offset=*/new IntAttr(0),
-      /*size=*/new SizeAttr(8)
-    });
-  }
 
   // Similarly add function epilogue.
   if (offset != 0) {
@@ -711,14 +705,6 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
     builder.setToBlockStart(bb);
 
     load(builder, preserve, offset);
-    if (!isLeaf) {
-      builder.create<sys::rv::LoadOp>({
-        /*value=*/new RdAttr(Reg::ra),
-        /*addr=*/new RsAttr(Reg::sp),
-        /*offset=*/new IntAttr(0),
-        /*size=*/new SizeAttr(8)
-      });
-    }
     builder.create<SubSpOp>({ new IntAttr(-offset) });
     builder.create<RetOp>();
   }

@@ -20,6 +20,9 @@ class TypeContext {
           hash *= (x + 1);
       }
 
+      if (auto ptr = dyn_cast<PointerType>(ty))
+        hash = (hash << 4) + Hash()(ptr->pointee);
+
       if (auto fn = dyn_cast<FunctionType>(ty)) {
         hash = (hash << 4) + Hash()(fn->ret);
         for (auto x : fn->params) {
@@ -48,6 +51,11 @@ class TypeContext {
         }
 
         return Eq()(arr->base, arrb->base);
+      }
+
+      if (auto ptr = dyn_cast<PointerType>(a)) {
+        auto ptrb = cast<PointerType>(b);
+        return Eq()(ptr->pointee, ptrb->pointee);
       }
 
       if (auto fn = dyn_cast<FunctionType>(a)) {

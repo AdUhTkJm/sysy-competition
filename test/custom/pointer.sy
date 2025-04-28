@@ -1,0 +1,16 @@
+int f(int a[]) {
+  int total = 0;
+  int i = 0;
+  while (i < 10) {
+    total = total + a[i];
+    i = i + 1;
+  }
+  return total;
+}
+
+int main() {
+  int a[10] = {
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+  };
+  return f(a);
+}
