@@ -143,8 +143,11 @@ Token Lexer::nextToken() {
         // Skip '/*', and loop till we find '*/'.
         loc += 2;
         for (; loc < input.size(); loc++) {
-          if (input[loc] == '*' && input[loc + 1] == '/')
+          if (input[loc] == '*' && input[loc + 1] == '/') {
+            // Skip '*/'.
+            loc += 2;
             return nextToken();
+          }
         }
       }
       break;

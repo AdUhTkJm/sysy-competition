@@ -567,6 +567,34 @@ void RegAlloc::tidyup(Region *region) {
   auto funcOp = region->getParent();
   region->updatePreds();
 
+  // Replace blocks with only a single `j` as terminator.
+  std::vector<BasicBlock*> singleJ;
+  for (auto bb : region->getBlocks()) {
+    if (!(bb->getOps().size() == 1 && isa<JOp>(bb->getLastOp())))
+      continue;
+    
+    auto target = bb->getLastOp()->getAttr<TargetAttr>()->bb;
+    for (auto pred : bb->getPreds()) {
+      auto term = pred->getLastOp();
+      auto &predTarget = term->getAttr<TargetAttr>()->bb;
+      if (predTarget == bb)
+        predTarget = target;
+
+      if (auto ifnot = term->findAttr<ElseAttr>()) {
+        if (ifnot->bb == bb)
+          ifnot->bb = target;
+      }
+    }
+
+    // For removal.
+    singleJ.push_back(bb);
+  }
+
+  // Erase all those single-j's.
+  region->updatePreds();
+  for (auto bb : singleJ)
+    bb->erase();
+
   // Now branches are still having both TargetAttr and ElseAttr.
   // Replace them (perform split when necessary), so that they only have one target.
   REPLACE_BRANCH(BltOp, BgeOp);

@@ -292,6 +292,9 @@ def test_all():
       else:
         passed += 1
   
+  # In case there's still unfinished processes.
+  proc.run(f"killall -9 {qemu}", shell=True)
+  
   # Print results
   print("\nTest results:")
   print(f"Total:  {total}")

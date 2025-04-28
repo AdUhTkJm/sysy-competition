@@ -58,10 +58,13 @@ void DCE::runOnRegion(Region *region) {
 
 void DCE::run() {
   auto funcs = module->findAll<FuncOp>();
-  for (auto func : funcs)
-    runOnRegion(func->getRegion());
+  do {
+    removeable.clear();
+    for (auto func : funcs)
+      runOnRegion(func->getRegion());
 
-  elim = removeable.size();
-  for (auto op : removeable)
-    op->erase();
+    elim += removeable.size();
+    for (auto op : removeable)
+      op->erase();
+  } while (removeable.size());
 }

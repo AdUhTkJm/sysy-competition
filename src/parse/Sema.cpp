@@ -242,6 +242,13 @@ Type *Sema::infer(ASTNode *node) {
         continue;
       }
 
+      if (isa<ArrayType>(ty) && isa<ArrayType>(argTy)) {
+        // No implicit cast needed.
+        // You say the dimensions might not coincide? That's acceptable.
+        // It's just a reinterpret_cast.
+        continue;
+      }
+
       if (ty != argTy) {
         std::cerr << "bad function argument\n";
         assert(false);
