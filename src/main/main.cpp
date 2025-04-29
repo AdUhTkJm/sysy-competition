@@ -40,6 +40,7 @@ void initPipeline(sys::PassManager &pm) {
 
   pm.addPass<sys::FlattenCFG>();
   pm.addPass<sys::Mem2Reg>();
+  pm.addPass<sys::GVN>();
   pm.addPass<sys::DCE>();
 
   if (opts.arm)

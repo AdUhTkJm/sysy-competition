@@ -111,6 +111,58 @@ public:
   void run();
 };
 
+// Global value numbering.
+class GVN : public Pass {
+  int elim = 0;
+
+  void runImpl(Region *region);
+  using SymbolTable = std::unordered_map<Op*, int>;
+  using Domtree = std::map<BasicBlock*, std::vector<BasicBlock*>>;
+
+  // The number of each Op.
+  SymbolTable symbols;
+
+  struct Expr {
+    int id;
+    std::vector<int> operands;
+
+    // Attributes
+    int vi = 0;
+    float vf = 0;
+    std::string name;
+
+    bool operator<(const Expr &other) const;
+  };
+  std::map<Expr, int> exprNum;
+  std::map<int, Op*> numOp;
+  // The current number.
+  int num = 1;
+
+  class SemanticScope {
+    GVN &pass;
+    SymbolTable symbols;
+    std::map<Expr, int> exprNum;
+    std::map<int, Op*> numOp;
+  public:
+    SemanticScope(GVN &pass):
+      pass(pass), symbols(pass.symbols), exprNum(pass.exprNum), numOp(pass.numOp) {}
+    ~SemanticScope() {
+      pass.symbols = symbols;
+      pass.exprNum = exprNum;
+      pass.numOp = numOp;
+    }
+  };
+
+  // Dominator-based Value Numbering Technique. See Briggs.
+  void dvnt(BasicBlock *bb, Domtree &domtree);
+public:
+  GVN(ModuleOp *module): Pass(module) {}
+    
+  std::string name() { return "global-value-numbering"; };
+  std::map<std::string, int> stats();
+  void run();
+};
+
 }
 
 #endif
