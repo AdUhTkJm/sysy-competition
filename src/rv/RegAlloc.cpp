@@ -600,31 +600,36 @@ void RegAlloc::tidyup(Region *region) {
   region->updatePreds();
 
   // Replace blocks with only a single `j` as terminator.
-  std::vector<BasicBlock*> single;
+  std::map<BasicBlock*, BasicBlock*> jumpTo;
   for (auto bb : region->getBlocks()) {
-    if (!(bb->getOps().size() == 1 && isa<JOp>(bb->getLastOp())))
-      continue;
-    
-    auto target = bb->getLastOp()->getAttr<TargetAttr>()->bb;
-    for (auto pred : bb->getPreds()) {
-      auto term = pred->getLastOp();
-      auto &predTarget = term->getAttr<TargetAttr>()->bb;
-      if (predTarget == bb)
-        predTarget = target;
+    if (bb->getOps().size() == 1 && isa<JOp>(bb->getLastOp())) {
+      auto target = bb->getLastOp()->getAttr<TargetAttr>()->bb;
+      jumpTo[bb] = target;
+    }
+  }
 
-      if (auto ifnot = term->findAttr<ElseAttr>()) {
-        if (ifnot->bb == bb)
-          ifnot->bb = target;
-      }
+  // Calculate jump-to closure.
+  for (auto &[k, v] : jumpTo) {
+    if (jumpTo.count(v))
+      v = jumpTo[v];
+  }
+
+  for (auto bb : region->getBlocks()) { 
+    auto term = bb->getLastOp();
+    if (auto target = term->findAttr<TargetAttr>()) {
+      if (jumpTo.count(target->bb))
+        target->bb = jumpTo[target->bb];
     }
 
-    // For removal.
-    single.push_back(bb);
+    if (auto ifnot = term->findAttr<ElseAttr>()) {
+      if (jumpTo.count(ifnot->bb))
+        ifnot->bb = jumpTo[ifnot->bb];
+    }
   }
 
   // Erase all those single-j's.
   region->updatePreds();
-  for (auto bb : single)
+  for (auto [bb, v] : jumpTo)
     bb->erase();
 
   // Now branches are still having both TargetAttr and ElseAttr.
