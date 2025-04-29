@@ -306,11 +306,8 @@ def test_all():
     failures = sorted(failures, key=lambda x: x[0])
     for path, reason in failures:
       print(f"- {path}")
-      if reason.startswith("Output mismatch"):
-        print(f"  Reason: {reason}")
-      else:
-        first_line = reason.split('\n')[0].strip()
-        print(f"  Reason: {first_line}")
+      first_line = reason.split('\n')[0].strip()
+      print(f"  Reason: {reason}")
 
 
 if __name__ == "__main__":

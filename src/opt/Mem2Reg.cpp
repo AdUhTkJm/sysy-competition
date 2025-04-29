@@ -125,6 +125,7 @@ void Mem2Reg::fillPhi(BasicBlock *bb, BasicBlock *last) {
   
       // It's possible for arrays - in which case it isn't undefined behaviour.
       if (!symbols.count(alloca)) {
+        builder.setBeforeOp(alloca);
         symbols[alloca] = builder.create<IntOp>({ new IntAttr(0) });
       }
       

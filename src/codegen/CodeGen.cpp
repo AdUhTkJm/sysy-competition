@@ -354,6 +354,17 @@ void CodeGen::emit(ASTNode *node) {
       });
     
     symbols[vardecl->name] = addr;
+    // An uninitialized local array.
+    // Give it another alloca.
+    if (isa<ArrayType>(vardecl->type) && !vardecl->init) {
+      auto arrayPtr = builder.create<AllocaOp>({
+        new SizeAttr(8)
+      });
+      builder.create<StoreOp>({ addr, arrayPtr }, { new SizeAttr(8) });
+      symbols[vardecl->name] = arrayPtr;
+      return;
+    }
+
     if (vardecl->init) {
       // This is a local variable with array initializer.
       // We manually load everything into the array.
