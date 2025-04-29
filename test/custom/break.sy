@@ -1,0 +1,24 @@
+int main() {
+  int a = 1;
+  int b = 10;
+  int total = 0;
+  while (a < 10) {
+    if (a > 5)
+      break;
+    if (a == 7)
+      continue;
+
+    while (b > 0) {
+      if (b < 5)
+        break;
+      b = b - 1;
+      total = total + 1;
+      continue;
+      total = total + 1;
+    }
+    total = total + 1;
+    b = a + 5;
+    a = a + 1;
+  }
+  return total;
+}

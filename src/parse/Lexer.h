@@ -22,7 +22,7 @@ struct Token {
 
     // Keywords
     If, Else, While, For, Return, Int, Float, Void,
-    Const,
+    Const, Break, Continue,
 
     // EOF
     End,

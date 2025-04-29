@@ -15,6 +15,8 @@ std::map<std::string, Token::Type> keywords = {
   { "float", Token::Float },
   { "void", Token::Void },
   { "const", Token::Const },
+  { "break", Token::Break },
+  { "continue", Token::Continue },
 };
 
 Token Lexer::nextToken() {

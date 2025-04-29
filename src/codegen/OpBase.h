@@ -183,6 +183,7 @@ public:
   const std::string &getName() { return opname; }
   BasicBlock *getParent() { return parent; }
   Op *getParentOp();
+  Op *nextOp();
 
   const auto &getUses() const { return uses; }
   const auto &getRegions() const { return regions; }

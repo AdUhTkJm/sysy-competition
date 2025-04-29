@@ -68,6 +68,11 @@ BasicBlock *BasicBlock::nextBlock() {
   return *++it;
 }
 
+Op *Op::nextOp() {
+  auto it = place;
+  return *++it;
+}
+
 Value::Value(Op *from):
   defining(from), ty(from->getResultType()) {}
 

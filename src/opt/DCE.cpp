@@ -12,7 +12,8 @@ std::map<std::string, int> DCE::stats() {
 bool DCE::isImpure(Op *op) {
   if (isa<StoreOp>(op) || isa<ReturnOp>(op) ||
       isa<BranchOp>(op) || isa<GotoOp>(op) ||
-      isa<ProceedOp>(op))
+      isa<ProceedOp>(op) || isa<BreakOp>(op) ||
+      isa<ContinueOp>(op))
     return true;
 
   if (isa<CallOp>(op)) {

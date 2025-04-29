@@ -373,6 +373,16 @@ ASTNode *Parser::stmt() {
     return new WhileNode(cond, body);
   }
 
+  if (test(Token::Break)) {
+    expect(Token::Semicolon);
+    return new BreakNode();
+  }
+
+  if (test(Token::Continue)) {
+    expect(Token::Semicolon);
+    return new ContinueNode();
+  }
+
   if (peek(Token::Const, Token::Int, Token::Float))
     return varDecl(false);
 

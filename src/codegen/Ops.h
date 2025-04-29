@@ -78,6 +78,8 @@ OPL(RShiftImmLOp); // Shift for 64 bit.
 OP(MulshOp);
 OP(MuluhOp);
 OP(SetNotZeroOp);
+OP(BreakOp);
+OP(ContinueOp);
 
 }
 

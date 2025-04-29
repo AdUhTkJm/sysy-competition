@@ -197,6 +197,9 @@ public:
     func(func), args(args) {}
 };
 
+class BreakNode : public ASTNodeImpl<BreakNode, __LINE__> {};
+class ContinueNode : public ASTNodeImpl<ContinueNode, __LINE__> {};
+
 };
 
 #endif

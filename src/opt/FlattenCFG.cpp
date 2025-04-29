@@ -93,6 +93,37 @@ void handleWhile(WhileOp *x) {
   builder.setToBlockEnd(afterFinal);
   builder.create<GotoOp>({ new TargetAttr(beforeFirst) });
 
+  auto unusedBB = region->insertAfter(end);
+
+  // Replace all breaks and continues.
+  // Note that we might encounter nested WhileOps. The breaks and continues would be naturally ignored. 
+  for (auto bb = beforeFirst; bb != end; bb = bb->nextBlock()) {
+    std::vector<Op*> disrupters;
+    for (auto op : bb->getOps()) {
+      if (isa<BreakOp>(op) || isa<ContinueOp>(op))
+        disrupters.push_back(op);
+    }
+
+    for (auto op : disrupters) {
+      auto bb = op->getParent();
+      // If it's not at the end of the basic block, then all Ops after it are useless.
+      // This also moves `op` itself, so we move it back.
+      bb->splitOpsAfter(unusedBB, op);
+      op->moveToEnd(bb);
+      for (auto unused : unusedBB->getOps())
+        unused->removeAllOperands();
+      auto copy = unusedBB->getOps();
+      for (auto unused : copy)
+        unused->erase();
+      
+      builder.replace<GotoOp>(op, { new TargetAttr(
+        isa<BreakOp>(op) ? end : beforeFirst
+      )});
+    }
+  }
+
+  unusedBB->erase();
+
   // Erase the now-empty WhileOp.
   x->erase();
 }

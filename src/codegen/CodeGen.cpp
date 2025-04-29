@@ -435,6 +435,16 @@ void CodeGen::emit(ASTNode *node) {
     emit(loop->body);
     return;
   }
+  
+  if (auto br = dyn_cast<BreakNode>(node)) {
+    builder.create<BreakOp>();
+    return;
+  }
+
+  if (auto cont = dyn_cast<ContinueNode>(node)) {
+    builder.create<ContinueOp>();
+    return;
+  }
 
   if (auto assign = dyn_cast<AssignNode>(node)) {
     auto l = cast<VarRefNode>(assign->l);
