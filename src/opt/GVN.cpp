@@ -61,6 +61,7 @@ bool allowed(Op *op) {
     ALLOW(MulshOp)
     ALLOW(MuluhOp)
     ALLOW(SetNotZeroOp)
+    ALLOW(GetGlobalOp)
   ;
 }
 

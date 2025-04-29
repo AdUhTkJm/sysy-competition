@@ -15,11 +15,13 @@ bool hasStoresTo(Op *op) {
 
     // It's a new address. Find all stores there.
     if (isa<AddIOp>(use) || isa<AddLOp>(use)) {
-      for (auto u : use->getUses())
-        if (hasStoresTo(u))
-          return true;
+      if (hasStoresTo(use))
+        return true;
       continue;
     }
+
+    if (isa<LoadOp>(use))
+      continue;
 
     // If something else happens, then it isn't an address.
     return false;
