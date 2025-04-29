@@ -256,6 +256,10 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   std::vector<Op*> ops;
   for (auto [k, v] : interf)
     ops.push_back(k);
+  // Even though registers in `priority` might not be colliding,
+  // we still allocate them here to respect their preference.
+  for (auto [k, v] : priority)
+    ops.push_back(k);
 
   // Sort by **descending** degree.
   std::sort(ops.begin(), ops.end(), [&](Op *a, Op *b) {
@@ -786,6 +790,7 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
         new IntAttr(-offset)
       });
     } else {
+      builder.setBeforeOp(op);
       builder.create<LiOp>({
         new RdAttr(Reg::t0),
         new IntAttr(offset)

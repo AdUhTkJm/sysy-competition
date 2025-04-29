@@ -245,14 +245,18 @@ Value CodeGen::emitExpr(ASTNode *node) {
       sizes.push_back(size /= arrTy->dims[i]);
     
     Value addr;
-    if (globals.count(access->array))
-      addr = builder.create<GetGlobalOp>({
-        new NameAttr(access->array)
-      });
-    else if (symbols.count(access->array))
+    if (symbols.count(access->array))
       addr = builder.create<LoadOp>({
         symbols[access->array]
       }, { new SizeAttr(getSize(arrTy->base)) });
+    else if (globals.count(access->array))
+      addr = builder.create<GetGlobalOp>({
+        new NameAttr(access->array)
+      });
+    else {
+      std::cerr << "unknown array: " << access->array << "\n";
+      assert(false);
+    }
     for (int i = 0; i < access->indices.size(); i++) {
       auto index = emitExpr(access->indices[i]);
       auto strideVal = builder.create<IntOp>({ new IntAttr(sizes[i]) });
@@ -460,12 +464,12 @@ void CodeGen::emit(ASTNode *node) {
   if (auto assign = dyn_cast<AssignNode>(node)) {
     auto l = cast<VarRefNode>(assign->l);
     Value addr;
-    if (globals.count(l->name))
+    if (symbols.count(l->name))
+      addr = symbols[l->name];
+    else if (globals.count(l->name))
       addr = builder.create<GetGlobalOp>({
         new NameAttr(l->name)
       });
-    else if (symbols.count(l->name))
-      addr = symbols[l->name];
     else {
       std::cerr << "assign to unknown name: " << l->name << "\n";
       assert(false);
@@ -488,14 +492,18 @@ void CodeGen::emit(ASTNode *node) {
       sizes.push_back(size /= arrTy->dims[i]);
     
     Value addr;
-    if (globals.count(write->array))
-      addr = builder.create<GetGlobalOp>({
-        new NameAttr(write->array)
-      });
-    else if (symbols.count(write->array))
+    if (symbols.count(write->array))
       addr = builder.create<LoadOp>({
         symbols[write->array]
       }, { new SizeAttr(getSize(arrTy->base)) });
+    else if (globals.count(write->array))
+      addr = builder.create<GetGlobalOp>({
+        new NameAttr(write->array)
+      });
+    else {
+      std::cerr << "assign to unknown name: " << write->array << "\n";
+      assert(false);
+    }
     for (int i = 0; i < write->indices.size(); i++) {
       auto index = emitExpr(write->indices[i]);
       auto strideVal = builder.create<IntOp>({ new IntAttr(sizes[i]) });
