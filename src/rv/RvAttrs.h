@@ -44,7 +44,7 @@ namespace rv {
   X(a7)
 
 #define X(name) name,
-enum class Reg {
+enum class Reg : signed int {
   REGS
 };
 

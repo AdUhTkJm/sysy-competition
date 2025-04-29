@@ -106,8 +106,19 @@ void dumpAssignment(Region *region, const std::map<Op*, Reg> &assignment) {
   }
 }
 
-// We use a dedicated register as the "spill" register, for simplicity.
+bool hasSpilled(Op *op) {
+  if (auto rd = op->findAttr<RdAttr>(); rd && (int) rd->reg < 0)
+    return true;
+  if (auto rs = op->findAttr<RsAttr>(); rs && (int) rs->reg < 0)
+    return true;
+  if (auto rs2 = op->findAttr<Rs2Attr>(); rs2 && (int) rs2->reg < 0)
+    return true;
+  return false;
+}
+
+// We use dedicated registers as the "spill" register, for simplicity.
 static const Reg spillReg = Reg::s11;
+static const Reg spillReg2 = Reg::t6;
 
 // Order for leaf functions. Prioritize temporaries.
 static const Reg leafOrder[] = {
@@ -115,7 +126,7 @@ static const Reg leafOrder[] = {
   Reg::a4, Reg::a5, Reg::a6, Reg::a7,
 
   Reg::t0, Reg::t1, Reg::t2, Reg::t3,
-  Reg::t4, Reg::t5, Reg::t6,
+  Reg::t4, Reg::t5, // Reg::t6,
   
   Reg::s0, Reg::s1, Reg::s2, Reg::s3, 
   Reg::s4, Reg::s5, Reg::s6, Reg::s7,
@@ -128,7 +139,7 @@ static const Reg normalOrder[] = {
   Reg::s8, Reg::s9, Reg::s10, // Reg::s11,
 
   Reg::t0, Reg::t1, Reg::t2, Reg::t3,
-  Reg::t4, Reg::t5, Reg::t6,
+  Reg::t4, Reg::t5, // Reg::t6,
 
   Reg::a0, Reg::a1, Reg::a2, Reg::a3,
   Reg::a4, Reg::a5, Reg::a6, Reg::a7,
@@ -150,8 +161,8 @@ static const std::set<Reg> calleeSaved = {
   Reg::s4, Reg::s5, Reg::s6, Reg::s7,
   Reg::s8, Reg::s9, Reg::s10, Reg::s11,
 };
-constexpr int leafRegCnt = 26;
-constexpr int normalRegCnt = 26;
+constexpr int leafRegCnt = 25;
+constexpr int normalRegCnt = 25;
 
 void RegAlloc::runImpl(Region *region, bool isLeaf) {
   const Reg *order = isLeaf ? leafOrder : normalOrder;
@@ -268,6 +279,13 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     return pa == pb ? interf[a].size() > interf[b].size() : pa > pb;
   });
 
+  std::map<Op*, int> spillOffset;
+  int currentOffset = 0;
+  auto subsp = region->getFirstBlock()->getFirstOp();
+  if (isa<SubSpOp>(subsp)) {
+    currentOffset = subsp->getAttr<IntAttr>()->value;
+  }
+  
   for (auto op : ops) {
     std::set<Reg> forbidden;
     for (auto v1 : interf[op]) {
@@ -317,9 +335,16 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     if (assignment.count(op))
       continue;
 
-    // Spilled. Not handled yet.
     spilled++;
-    assert(false);
+    assignment[op] = (Reg) -(currentOffset += 8);
+  }
+
+  // Allocate more stack space for it.
+  if (isa<SubSpOp>(subsp)) {
+    subsp->getAttr<IntAttr>()->value += currentOffset + 8;
+  } else {
+    builder.setToRegionStart(region);
+    builder.create<SubSpOp>({ new IntAttr(currentOffset + 8) });
   }
   
   // dumpAssignment(region, assignment);
@@ -594,6 +619,90 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     for (auto op : bb->getOps()) {
       if (hasRd(op) && !op->hasAttr<RdAttr>())
         op->addAttr<RdAttr>(getReg(op));
+    }
+  }
+
+  // Now let's deal with spilled registers.
+  for (auto bb : region->getBlocks()) {
+    std::vector<Op*> spilling;
+    for (auto op : bb->getOps()) {
+      if (hasSpilled(op))
+        spilling.push_back(op);
+    }
+
+    for (auto op : spilling) {
+      if (auto rs = op->findAttr<RsAttr>(); rs && (int) rs->reg < 0) {
+        int offset = -(int) rs->reg;
+
+        builder.setBeforeOp(op);
+        if (offset < 2048) {
+          //   op rd, <spilled>
+          // becomes
+          //   ld s11, offset(sp)
+          //   op rd, s11
+          builder.create<LoadOp>({
+            new RdAttr(spillReg),
+            new RsAttr(Reg::sp),
+            new IntAttr(offset),
+            new SizeAttr(8)
+          });
+          rs->reg = spillReg;
+        } else {
+          // Cannot build a single load.
+          //
+          //   op rd, <spilled>
+          // becomes
+          //   addi sp, sp, -4
+          //   sd a0, 0(sp)
+          //   li a0, offset
+          //   addi a0, sp, a0
+          //   ld s11, 0(a0)
+          //   ld a0, 0(sp)
+          //   addi sp, sp, 4
+          //   op rd, s11
+          assert(false);
+        }
+      }
+
+      if (auto rs2 = op->findAttr<Rs2Attr>(); rs2 && (int) rs2->reg < 0) {
+        int offset = -(int) rs2->reg;
+
+        builder.setBeforeOp(op);
+        assert(offset < 2048);
+        if (offset < 2048) {
+          //   op rd, <spilled>
+          // becomes
+          //   ld t6, offset(sp)
+          //   op rd, t6
+          builder.create<LoadOp>({
+            new RdAttr(spillReg2),
+            new RsAttr(Reg::sp),
+            new IntAttr(offset),
+            new SizeAttr(8)
+          });
+          rs2->reg = spillReg2;
+        }
+      }
+
+      if (auto rd = op->findAttr<RdAttr>(); rd && (int) rd->reg < 0) {
+        int offset = -(int) rd->reg;
+
+        builder.setAfterOp(op);
+        assert(offset < 2048);
+        if (offset < 2048) {
+          //   op <spilled>, rs
+          // becomes
+          //   op s11, rs
+          //   sd s11, offset(sp)
+          builder.create<StoreOp>({
+            new RsAttr(spillReg),
+            new Rs2Attr(Reg::sp),
+            new IntAttr(offset),
+            new SizeAttr(8)
+          });
+          rd->reg = spillReg;
+        }
+      }
     }
   }
 }
