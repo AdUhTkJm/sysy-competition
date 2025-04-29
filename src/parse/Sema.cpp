@@ -66,7 +66,7 @@ Type *Sema::infer(ASTNode *node) {
   if (isa<FloatNode>(node))
     return node->type = ctx.create<FloatType>();
 
-  if (isa<BreakNode>(node) || isa<ContinueNode>(node))
+  if (isa<BreakNode>(node) || isa<ContinueNode>(node) || isa<EmptyNode>(node))
     return node->type = ctx.create<VoidType>();
   
   if (auto binary = dyn_cast<BinaryNode>(node)) {
@@ -147,6 +147,9 @@ Type *Sema::infer(ASTNode *node) {
   }
 
   if (auto ret = dyn_cast<ReturnNode>(node)) {
+    if (!ret->node)
+      return ctx.create<VoidType>();
+    
     auto ty = infer(ret->node);
     if (!symbols.count(ret->func)) {
       std::cerr << "cannot find symbol " << ret->func << "\n";

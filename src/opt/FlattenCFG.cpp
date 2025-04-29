@@ -97,10 +97,11 @@ void handleWhile(WhileOp *x) {
 
   // Replace all breaks and continues.
   // Note that we might encounter nested WhileOps. The breaks and continues would be naturally ignored. 
+  // Early returns should also be handled.
   for (auto bb = beforeFirst; bb != end; bb = bb->nextBlock()) {
     std::vector<Op*> disrupters;
     for (auto op : bb->getOps()) {
-      if (isa<BreakOp>(op) || isa<ContinueOp>(op))
+      if (isa<BreakOp>(op) || isa<ContinueOp>(op) || isa<ReturnOp>(op))
         disrupters.push_back(op);
     }
 
@@ -116,9 +117,10 @@ void handleWhile(WhileOp *x) {
       for (auto unused : copy)
         unused->erase();
       
-      builder.replace<GotoOp>(op, { new TargetAttr(
-        isa<BreakOp>(op) ? end : beforeFirst
-      )});
+      if (isa<BreakOp>(op))
+        builder.replace<GotoOp>(op, { new TargetAttr(end) });
+      else if (isa<ContinueOp>(op))
+        builder.replace<GotoOp>(op, { new TargetAttr(beforeFirst) });
     }
   }
 

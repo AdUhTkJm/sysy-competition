@@ -199,6 +199,7 @@ public:
 
 class BreakNode : public ASTNodeImpl<BreakNode, __LINE__> {};
 class ContinueNode : public ASTNodeImpl<ContinueNode, __LINE__> {};
+class EmptyNode : public ASTNodeImpl<EmptyNode, __LINE__> {};
 
 };
 

@@ -362,13 +362,15 @@ ASTNode *Parser::expr() {
 
 ASTNode *Parser::stmt() {
   // Consume all empty statements.
-  while (test(Token::Semicolon))
-    ;
+  if (test(Token::Semicolon))
+    return new EmptyNode();
 
   if (peek(Token::LBrace))
     return block();
 
   if (test(Token::Return)) {
+    if (test(Token::Semicolon))
+      return new ReturnNode(currentFunc, nullptr);
     auto ret = new ReturnNode(currentFunc, expr());
     expect(Token::Semicolon);
     return ret;

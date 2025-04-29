@@ -279,6 +279,9 @@ Value CodeGen::emitExpr(ASTNode *node) {
 }
 
 void CodeGen::emit(ASTNode *node) {
+  if (isa<EmptyNode>(node))
+    return;
+  
   if (auto block = dyn_cast<BlockNode>(node)) {
     SemanticScope scope(*this);
     for (auto x : block->nodes)
@@ -403,6 +406,10 @@ void CodeGen::emit(ASTNode *node) {
   }
 
   if (auto ret = dyn_cast<ReturnNode>(node)) {
+    if (!ret->node) {
+      builder.create<ReturnOp>();
+      return;
+    }
     auto value = emitExpr(ret->node);
     builder.create<ReturnOp>({ value });
     return;
