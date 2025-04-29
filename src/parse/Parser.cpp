@@ -3,7 +3,7 @@
 #include "Lexer.h"
 #include "Type.h"
 #include "TypeContext.h"
-#include <iostream>
+#include <ostream>
 #include <vector>
 
 using namespace sys;
@@ -22,6 +22,24 @@ int ConstValue::stride() {
   return stride;
 }
 
+std::ostream &operator<<(std::ostream &os, ConstValue value) {
+  auto sz = value.size();
+  auto vi = (int*) value.getRawRef();
+  os << vi[0];
+  for (int i = 1; i < sz; i++)
+    os << ", " << vi[i];
+  
+  return os;
+}
+
+std::ostream &operator<<(std::ostream &os, const std::vector<int> vec) {
+  if (vec.size() > 0)
+    os << vec[0];
+  for (int i = 1; i < vec.size(); i++)
+    os << ", " << vec[i];
+  return os;
+}
+
 ConstValue ConstValue::operator[](int i) {
   assert(dims.size() >= 1);
 
@@ -29,9 +47,9 @@ ConstValue ConstValue::operator[](int i) {
   newDims.reserve(dims.size() - 1);
 
   for (size_t i = 1; i < dims.size(); i++) 
-    newDims.push_back(i);
+    newDims.push_back(dims[i]);
   
-  return ConstValue(vi + stride(), newDims);
+  return ConstValue(vi + i * stride(), newDims);
 };
 
 int *ConstValue::getRaw() {
@@ -134,24 +152,26 @@ void *Parser::getArrayInit(const std::vector<int> &dims, bool expectFloat, bool 
   memset(vi, 0, size * (doFold ? expectFloat ? sizeof(float) : sizeof(int) : sizeof(ASTNode*)));
 
   // add 1 to `place[addAt]` when we meet the next `}`.
-  int addAt = dims.size();
+  int addAt = -1;
   do {
     if (test(Token::LBrace)) {
-      addAt--;
+      addAt++;
       continue;
     }
 
     if (test(Token::RBrace)) {
+      if (--addAt == -1)
+        break;
+
       // Bump `place[addAt]`, and set everything after it to 0.
       place[addAt]++;
       for (int i = addAt + 1; i < dims.size(); i++)
         place[i] = 0;
-      carry(place);
-
-      addAt++;
+      if (!peek(Token::RBrace))
+        carry(place);
       
       // If this `}` isn't at the end, then a `,` or `}` must follow.
-      if (addAt != dims.size() && !peek(Token::RBrace))
+      if (addAt != -1 && !peek(Token::RBrace))
         expect(Token::Comma);
       continue;
     }
@@ -166,12 +186,12 @@ void *Parser::getArrayInit(const std::vector<int> &dims, bool expectFloat, bool 
     place[place.size() - 1]++;
 
     // Automatically carry.
-    // But don't carry if the next token is `}`, because it will carry at that time.
+    // But don't carry if the next token is `}`. See official functional test 05.
     if (!peek(Token::RBrace))
       carry(place);
     if (!test(Token::Comma) && !peek(Token::RBrace))
       expect(Token::RBrace);
-  } while (addAt != dims.size());
+  } while (addAt != -1);
 
   return vi;
 }
@@ -448,14 +468,32 @@ TransparentBlockNode *Parser::varDecl(bool global) {
         init->type = ty;
       } else init = expr();
     }
+    // No initialization; all must be zero.
+    if (!init && global) {
+      if (auto arrTy = dyn_cast<ArrayType>(ty)) {
+        int size = arrTy->getSize();
+        if (isa<FloatType>(base)) {
+          float *ptr = new float[size];
+          memset(ptr, 0, sizeof(float) * size);
+          init = new ConstArrayNode(ptr);
+        } else {
+          int *ptr = new int[size];
+          memset(ptr, 0, sizeof(int) * size);
+          init = new ConstArrayNode(ptr);
+        }
+        init->type = ty;
+      } else init = new IntNode(0);
+    }
 
     auto decl = new VarDeclNode(name, init, mut, global);
     decl->type = ty;
     decls.push_back(decl);
 
     // Record in symbol table.
-    if (!mut && isa<IntType>(base))
+    if ((!mut || global) && isa<IntType>(base)) {
+      assert(init);
       symbols[name] = earlyFold(init);
+    }
 
     if (!test(Token::Comma) && !peek(Token::Semicolon))
       expect(Token::Comma);
@@ -571,17 +609,57 @@ ConstValue Parser::earlyFold(ASTNode *node) {
     }
   }
 
+  if (auto unary = dyn_cast<UnaryNode>(node)) {
+    auto v = earlyFold(unary->node).getInt();
+    switch (unary->kind) {
+    case UnaryNode::Minus:
+      return ConstValue(new int(-v), {});
+    case UnaryNode::Not:
+      return ConstValue(new int(!v), {});
+    default:
+      assert(false);
+    }
+  }
+
   if (auto lint = dyn_cast<IntNode>(node)) {
     return ConstValue(new int(lint->value), {});
   }
 
   if (auto access = dyn_cast<ArrayAccessNode>(node)) {
+    if (!symbols.count(access->array)) {
+      std::cerr << "cannot find constant: " << access->array << "\n";
+      assert(false);
+    }
     auto array = symbols[access->array];
     ConstValue v = array;
     for (auto index : access->indices)
-      v = array[earlyFold(index).getInt()];
-    
+      v = v[earlyFold(index).getInt()];
     return v;
+  }
+
+  if (auto arr = dyn_cast<ConstArrayNode>(node))
+    return ConstValue(arr->vi, cast<ArrayType>(arr->type)->dims);
+  
+  if (auto arr = dyn_cast<LocalArrayNode>(node)) {
+    // This implies that the whole LocalArray is constant. Try to fold it.
+    auto arrTy = cast<ArrayType>(arr->type);
+    bool isFloat = isa<FloatType>(arrTy->base);
+    if (isFloat) {
+      assert(false);
+    } else {
+      int size = arrTy->getSize();
+      int *result = new int[size];
+      for (int i = 0; i < size; i++) {
+        auto node = arr->va[i];
+        if (!node) {
+          result[i] = 0;
+          continue;
+        }
+
+        result[i] = earlyFold(node).getInt();
+      }
+      return ConstValue(result, arrTy->dims);
+    }
   }
 
   std::cerr << "not constexpr: " << node->getID() << "\n";
@@ -603,9 +681,6 @@ ASTNode *Parser::parse() {
     if (tok.type == Token::Ident)
       delete[] tok.vs;
   }
-
-  for (auto [name, constVal] : symbols)
-    constVal.release();
 
   return unit;
 }
