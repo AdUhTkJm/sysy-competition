@@ -210,6 +210,10 @@ Value CodeGen::emitExpr(ASTNode *node) {
         auto addr = builder.create<GetGlobalOp>({
           new NameAttr(ref->name)
         });
+        // No extra indirection for global arrays.
+        if (isa<ArrayType>(ref->type) || isa<PointerType>(ref->type))
+          return addr;
+
         return builder.create<LoadOp>({ addr }, {
           new SizeAttr(getSize(ref->type))
         });
