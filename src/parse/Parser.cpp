@@ -456,8 +456,8 @@ TransparentBlockNode *Parser::varDecl(bool global) {
 
     ASTNode *init = nullptr;
     if (test(Token::Assign)) {
+      bool isFloat = isa<FloatType>(base);
       if (isa<ArrayType>(ty)) {
-        bool isFloat = isa<FloatType>(base);
         auto arrayInit = getArrayInit(dims, isFloat, global);
         init = !global
           ? (ASTNode*) new LocalArrayNode((ASTNode **) arrayInit)
@@ -468,7 +468,13 @@ TransparentBlockNode *Parser::varDecl(bool global) {
         // We can never infer the real type of ConstArrayNode in Sema.
         // Must place it here.
         init->type = ty;
-      } else init = expr();
+      } else {
+        init = expr();
+        if (global)
+          init = !isFloat
+            ? (ASTNode*) new IntNode(earlyFold(init).getInt())
+            : new FloatNode(earlyFold(init).getFloat());
+      }
     }
     // No initialization; all must be zero.
     if (!init && global) {

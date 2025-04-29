@@ -130,6 +130,16 @@ void Mem2Reg::fillPhi(BasicBlock *bb, BasicBlock *last) {
       }
       
       auto value = symbols[alloca];
+      // `value` might not be the ground truth value; Consider:
+      //   %1 = load %alloca0
+      //   store %1, %alloca1
+      // In this case we actually want the value in `alloca0`.
+      auto def = value.defining;
+      while (isa<LoadOp>(def) && converted.count(def->getOperand().defining)) {
+        def = symbols[def->getOperand().defining].defining;
+      }
+      value.defining = def;
+      
       loads.push_back(std::make_pair(load, value));
     }
     

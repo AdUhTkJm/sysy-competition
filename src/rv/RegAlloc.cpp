@@ -340,11 +340,13 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   }
 
   // Allocate more stack space for it.
-  if (isa<SubSpOp>(subsp)) {
-    subsp->getAttr<IntAttr>()->value += currentOffset + 8;
-  } else {
-    builder.setToRegionStart(region);
-    builder.create<SubSpOp>({ new IntAttr(currentOffset + 8) });
+  if (currentOffset != 0) {
+    if (isa<SubSpOp>(subsp)) {
+      subsp->getAttr<IntAttr>()->value += currentOffset + 8;
+    } else {
+      builder.setToRegionStart(region);
+      builder.create<SubSpOp>({ new IntAttr(currentOffset + 8) });
+    }
   }
   
   // dumpAssignment(region, assignment);
@@ -646,49 +648,70 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
             new IntAttr(offset),
             new SizeAttr(8)
           });
-          rs->reg = spillReg;
         } else {
           // Cannot build a single load.
           //
           //   op rd, <spilled>
           // becomes
-          //   addi sp, sp, -4
-          //   sd a0, 0(sp)
-          //   li a0, offset
-          //   addi a0, sp, a0
-          //   ld s11, 0(a0)
-          //   ld a0, 0(sp)
-          //   addi sp, sp, 4
+          //   li s11, offset
+          //   add s11, s11, sp
+          //   ld s11, 0(s11)
           //   op rd, s11
-          assert(false);
+          builder.create<LiOp>({
+            new RdAttr(spillReg),
+            new IntAttr(offset)
+          });
+          builder.create<AddOp>({
+            new RdAttr(spillReg),
+            new RsAttr(spillReg),
+            new Rs2Attr(Reg::sp)
+          });
+          builder.create<LoadOp>({
+            new RdAttr(spillReg),
+            new RsAttr(spillReg),
+            new IntAttr(0),
+            new SizeAttr(8)
+          });
         }
+        rs->reg = spillReg;
       }
 
       if (auto rs2 = op->findAttr<Rs2Attr>(); rs2 && (int) rs2->reg < 0) {
         int offset = -(int) rs2->reg;
 
         builder.setBeforeOp(op);
-        assert(offset < 2048);
+        // Similar to the sequence above.
         if (offset < 2048) {
-          //   op rd, <spilled>
-          // becomes
-          //   ld t6, offset(sp)
-          //   op rd, t6
           builder.create<LoadOp>({
             new RdAttr(spillReg2),
             new RsAttr(Reg::sp),
             new IntAttr(offset),
             new SizeAttr(8)
           });
-          rs2->reg = spillReg2;
+        } else {
+          builder.create<LiOp>({
+            new RdAttr(spillReg2),
+            new IntAttr(offset)
+          });
+          builder.create<AddOp>({
+            new RdAttr(spillReg2),
+            new RsAttr(spillReg2),
+            new Rs2Attr(Reg::sp)
+          });
+          builder.create<LoadOp>({
+            new RdAttr(spillReg2),
+            new RsAttr(spillReg2),
+            new IntAttr(0),
+            new SizeAttr(8)
+          });
         }
+        rs2->reg = spillReg2;
       }
 
       if (auto rd = op->findAttr<RdAttr>(); rd && (int) rd->reg < 0) {
         int offset = -(int) rd->reg;
 
         builder.setAfterOp(op);
-        assert(offset < 2048);
         if (offset < 2048) {
           //   op <spilled>, rs
           // becomes
@@ -700,8 +723,33 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
             new IntAttr(offset),
             new SizeAttr(8)
           });
-          rd->reg = spillReg;
+        } else {
+          // Note that we can't tamper spillReg this time,
+          // but we still have spillReg2.
+          //
+          //   op <spilled>, rs
+          // becomes
+          //   op s11, rs
+          //   li t6, offset
+          //   addi t6, t6, sp
+          //   sd s11, 0(t6)
+          builder.create<LiOp>({
+            new RdAttr(spillReg2),
+            new IntAttr(offset)
+          });
+          builder.create<AddOp>({
+            new RdAttr(spillReg2),
+            new RsAttr(spillReg2),
+            new Rs2Attr(Reg::sp)
+          });
+          builder.create<StoreOp>({
+            new RsAttr(spillReg),
+            new Rs2Attr(spillReg2),
+            new IntAttr(0),
+            new SizeAttr(8)
+          });
         }
+        rd->reg = spillReg;
       }
     }
   }
@@ -776,23 +824,67 @@ void RegAlloc::tidyup(Region *region) {
 
 void save(Builder builder, const std::vector<Reg> &regs, int offset) {
   for (auto reg : regs) {
-    builder.create<sys::rv::StoreOp>({
-      /*value=*/new RsAttr(reg),
-      /*addr=*/new Rs2Attr(Reg::sp),
-      /*offset=*/new IntAttr(offset -= 8),
-      /*size=*/new SizeAttr(8)
-    });
+    offset -= 8;
+    if (offset < 2048) {
+      builder.create<sys::rv::StoreOp>({
+        /*value=*/new RsAttr(reg),
+        /*addr=*/new Rs2Attr(Reg::sp),
+        /*offset=*/new IntAttr(offset),
+        /*size=*/new SizeAttr(8)
+      });
+    } else {
+      // li s11, offset
+      // addi s11, s11, sp
+      // sd reg, 0(s11)
+      builder.create<LiOp>({
+        new RdAttr(spillReg),
+        new IntAttr(offset)
+      });
+      builder.create<AddOp>({
+        new RdAttr(spillReg),
+        new RsAttr(spillReg),
+        new Rs2Attr(Reg::sp)
+      });
+      builder.create<sys::rv::StoreOp>({
+        new RsAttr(reg),
+        new Rs2Attr(spillReg),
+        new IntAttr(0),
+        new SizeAttr(8)
+      });
+    }
   }
 }
 
 void load(Builder builder, const std::vector<Reg> &regs, int offset) {
   for (auto reg : regs) {
-    builder.create<sys::rv::LoadOp>({
-      /*value=*/new RdAttr(reg),
-      /*addr=*/new RsAttr(Reg::sp),
-      /*offset=*/new IntAttr(offset -= 8),
-      /*size=*/new SizeAttr(8)
-    });
+    offset -= 8;
+    if (offset < 2048) {
+      builder.create<sys::rv::LoadOp>({
+        /*value=*/new RdAttr(reg),
+        /*addr=*/new RsAttr(Reg::sp),
+        /*offset=*/new IntAttr(offset),
+        /*size=*/new SizeAttr(8)
+      });
+    } else {
+      // li s11, offset
+      // addi s11, s11, sp
+      // ld reg, 0(s11)
+      builder.create<LiOp>({
+        new RdAttr(spillReg),
+        new IntAttr(offset)
+      });
+      builder.create<AddOp>({
+        new RdAttr(spillReg),
+        new RsAttr(spillReg),
+        new Rs2Attr(Reg::sp)
+      });
+      builder.create<sys::rv::LoadOp>({
+        new RdAttr(reg),
+        new RsAttr(spillReg),
+        new IntAttr(0),
+        new SizeAttr(8)
+      });
+    }
   }
 }
 

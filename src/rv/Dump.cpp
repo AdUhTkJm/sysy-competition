@@ -132,6 +132,7 @@ void Dump::dump(std::ostream &os) {
         dumpOp(op, os);
       }
     }
+    os << "\n\n";
   }
 
   auto globals = module->findAll<GlobalOp>();
