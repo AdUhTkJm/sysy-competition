@@ -96,7 +96,7 @@ public:
 
   ArgCountAttr(int count): count(count) {}
 
-  std::string toString() { return "<" + std::to_string(count) + ">"; }
+  std::string toString() { return "<count = " + std::to_string(count) + ">"; }
 };
 
 }

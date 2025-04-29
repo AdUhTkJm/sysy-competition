@@ -225,15 +225,6 @@ void Lower::run() {
     return true;
   });
 
-  runRewriter([&](GetArgOp *op) {
-    auto value = op->getAttr<IntAttr>()->value;
-    // TODO: spilling
-    assert(value < 8);
-
-    builder.replace<ReadRegOp>(op, { new RegAttr(regs[value]) });
-    return true;
-  });
-
   auto funcs = module->findAll<FuncOp>();
   for (auto func : funcs)
     rewriteAlloca(func);

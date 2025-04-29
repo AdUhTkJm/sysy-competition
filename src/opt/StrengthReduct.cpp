@@ -109,6 +109,7 @@ void StrengthReduct::run() {
     for (int place = 0; place < 31; place++) {
       if (__builtin_popcount(i + (1 << place)) == 1) {
         converted++;
+        builder.setBeforeOp(op);
         Op *lowerBits;
         if (place == 0) // Multiplying by 1
           lowerBits = x.defining;

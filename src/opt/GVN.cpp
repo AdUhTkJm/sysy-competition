@@ -26,7 +26,9 @@ bool GVN::Expr::operator<(const Expr &other) const {
 
 #define ALLOW(Ty) || isa<Ty>(op)
 bool allowed(Op *op) {
-  return isa<AddIOp>(op)
+  return
+    (isa<CallOp>(op) && !op->hasAttr<ImpureAttr>())
+    ALLOW(AddIOp)
     ALLOW(SubIOp)
     ALLOW(MulIOp)
     ALLOW(DivIOp)

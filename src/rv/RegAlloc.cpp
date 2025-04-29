@@ -186,6 +186,36 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     return false;
   });
 
+  // Similarly, add placeholders around each GetArg.
+  runRewriter([&](GetArgOp *op) {
+    auto value = op->getAttr<IntAttr>()->value;
+    // TODO: spilling
+    assert(value < 8);
+    
+    // The i'th argument cannot take registers from argReg[i + 1] ~ argReeg[argcnt - 1].
+    // So we do it like (take `a0` as example):
+    //   %0 = placeholder [a1]
+    //   %1 = placeholder [a2]
+    //   %ARG = getarg <0>
+    //   placeholder %0, %1
+    // This prevents %ARG being allocated a1 or a2, but doesn't affect any other ops.
+
+    builder.setBeforeOp(op);
+    int argcnt = funcOp->getAttr<ArgCountAttr>()->count;
+    std::vector<Value> holders;
+    for (int i = value + 1; i < std::min(argcnt, 8); i++) {
+      auto placeholder = builder.create<PlaceHolderOp>();
+      assignment[placeholder] = argRegs[i];
+      holders.push_back(placeholder);
+    }
+
+    builder.setAfterOp(op);
+    builder.create<PlaceHolderOp>(holders);
+
+    builder.replace<ReadRegOp>(op, { new RegAttr(argRegs[value]) });
+    return true;
+  });
+
   region->updateLiveness();
 
   // Interference graph.
@@ -404,10 +434,11 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   });
 
   // Remove placeholders inserted previously.
-  runRewriter(funcOp, [&](PlaceHolderOp *op) {
-    op->erase();
-    return true;
-  });
+  auto holders = funcOp->findAll<PlaceHolderOp>();
+  for (auto holder : holders)
+    holder->removeAllOperands();
+  for (auto holder : holders)
+    holder->erase();
 
   //   writereg %1, <reg = a0>
   // becomes
