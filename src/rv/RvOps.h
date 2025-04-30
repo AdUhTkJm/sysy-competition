@@ -51,6 +51,9 @@ RVOPL(SraiOp); // Shift right (64 bit), signed.
 RVOP(SraiwOp); // Shift right, signed.
 RVOP(MulhOp); // Higher bits of mul, signed.
 RVOP(MulhuOp); // Higher bits of mul, unsigned.
+RVOP(AndOp);
+RVOP(OrOp);
+RVOP(XorOp);
 RVOP(BneOp);
 RVOP(BeqOp);
 RVOP(BltOp);
@@ -59,7 +62,6 @@ RVOP(SeqzOp); // Set equal to zero (pseudo, = sltiu)
 RVOP(SnezOp); // Set not equal to zero (pseudo, 2 ops)
 RVOP(SltOp); // Set less than
 RVOP(SltiOp);
-RVOP(XorOp);
 RVOP(JOp);
 RVOP(MvOp);
 RVOP(RetOp);
@@ -98,6 +100,8 @@ inline bool hasRd(Op *op) {
     isa<MulhOp>(op) ||
     isa<MulhuOp>(op) ||
     isa<LaOp>(op) ||
+    isa<AndOp>(op) ||
+    isa<OrOp>(op) ||
     isa<XorOp>(op);
 }
 

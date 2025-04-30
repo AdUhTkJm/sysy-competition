@@ -56,13 +56,16 @@ Op::Op(int id, Value::Type resultTy, const std::vector<Value> &values):
 }
 
 Op::Op(int id, Value::Type resultTy, const std::vector<Value> &values, const std::vector<Attr*> &attrs):
-  id(id), resultTy(resultTy), attrs(attrs) {
+  id(id), resultTy(resultTy) {
   for (auto x : values) {
     operands.push_back(x);
     x.defining->uses.insert(this);
   }
-  for (auto attr : attrs)
-    attr->refcnt++;
+  for (auto attr : attrs) {
+    auto cloned = attr->clone();
+    this->attrs.push_back(cloned);
+    cloned->refcnt++;
+  }
 }
 
 void indent(std::ostream &os, int n) {

@@ -22,6 +22,7 @@ parser.add_argument("-d", "--directory", type=str)
 parser.add_argument("--timeout", type=float, default=0.5)
 parser.add_argument("--asm", type=str)
 parser.add_argument("-t", "--test", type=str)
+parser.add_argument("-i", "--input", type=str) # Input to the executable
 
 args = parser.parse_args()
 
@@ -155,7 +156,10 @@ def run_asm(file: str):
 
   # Run the file.
   qemu = "qemu-aarch64-static" if args.arm else "qemu-riscv64-static"
-  return proc.run([qemu, f"temp/{basename}"])
+  if args.input:
+    with open(args.input, "r") as f:
+      buffer = f.read().encode('utf-8')
+  return proc.run([qemu, f"temp/{basename}"], input=buffer if args.input else None)
 
 def run(full_file: str, no_exec: bool):
   basename = os.path.splitext(os.path.basename(full_file))[0]

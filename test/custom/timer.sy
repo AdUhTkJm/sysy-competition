@@ -1,0 +1,21 @@
+int loop() {
+  int i = 0;
+  int total = 0;
+  while (i < 1000000) {
+    if (i % 2 == 0)
+      total = total + i;
+    else
+      total = total - i;
+    i = i + 1;
+  }
+  return total;
+}
+
+int main() {
+  int val;
+  starttime();
+  val = loop();
+  stoptime();
+  putint(val);
+  return 0;
+}

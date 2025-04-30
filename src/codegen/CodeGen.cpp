@@ -245,8 +245,15 @@ Value CodeGen::emitExpr(ASTNode *node) {
     std::vector<Value> args;
     for (auto arg : call->args)
       args.push_back(emitExpr(arg));
+
+    // Note that "starttime" and "stoptime" are actually "_sysy_{start,stop}time".
+    auto name = call->func;
+    if (name == "starttime")
+      name = "_sysy_starttime";
+    if (name == "stoptime")
+      name = "_sysy_stoptime";
     auto callOp = builder.create<CallOp>(args, {
-      new NameAttr(call->func),
+      new NameAttr(name),
     });
     return callOp;
   }

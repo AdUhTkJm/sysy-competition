@@ -375,6 +375,8 @@ Sema::Sema(ASTNode *node, TypeContext &ctx): ctx(ctx) {
     { "putfloat", ctx.create<FunctionType>(voidTy, Args { floatTy }) },
     { "putarray", ctx.create<FunctionType>(voidTy, Args { intTy, intPtrTy }) },
     { "putfarray", ctx.create<FunctionType>(voidTy, Args { intTy, floatPtrTy }) },
+    { "starttime", ctx.create<FunctionType>(voidTy, empty) },
+    { "stoptime", ctx.create<FunctionType>(voidTy, empty) },
   };
 
   infer(node);

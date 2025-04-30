@@ -109,7 +109,9 @@ public:
 };
 
 class StrengthReduct : public Pass {
-  int converted = 0;
+  int convertedTotal = 0;
+
+  int runImpl();
 public:
   StrengthReduct(ModuleOp *module): Pass(module) {}
     

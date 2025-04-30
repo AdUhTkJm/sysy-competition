@@ -86,6 +86,9 @@ void Lower::run() {
   REPLACE(GetGlobalOp, LaOp);
   REPLACE(NotOp, SeqzOp);
   REPLACE(SetNotZeroOp, SnezOp);
+  REPLACE(AndIOp, AndOp);
+  REPLACE(OrIOp, OrOp);
+  REPLACE(XorIOp, XorOp);
 
   runRewriter([&](MinusOp *op) {
     auto value = op->getOperand();

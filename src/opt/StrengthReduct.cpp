@@ -6,7 +6,7 @@ using namespace sys;
 
 std::map<std::string, int> StrengthReduct::stats() {
   return {
-    { "converted-ops", converted }
+    { "converted-ops", convertedTotal }
   };
 }
 
@@ -37,8 +37,10 @@ Multiplier chooseMultiplier(int d) {
   return { shPost, mHigh, l };
 }
 
-void StrengthReduct::run() {
+int StrengthReduct::runImpl() {
   Builder builder;
+
+  int converted = 0;
   
   // ===================
   // Rewrite MulOp.
@@ -50,6 +52,7 @@ void StrengthReduct::run() {
 
     // Const fold if possible.
     if (isa<IntOp>(x.defining) && isa<IntOp>(y.defining)) {
+      converted++;
       auto vx = x.defining->getAttr<IntAttr>()->value;
       auto vy = y.defining->getAttr<IntAttr>()->value;
       builder.replace<IntOp>(op, { new IntAttr(vx * vy) });
@@ -138,15 +141,10 @@ void StrengthReduct::run() {
 
     // Const fold if possible.
     if (isa<IntOp>(x.defining) && isa<IntOp>(y.defining)) {
+      converted++;
       auto vx = x.defining->getAttr<IntAttr>()->value;
       auto vy = y.defining->getAttr<IntAttr>()->value;
       builder.replace<IntOp>(op, { new IntAttr(vx / vy) });
-      return true;
-    }
-
-    // Canonicalize.
-    if (isa<IntOp>(x.defining) && !isa<IntOp>(y.defining)) {
-      builder.replace<DivIOp>(op, { y, x });
       return true;
     }
 
@@ -178,6 +176,7 @@ void StrengthReduct::run() {
     // See https://gmplib.org/~tege/divcnst-pldi94.pdf,
     // Section 5.
     // For signed integer, we know that N = 31.
+    converted++;
     auto [shPost, m, l] = chooseMultiplier(i);
     auto n = x.defining;
     builder.setBeforeOp(op);
@@ -207,4 +206,64 @@ void StrengthReduct::run() {
 
     return false;
   });
+
+  // ===================
+  // Rewrite ModOp.
+  // ===================
+
+  runRewriter([&](ModIOp *op) {
+    auto x = op->getOperand(0);
+    auto y = op->getOperand(1);
+
+    // Const fold if possible.
+    if (isa<IntOp>(x.defining) && isa<IntOp>(y.defining)) {
+      auto vx = x.defining->getAttr<IntAttr>()->value;
+      auto vy = y.defining->getAttr<IntAttr>()->value;
+      builder.replace<IntOp>(op, { new IntAttr(vx % vy) });
+      return true;
+    }
+
+    if (!isa<IntOp>(y.defining))
+      return false;
+
+    int i = y.defining->getAttr<IntAttr>()->value;
+
+    if (i < 0)
+      return false;
+
+    //   x % (1 << n)
+    // becomes
+    //   x & ((1 << n) - 1)
+    if (__builtin_popcount(i) == 1) {
+      converted++;
+      builder.setBeforeOp(op);
+      auto value = builder.create<IntOp>({ new IntAttr(i - 1) });
+      builder.replace<AndIOp>(op, { x, value });
+      return true;
+    }
+
+    // Replace with div-mul-sub.
+    //   x % y
+    // becomes
+    //   %quot = x / y
+    //   %mul = %quot * y
+    //   x - %mul
+    converted++;
+    builder.setBeforeOp(op);
+    auto quot = builder.create<DivIOp>(op->getOperands(), op->getAttrs());
+    auto mul = builder.create<MulIOp>({ quot, y });
+    builder.replace<SubIOp>(op, { x, mul });
+
+    return false;
+  });
+
+  return converted;
+}
+
+void StrengthReduct::run() {
+  int converted;
+  do {
+    converted = runImpl();
+    convertedTotal += converted;
+  } while (converted);
 }
