@@ -8,54 +8,12 @@
 #include <iterator>
 #include <map>
 #include <iostream>
-#include <sstream>
 #include <string>
 
 using namespace sys;
 
 std::map<BasicBlock*, int> sys::bbmap;
 int sys::bbid = 0;
-
-std::string TargetAttr::toString() {
-  if (!bbmap.count(bb))
-    bbmap[bb] = bbid++;
-  return "<bb" + std::to_string(bbmap[bb]) + ">";
-}
-
-std::string ElseAttr::toString() {
-  if (!bbmap.count(bb))
-    bbmap[bb] = bbid++;
-  return "<else = bb" + std::to_string(bbmap[bb]) + ">";
-}
-
-std::string FromAttr::toString() {
-  if (!bbmap.count(bb))
-    bbmap[bb] = bbid++;
-  return "<from = bb" + std::to_string(bbmap[bb]) + ">";
-}
-
-IntArrayAttr::IntArrayAttr(int *vi, int size): vi(vi), size(size), allZero(true) {
-  for (int i = 0; i < size; i++) {
-    if (vi[i] != 0) {
-      allZero = false;
-      break;
-    }
-  }
-}
-
-std::string IntArrayAttr::toString() {
-  if (allZero)
-    return "<array = 0 x " + std::to_string(size) + ">";
-  
-  std::stringstream ss;
-  ss << "<array = ";
-  if (size > 0)
-    ss << vi[0];
-  for (int i = 1; i < size; i++)
-    ss << ", " << vi[i];
-  ss << ">";
-  return ss.str();
-}
 
 void BasicBlock::insert(iterator at, Op *op) {
   op->parent = this;

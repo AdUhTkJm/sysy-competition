@@ -238,7 +238,7 @@ void FlattenCFG::run() {
   //    1) all basic blocks must have a terminator;
   //    2) empty basic blocks are eliminated;
   //    3) calculate `pred`.
-  auto functions = module->findAll<FuncOp>();
+  auto functions = collectFuncs();
   for (auto x : functions)
     tidy(x);
 }

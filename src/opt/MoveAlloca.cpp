@@ -3,7 +3,7 @@
 using namespace sys;
 
 void MoveAlloca::run() {
-  auto funcs = module->findAll<FuncOp>();
+  auto funcs = collectFuncs();
   
   for (auto func : funcs) {
     auto allocas = func->findAll<AllocaOp>();

@@ -100,6 +100,20 @@ public:
   std::string toString() { return "<count = " + std::to_string(count) + ">"; }
 };
 
+class CallerAttr : public AttrImpl<CallerAttr, __LINE__> {
+public:
+  // The functions in `callers` actually calls the function with this attribute.
+  // For example,
+  //    func <name = f> <caller = g, h>
+  // means `f` is called by `g` and `h`.
+  std::vector<std::string> callers;
+
+  CallerAttr(const std::vector<std::string> &callers): callers(callers) {}
+  CallerAttr() {}
+
+  std::string toString();
+};
+
 }
 
 #endif

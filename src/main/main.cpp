@@ -32,6 +32,8 @@ void initPipeline(sys::PassManager &pm) {
 
   // ===== Structured control flow =====
 
+  pm.addPass<sys::CallGraph>();
+  pm.addPass<sys::Inline>(/*inlineThreshold=*/50);
   pm.addPass<sys::StrengthReduct>();
   pm.addPass<sys::Pureness>();
   pm.addPass<sys::DCE>();

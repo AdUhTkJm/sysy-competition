@@ -3,7 +3,7 @@
 using namespace sys;
 
 void ImplicitReturn::run() {
-  auto funcs = module->findAll<FuncOp>();
+  auto funcs = collectFuncs();
   for (auto func : funcs) {
     auto region = func->getRegion();
     auto bb = region->getLastBlock();

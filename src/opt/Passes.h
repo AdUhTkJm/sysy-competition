@@ -115,7 +115,6 @@ public:
 class GVN : public Pass {
   int elim = 0;
 
-  void runImpl(Region *region);
   using SymbolTable = std::unordered_map<Op*, int>;
   using Domtree = std::map<BasicBlock*, std::vector<BasicBlock*>>;
 
@@ -159,6 +158,30 @@ public:
   GVN(ModuleOp *module): Pass(module) {}
     
   std::string name() { return "global-value-numbering"; };
+  std::map<std::string, int> stats();
+  void run();
+  void runImpl(Region *region);
+};
+
+// Puts CallerAttr to each function.
+class CallGraph : public Pass {
+public:
+  CallGraph(ModuleOp *module): Pass(module) {}
+    
+  std::string name() { return "call-graph"; };
+  std::map<std::string, int> stats() { return {}; }
+  void run();
+};
+
+class Inline : public Pass {
+  int inlined = 0;
+
+  // Do not inline functions with Op count > `threshold`.
+  int threshold;
+public:
+  Inline(ModuleOp *module, int threshold): Pass(module), threshold(threshold) {}
+    
+  std::string name() { return "inline"; };
   std::map<std::string, int> stats();
   void run();
 };

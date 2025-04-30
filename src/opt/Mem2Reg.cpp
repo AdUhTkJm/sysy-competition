@@ -184,7 +184,7 @@ void Mem2Reg::fillPhi(BasicBlock *bb, BasicBlock *last) {
 }
 
 void Mem2Reg::run() {
-  auto funcs = module->findAll<FuncOp>();
+  auto funcs = collectFuncs();
   for (auto func : funcs)
     runImpl(func);
 }

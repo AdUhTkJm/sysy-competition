@@ -45,7 +45,7 @@ void RvDCE::runOnRegion(Region *region) {
 }
 
 void RvDCE::run() {
-  auto funcs = module->findAll<FuncOp>();
+  auto funcs = collectFuncs();
 
   do {
     removeable.clear();

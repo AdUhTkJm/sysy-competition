@@ -169,7 +169,7 @@ void GVN::runImpl(Region *region) {
 
 void GVN::run() {
   // module->dump(std::cerr);
-  auto funcs = module->findAll<FuncOp>();
+  auto funcs = collectFuncs();
   for (auto func : funcs)
     runImpl(func->getRegion());
 }

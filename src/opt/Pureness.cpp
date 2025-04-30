@@ -62,7 +62,7 @@ void Pureness::predetermineImpure(FuncOp *func) {
 }
 
 void Pureness::run() {
-  auto funcs = module->findAll<FuncOp>();
+  auto funcs = collectFuncs();
 
   // Note that predetermineImpure() assumes to operate **before** Mem2Reg,
   // and any further transformation should preserve function pureness.

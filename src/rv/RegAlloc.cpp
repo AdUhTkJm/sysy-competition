@@ -1038,7 +1038,7 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
 }
 
 void RegAlloc::run() {
-  auto funcs = module->findAll<FuncOp>();
+  auto funcs = collectFuncs();
   std::set<FuncOp*> leaves;
 
   for (auto func : funcs) {

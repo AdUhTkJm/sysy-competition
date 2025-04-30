@@ -43,6 +43,16 @@ PassManager::~PassManager() {
     delete pass;
 }
 
+std::vector<FuncOp*> Pass::collectFuncs() {
+  std::vector<FuncOp*> result;
+  auto toplevel = module->getRegion()->getFirstBlock()->getOps();
+  for (auto op : toplevel) {
+    if (auto fn = dyn_cast<FuncOp>(op))
+      result.push_back(fn);
+  }
+  return result;
+}
+
 void PassManager::setVerbose(bool verbose) {
   this->verbose = verbose;
 }
