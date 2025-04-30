@@ -196,6 +196,16 @@ public:
   void run();
 };
 
+// Folds before flattening CFG.
+class EarlyConstFold : public Pass {
+public:
+  EarlyConstFold(ModuleOp *module): Pass(module) {}
+    
+  std::string name() { return "early-const-fold"; };
+  std::map<std::string, int> stats() { return {}; }
+  void run();
+};
+
 }
 
 #endif

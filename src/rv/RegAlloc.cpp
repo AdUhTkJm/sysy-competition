@@ -12,7 +12,8 @@ using namespace sys::rv;
 
 std::map<std::string, int> RegAlloc::stats() {
   return {
-    { "spilled", spilled }
+    { "spilled", spilled },
+    { "peepholed", convertedTotal },
   };
 }
 
@@ -82,6 +83,11 @@ std::map<std::string, int> RegAlloc::stats() {
 #define END_REPLACE \
   op->removeAttr<ElseAttr>(); \
   return true
+
+#define RD(op) (op)->getAttr<RdAttr>()->reg
+#define RS(op) (op)->getAttr<RsAttr>()->reg
+#define RS2(op) (op)->getAttr<Rs2Attr>()->reg
+#define IMM(op) (op)->getAttr<IntAttr>()->value
 
 // In OpBase.cpp
 std::ostream &operator<<(std::ostream &os, Value value);
@@ -569,8 +575,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     std::set<Reg> dsts;
 
     for (auto mv : moves) {
-      auto src = mv->getAttr<RdAttr>()->reg;
-      auto dst = mv->getAttr<RsAttr>()->reg;
+      auto src = RD(mv);
+      auto dst = RS(mv);
       moveMap[src] = dst;
       moveOpMap[std::pair {src, dst}] = mv;
       srcs.insert(src);
@@ -586,8 +592,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
     // Detect cycles.
     for (auto mv : moves) {
-      auto src = mv->getAttr<RdAttr>()->reg;
-      auto dst = mv->getAttr<RsAttr>()->reg;
+      auto src = RD(mv);
+      auto dst = RS(mv);
       if (visited.count(src))
         continue;
 
@@ -788,11 +794,56 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   }
 }
 
+int RegAlloc::latePeephole(Op *funcOp) {
+  Builder builder;
+
+  int converted = 0;
+
+  //   sw a0, N(addr)
+  //   lw a1, N(addr)
+  // becomes
+  //   sw a0, N(addr)
+  //   mv a1, a0
+  runRewriter(funcOp, [&](StoreOp *op) {
+    if (op == op->getParent()->getLastOp() || !isa<LoadOp>(op->nextOp()))
+      return false;
+
+    auto load = op->nextOp();
+    if (RS(load) == RS2(op) && IMM(load) == IMM(op) && load->getAttr<SizeAttr>()->value == op->getAttr<SizeAttr>()->value) {
+      converted++;
+      builder.replace<MvOp>(load, {
+        new RdAttr(RD(load)),
+        new RsAttr(RS(op))
+      });
+      return true;
+    }
+
+    return false;
+  });
+
+  // Eliminate useless MvOp.
+  runRewriter(funcOp, [&](MvOp *op) {
+    if (RD(op) == RS(op)) {
+      converted++;
+      op->erase();
+      return true;
+    }
+    return false;
+  });
+
+  return converted;
+}
+
 void RegAlloc::tidyup(Region *region) {
   Builder builder;
   auto funcOp = region->getParent();
   region->updatePreds();
 
+  int converted;
+  do {
+    converted = latePeephole(funcOp);
+    convertedTotal += converted;
+  } while (converted);
   // Replace blocks with only a single `j` as terminator.
   std::map<BasicBlock*, BasicBlock*> jumpTo;
   for (auto bb : region->getBlocks()) {
@@ -845,15 +896,6 @@ void RegAlloc::tidyup(Region *region) {
       return false;
 
     if (me->nextBlock() == target) {
-      op->erase();
-      return true;
-    }
-    return false;
-  });
-
-  // Eliminate useless MvOp.
-  runRewriter(funcOp, [&](MvOp *op) {
-    if (op->getAttr<RdAttr>()->reg == op->getAttr<RsAttr>()->reg) {
       op->erase();
       return true;
     }

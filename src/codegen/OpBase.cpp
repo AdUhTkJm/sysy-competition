@@ -65,6 +65,8 @@ Op::Op(int id, Value::Type resultTy, const std::vector<Value> &values, const std
     auto cloned = attr->clone();
     this->attrs.push_back(cloned);
     cloned->refcnt++;
+    if (!attr->refcnt)
+      delete attr;
   }
 }
 

@@ -32,6 +32,7 @@ void initPipeline(sys::PassManager &pm) {
 
   // ===== Structured control flow =====
 
+  pm.addPass<sys::EarlyConstFold>();
   pm.addPass<sys::StrengthReduct>();
   pm.addPass<sys::Pureness>();
   pm.addPass<sys::DCE>(/*elimBlocks=*/ false);
