@@ -200,9 +200,28 @@ void tidy(FuncOp *func) {
   // Recalculate preds after change.
   body->updatePreds();
 
-  // Remove empty blocks.
+  // Remove inlined blocks.
   for (auto [k, v] : inliner)
     k->erase();
+  
+  body->updatePreds();
+
+  // If the (newly produced) first block has any preds, then make a new entry block,
+  // and move the real "entry ops" (alloca and getarg) to that block.
+  if (body->getFirstBlock()->getPreds().size() >= 1) {
+    auto first = body->getFirstBlock();
+    auto entry = body->insert(first);
+    auto ops = first->getOps();
+    for (auto op : ops) {
+      if (isa<AllocaOp>(op) || isa<GetArgOp>(op))
+        op->moveToEnd(entry);
+    }
+    // Supply a terminator.
+    builder.setToBlockEnd(entry);
+    builder.create<GotoOp>({ new TargetAttr(first) });
+  }
+
+  body->updatePreds();
 }
 
 void FlattenCFG::run() {

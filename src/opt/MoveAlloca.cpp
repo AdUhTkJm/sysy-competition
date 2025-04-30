@@ -11,6 +11,5 @@ void MoveAlloca::run() {
     auto begin = region->insert(region->getFirstBlock());
     for (auto alloca : allocas)
       alloca->moveToEnd( begin);
-    
   }
 }
