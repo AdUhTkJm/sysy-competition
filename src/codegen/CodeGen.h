@@ -95,6 +95,9 @@ public:
     op->erase();
     return opnew;
   }
+
+  // This shallow-copies operands, but deep copies attributes.
+  Op *copy(Op *op);
 };
 
 class CodeGen {

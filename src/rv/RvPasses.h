@@ -47,6 +47,7 @@ class RegAlloc : public Pass {
   int spilled = 0;
 
   std::map<FuncOp*, std::set<Reg>> usedRegisters;
+  std::map<std::string, FuncOp*> fnMap;
 
   void runImpl(Region *region, bool isLeaf);
   void tidyup(Region *region);

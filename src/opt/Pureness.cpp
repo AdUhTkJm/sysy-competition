@@ -69,12 +69,13 @@ void Pureness::run() {
   // For pureness of individual functions, do it in DCE.
 
   // Construct a call graph.
+  auto fnMap = getFunctionMap();
   auto calls = module->findAll<CallOp>();
   for (auto call : calls) {
     auto func = call->getParentOp<FuncOp>();
     auto calledName = call->getAttr<NameAttr>()->name;
     if (!isExtern(calledName))
-      callGraph[func].insert(findFunction(calledName));
+      callGraph[func].insert(fnMap[calledName]);
     else if (!func->hasAttr<ImpureAttr>())
       // External functions are impure.
       func->addAttr<ImpureAttr>();

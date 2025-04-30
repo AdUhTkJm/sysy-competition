@@ -13,6 +13,7 @@ public:
   NameAttr(std::string name): name(name) {}
 
   std::string toString() { return "<name = " + name + ">"; }
+  NameAttr *clone() { return new NameAttr(name); }
 };
 
 class IntAttr : public AttrImpl<IntAttr, __LINE__> {
@@ -22,6 +23,7 @@ public:
   IntAttr(int value): value(value) {}
 
   std::string toString() { return "<" + std::to_string(value) + ">"; }
+  IntAttr *clone() { return new IntAttr(value); }
 };
 
 class FloatAttr : public AttrImpl<FloatAttr, __LINE__> {
@@ -31,6 +33,7 @@ public:
   FloatAttr(float value): value(value) {}
 
   std::string toString() { return "<" + std::to_string(value) + "f>"; }
+  FloatAttr *clone() { return new FloatAttr(value); }
 };
 
 class SizeAttr : public AttrImpl<SizeAttr, __LINE__> {
@@ -40,6 +43,7 @@ public:
   SizeAttr(size_t value): value(value) {}
 
   std::string toString() { return "<size = " + std::to_string(value) + ">"; }
+  SizeAttr *clone() { return new SizeAttr(value); }
 };
 
 // A map for printing purposes.
@@ -54,6 +58,7 @@ public:
   TargetAttr(BasicBlock *bb): bb(bb) {}
 
   std::string toString();
+  TargetAttr *clone() { return new TargetAttr(bb); }
 };
 
 // The target for BranchOp if the condition is false.
@@ -64,6 +69,7 @@ public:
   ElseAttr(BasicBlock *bb): bb(bb) {}
 
   std::string toString();
+  ElseAttr *clone() { return new ElseAttr(bb); }
 };
 
 class FromAttr : public AttrImpl<FromAttr, __LINE__> {
@@ -73,6 +79,7 @@ public:
   FromAttr(BasicBlock *bb): bb(bb) {}
 
   std::string toString();
+  FromAttr *clone() { return new FromAttr(bb); }
 };
 
 class IntArrayAttr : public AttrImpl<IntArrayAttr, __LINE__> {
@@ -84,11 +91,13 @@ public:
   IntArrayAttr(int *vi, int size);
 
   std::string toString();
+  IntArrayAttr *clone() { return new IntArrayAttr(vi, size); }
 };
 
 class ImpureAttr : public AttrImpl<ImpureAttr, __LINE__> {
 public:
   std::string toString() { return "<impure>"; }
+  ImpureAttr *clone() { return new ImpureAttr; }
 };
 
 class ArgCountAttr : public AttrImpl<ArgCountAttr, __LINE__> {
@@ -98,6 +107,7 @@ public:
   ArgCountAttr(int count): count(count) {}
 
   std::string toString() { return "<count = " + std::to_string(count) + ">"; }
+  ArgCountAttr *clone() { return new ArgCountAttr(count); }
 };
 
 class CallerAttr : public AttrImpl<CallerAttr, __LINE__> {
@@ -112,6 +122,7 @@ public:
   CallerAttr() {}
 
   std::string toString();
+  CallerAttr *clone() { return new CallerAttr(callers); }
 };
 
 }

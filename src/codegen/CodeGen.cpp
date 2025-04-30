@@ -36,6 +36,18 @@ void Builder::setAfterOp(Op *op) {
   ++at;
 }
 
+Op *Builder::copy(Op *op) {
+  auto opnew = new Op(op->id, op->resultTy, op->operands);
+  for (auto attr : op->attrs) {
+    auto cloned = attr->clone();
+    cloned->refcnt++;
+    opnew->attrs.push_back(cloned);
+  }
+  opnew->opname = op->opname;
+  bb->insert(at, opnew);
+  return opnew;
+}
+
 CodeGen::CodeGen(ASTNode *node): module(new ModuleOp()) {
   module->createFirstBlock();
   builder.setToRegionStart(module->getRegion());

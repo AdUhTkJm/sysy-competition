@@ -1,11 +1,14 @@
 #include "Passes.h"
 #include "../codegen/Attrs.h"
+#include <vector>
 
 using namespace sys;
 
 std::map<std::string, int> DCE::stats() {
   return {
-    { "eliminated-ops", elim }
+    { "removed-ops", elimOp },
+    { "removed-basic-blocks", elimBB },
+    { "removed-funcs", elimFn },
   };
 }
 
@@ -20,7 +23,7 @@ bool DCE::isImpure(Op *op) {
     auto name = op->getAttr<NameAttr>()->name;
     if (isExtern(name))
       return true;
-    return findFunction(name)->hasAttr<ImpureAttr>();
+    return fnMap[name]->hasAttr<ImpureAttr>();
   }
 
   return false;
@@ -58,16 +61,63 @@ void DCE::runOnRegion(Region *region) {
 
 void DCE::run() {
   auto funcs = collectFuncs();
+  fnMap = getFunctionMap();
+  
   for (auto func : funcs)
     markImpure(func->getRegion());
   
+  // Remove unused variables.
   do {
     removeable.clear();
     for (auto func : funcs)
       runOnRegion(func->getRegion());
 
-    elim += removeable.size();
+    elimOp += removeable.size();
     for (auto op : removeable)
       op->erase();
   } while (removeable.size());
+
+  // Remove unused functions.
+  bool changed;
+  do {
+    CallGraph(module).run();
+
+    changed = false;
+    for (auto func : funcs) {
+      // main() might not be used, but it must be preserved.
+      if (func->getAttr<NameAttr>()->name == "main")
+        continue;
+
+      if (!func->getAttr<CallerAttr>()->callers.size()) {
+        func->erase();
+        changed = true;
+        elimFn++;
+      }
+    }
+
+    if (changed)
+      funcs = collectFuncs();
+  } while (changed);
+
+  if (!elimBlocks)
+    return;
+  
+  do {
+    changed = false;
+    for (auto func : funcs) {
+      auto region = func->getRegion();
+      region->updatePreds();
+      std::vector<BasicBlock*> toRemove;
+      for (auto bb : region->getBlocks()) {
+        if (bb != region->getFirstBlock() && bb->getPreds().size() == 0)
+          toRemove.push_back(bb);
+      }
+
+      elimBB += toRemove.size();
+      if (toRemove.size())
+        changed = true;
+      for (auto bb : toRemove)
+        bb->erase();
+    }
+  } while (changed);
 }

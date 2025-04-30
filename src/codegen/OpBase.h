@@ -151,12 +151,14 @@ class Attr {
   int refcnt = 0;
 
   friend class Op;
+  friend class Builder;
 public:
   int getID() const { return id; }
   Attr(int id): id(id) {}
   
   virtual ~Attr() {}
   virtual std::string toString() = 0;
+  virtual Attr *clone() = 0;
 };
 
 class Op {

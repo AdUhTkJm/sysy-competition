@@ -223,7 +223,19 @@ void BasicBlock::moveToEnd(Region *region) {
 }
 
 void BasicBlock::erase() {
-  assert(preds.size() == 0);
+  if (preds.size() != 0) {
+    std::cerr << "Erasing block with preds!\nself = bb" << bbmap[this] << "; all preds: ";
+    for (auto x : preds)
+      std::cerr << "bb" << bbmap[x] << " ";
+    std::cerr << "\n";
+    assert(false);
+  }
+
+  auto copy = ops;
+  for (auto op : ops)
+    op->removeAllOperands();
+  for (auto op : copy)
+    op->erase();
   
   parent->remove(place);
   delete this;
@@ -418,8 +430,10 @@ void Region::updateDoms() {
         break;
       }
     }
-    assert(bb->idom); // Only start block can have no idom
-}
+    // Only blocks without preds can have no idom
+    // We must remove those blocks before calling `updateDoms`.
+    assert(bb->idom);
+  }
 
   // Update dominance frontier.
   for (auto bb : bbs)

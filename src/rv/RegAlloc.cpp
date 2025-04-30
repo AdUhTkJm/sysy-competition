@@ -801,10 +801,16 @@ void RegAlloc::tidyup(Region *region) {
   }
 
   // Calculate jump-to closure.
-  for (auto &[k, v] : jumpTo) {
-    if (jumpTo.count(v))
-      v = jumpTo[v];
-  }
+  bool changed;
+  do {
+    changed = false;
+    for (auto [k, v] : jumpTo) {
+      if (jumpTo.count(v)) {
+        jumpTo[k] = jumpTo[v];
+        changed = true;
+      }
+    }
+  } while (changed);
 
   for (auto bb : region->getBlocks()) { 
     auto term = bb->getLastOp();
@@ -991,7 +997,7 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
       else {
         // If we know what registers that function would use,
         // then we only need to preserve those registers that get tampered with.
-        auto calledFunc = findFunction(callName);
+        auto calledFunc = fnMap[callName];
         for (auto r : callPreserve) {
           if (usedRegisters[calledFunc].count(r))
             caller.push_back(r);
@@ -1039,6 +1045,7 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
 
 void RegAlloc::run() {
   auto funcs = collectFuncs();
+  fnMap = getFunctionMap();
   std::set<FuncOp*> leaves;
 
   for (auto func : funcs) {

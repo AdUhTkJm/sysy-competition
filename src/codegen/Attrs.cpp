@@ -46,6 +46,9 @@ std::string IntArrayAttr::toString() {
 
 std::string CallerAttr::toString() {
   std::stringstream ss;
+  if (!callers.size())
+    return "<no caller>";
+  
   ss << "<caller = ";
   if (callers.size() > 0)
     ss << callers[0];

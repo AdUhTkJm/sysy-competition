@@ -17,11 +17,15 @@ bool Pass::isExtern(const std::string &name) {
     "putfloat",
     "putarray",
     "putfarray",
+    "_sysy_starttime",
+    "_sysy_stoptime",
+    "starttime",
+    "stoptime",
   };
   return externs.count(name);
 }
 
-FuncOp *Pass::findFunction(const std::string &name) {
+std::map<std::string, FuncOp*> Pass::getFunctionMap() {
   std::map<std::string, FuncOp*> funcs;
 
   auto region = module->getRegion();
@@ -31,11 +35,7 @@ FuncOp *Pass::findFunction(const std::string &name) {
       funcs[op->getAttr<NameAttr>()->name] = func;
   }
   
-  if (!funcs.count(name)) {
-    std::cerr << "unknown function: " << name << "\n";
-    assert(false);
-  }
-  return funcs[name];
+  return funcs;
 }
 
 PassManager::~PassManager() {

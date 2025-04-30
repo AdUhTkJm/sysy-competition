@@ -32,15 +32,16 @@ void initPipeline(sys::PassManager &pm) {
 
   // ===== Structured control flow =====
 
-  pm.addPass<sys::CallGraph>();
-  pm.addPass<sys::Inline>(/*inlineThreshold=*/50);
   pm.addPass<sys::StrengthReduct>();
   pm.addPass<sys::Pureness>();
-  pm.addPass<sys::DCE>();
+  pm.addPass<sys::DCE>(/*elimBlocks=*/ false);
 
   // ===== Flattened CFG =====
 
   pm.addPass<sys::FlattenCFG>();
+  pm.addPass<sys::CallGraph>();
+  pm.addPass<sys::Inline>(/*inlineThreshold=*/ 50);
+  pm.addPass<sys::DCE>();
   pm.addPass<sys::Mem2Reg>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::DCE>();

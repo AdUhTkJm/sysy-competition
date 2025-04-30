@@ -85,16 +85,23 @@ public:
   void run();
 };
 
-// Dead variable elimination.
+// Dead code elimination. Deals with functions, basic blocks and variables.
 class DCE : public Pass {
   std::vector<Op*> removeable;
-  int elim = 0;
+  int elimOp = 0;
+  int elimFn = 0;
+  int elimBB = 0;
+  bool elimBlocks;
 
   bool isImpure(Op *op);
   bool markImpure(Region *region);
   void runOnRegion(Region *region);
+
+  std::map<std::string, FuncOp*> fnMap;
 public:
-  DCE(ModuleOp *module): Pass(module) {}
+  // If DCE is called before flatten cfg, then it shouldn't eliminate blocks,
+  // since the blocks aren't actually well-formed.
+  DCE(ModuleOp *module, bool elimBlocks = true): Pass(module), elimBlocks(elimBlocks) {}
     
   std::string name() { return "dce"; };
   std::map<std::string, int> stats();
@@ -178,6 +185,7 @@ class Inline : public Pass {
 
   // Do not inline functions with Op count > `threshold`.
   int threshold;
+  std::map<std::string, FuncOp*> fnMap;
 public:
   Inline(ModuleOp *module, int threshold): Pass(module), threshold(threshold) {}
     

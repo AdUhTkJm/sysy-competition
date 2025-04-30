@@ -38,12 +38,12 @@ protected:
     runRewriter(module, rewriter);
   }
 
-  FuncOp *findFunction(const std::string &name);
   static bool isExtern(const std::string &name);
 
   // This will be faster than module->findAll<FuncOp>,
   // as it doesn't need to iterate through the contents of functions.
   std::vector<FuncOp*> collectFuncs();
+  std::map<std::string, FuncOp*> getFunctionMap();
 public:
   Pass(ModuleOp *module): module(module) {}
   virtual ~Pass() {}

@@ -68,6 +68,7 @@ public:
   RegAttr(Reg reg): reg(reg) {}
 
   std::string toString() { return "<reg = " + showReg(reg) + ">"; }
+  RegAttr *clone() { return new RegAttr(reg); }
 };
 
 class RdAttr : public AttrImpl<RegAttr, RVLINE> {
@@ -77,6 +78,7 @@ public:
   RdAttr(Reg reg): reg(reg) {}
 
   std::string toString() { return "<rd = " + showReg(reg) + ">"; }
+  RdAttr *clone() { return new RdAttr(reg); }
 };
 
 class RsAttr : public AttrImpl<RegAttr, RVLINE> {
@@ -86,6 +88,7 @@ public:
   RsAttr(Reg reg): reg(reg) {}
 
   std::string toString() { return "<rs = " + showReg(reg) + ">"; }
+  RsAttr *clone() { return new RsAttr(reg); }
 };
 
 class Rs2Attr : public AttrImpl<RegAttr, RVLINE> {
@@ -95,6 +98,7 @@ public:
   Rs2Attr(Reg reg): reg(reg) {}
 
   std::string toString() { return "<rs2 = " + showReg(reg) + ">"; }
+  Rs2Attr *clone() { return new Rs2Attr(reg); }
 };
 
 }
