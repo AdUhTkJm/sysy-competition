@@ -79,8 +79,9 @@ class IntArrayAttr : public AttrImpl<IntArrayAttr, __LINE__> {
 public:
   int *vi;
   int size;
+  bool allZero;
 
-  IntArrayAttr(int *vi, int size): vi(vi), size(size) {}
+  IntArrayAttr(int *vi, int size);
 
   std::string toString();
 };

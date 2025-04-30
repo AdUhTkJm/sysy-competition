@@ -187,12 +187,12 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   });
 
   // Similarly, add placeholders around each GetArg.
-  runRewriter([&](GetArgOp *op) {
+  runRewriter(funcOp, [&](GetArgOp *op) {
     auto value = op->getAttr<IntAttr>()->value;
     // TODO: spilling
     assert(value < 8);
     
-    // The i'th argument cannot take registers from argReg[i + 1] ~ argReeg[argcnt - 1].
+    // The i'th argument cannot take registers from argReg[i + 1] ~ argReg[argcnt - 1].
     // So we do it like (take `a0` as example):
     //   %0 = placeholder [a1]
     //   %1 = placeholder [a2]

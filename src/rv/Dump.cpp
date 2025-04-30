@@ -136,22 +136,37 @@ void Dump::dump(std::ostream &os) {
   }
 
   auto globals = module->findAll<GlobalOp>();
+  // Arrays of all zeros should be put in .bss segment.
+  std::vector<GlobalOp*> bss;
 
   if (!globals.empty())
-    os << ".data\n";
+    os << "\n.data\n";
   for (auto global : globals) {
-    os << global->getAttr<NameAttr>()->name << ":\n";
     // It must have been 4 bytes long for each element.
+    // Here `size` is the total number of bytes.
     auto size = global->getAttr<SizeAttr>()->value;
     assert(size >= 1);
 
     if (auto intArr = global->findAttr<IntArrayAttr>()) {
+      if (intArr->allZero) {
+        bss.push_back(global);
+        continue;
+      }
+
+      os << global->getAttr<NameAttr>()->name << ":\n";
       os << "  .word " << intArr->vi[0];
       for (size_t i = 1; i < size / 4; i++)
         os << ", " << intArr->vi[i];
       os << "\n";
     }
     // .float for FloatArray
+  }
+
+  if (!bss.empty())
+    os << "\n.bss\n  .align 4\n";
+  for (auto global : bss) {
+    os << global->getAttr<NameAttr>()->name << ":\n  .space ";
+    os << global->getAttr<SizeAttr>()->value << "\n";
   }
 }
 

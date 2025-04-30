@@ -9,6 +9,7 @@
 #include <map>
 #include <iostream>
 #include <sstream>
+#include <string>
 
 using namespace sys;
 
@@ -33,7 +34,19 @@ std::string FromAttr::toString() {
   return "<from = bb" + std::to_string(bbmap[bb]) + ">";
 }
 
+IntArrayAttr::IntArrayAttr(int *vi, int size): vi(vi), size(size), allZero(true) {
+  for (int i = 0; i < size; i++) {
+    if (vi[i] != 0) {
+      allZero = false;
+      break;
+    }
+  }
+}
+
 std::string IntArrayAttr::toString() {
+  if (allZero)
+    return "<array = 0 x " + std::to_string(size) + ">";
+  
   std::stringstream ss;
   ss << "<array = ";
   if (size > 0)
