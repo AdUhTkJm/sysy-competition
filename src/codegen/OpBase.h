@@ -96,7 +96,10 @@ class BasicBlock {
 
   friend class Region;
   friend class Op;
-  
+
+  // Does not check if there's any preds.
+  // Used when a whole region is removed.
+  void forceErase();
 public:
   using iterator = decltype(ops)::iterator;
 

@@ -132,6 +132,18 @@ void Op::erase() {
   
   parent->remove(place);
   removeAllOperands();
+
+  for (auto region : regions) {
+    auto bbs = region->getBlocks();
+    // Clear all uses.
+    for (auto bb : bbs) {
+      for (auto op : bb->getOps())
+        op->removeAllOperands();
+    }
+    for (auto bb : bbs)
+      bb->forceErase();
+    delete region;
+  }
   
   for (auto attr : attrs) {
     if (!--attr->refcnt)
@@ -235,7 +247,11 @@ void BasicBlock::erase() {
     std::cerr << "\n";
     assert(false);
   }
+  
+  forceErase();
+}
 
+void BasicBlock::forceErase() {
   auto copy = ops;
   for (auto op : ops)
     op->removeAllOperands();

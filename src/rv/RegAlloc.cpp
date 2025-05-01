@@ -850,6 +850,7 @@ void RegAlloc::tidyup(Region *region) {
     converted = latePeephole(funcOp);
     convertedTotal += converted;
   } while (converted);
+
   // Replace blocks with only a single `j` as terminator.
   std::map<BasicBlock*, BasicBlock*> jumpTo;
   for (auto bb : region->getBlocks()) {
