@@ -428,6 +428,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(SeqzOp, UNARY);
   LOWER(SnezOp, UNARY);
   LOWER(SltiOp, UNARY);
+  LOWER(AndiOp, UNARY);
+  LOWER(OriOp, UNARY);
+  LOWER(XoriOp, UNARY);
 
   // Remove all operands of calls and returns.
   // The "operands" are only formal and carry no real meaning.
@@ -805,20 +808,21 @@ int RegAlloc::latePeephole(Op *funcOp) {
 
   int converted = 0;
 
-  //   sw a0, N(addr)
-  //   lw a1, N(addr)
-  // becomes
-  //   sw a0, N(addr)
-  //   mv a1, a0
   runRewriter(funcOp, [&](StoreOp *op) {
-    if (op == op->getParent()->getLastOp() || !isa<LoadOp>(op->nextOp()))
+    if (op == op->getParent()->getLastOp())
       return false;
 
-    auto load = op->nextOp();
-    if (RS(load) == RS2(op) && IMM(load) == IMM(op) && load->get<SizeAttr>()->value == op->get<SizeAttr>()->value) {
+    //   sw a0, N(addr)
+    //   lw a1, N(addr)
+    // becomes
+    //   sw a0, N(addr)
+    //   mv a1, a0
+    auto next = op->nextOp();
+    if (isa<LoadOp>(next) &&
+        RS(next) == RS2(op) && IMM(next) == IMM(op) && next->get<SizeAttr>()->value == op->get<SizeAttr>()->value) {
       converted++;
-      builder.replace<MvOp>(load, {
-        new RdAttr(RD(load)),
+      builder.replace<MvOp>(next, {
+        new RdAttr(RD(next)),
         new RsAttr(RS(op))
       });
       return true;
@@ -826,6 +830,71 @@ int RegAlloc::latePeephole(Op *funcOp) {
 
     return false;
   });
+
+  bool changed;
+  std::vector<StoreOp*> stores;
+  do {
+    changed = false;
+    // This modifies the content of stores, so cannot run in a rewriter.
+    stores = funcOp->findAll<StoreOp>();
+    for (auto op : stores) {
+      if (op == op->getParent()->getLastOp())
+        continue;
+      auto next = op->nextOp();
+
+      //   sw zero, N(sp)
+      //   sw zero, N+4(sp)
+      // becomes
+      //   sd zero, N(sp)
+      // only when N is a multiple of 8.
+      //
+      // We know `sp` is 16-aligned, but we don't know for other registers.
+      // That's why we fold it only for `sp`.
+      if (isa<StoreOp>(next) &&
+          RS(op) == Reg::zero && RS2(op) == Reg::sp &&
+          RS(next) == Reg::zero && RS2(next) == Reg::sp &&
+          op->get<IntAttr>()->value % 8 == 0 && op->get<SizeAttr>()->value == 4 &&
+          next->get<IntAttr>()->value == op->get<IntAttr>()->value + 4 && next->get<SizeAttr>()->value == 4) {
+        converted++;
+        changed = true;
+
+        auto offset = op->get<IntAttr>()->value;
+        builder.replace<StoreOp>(op, {
+          new RsAttr(Reg::zero),
+          new Rs2Attr(Reg::sp),
+          new IntAttr(offset),
+          new SizeAttr(8),
+        });
+        next->erase();
+        break;
+      }
+
+      // Similarly:
+      //   sw zero, N(sp)
+      //   sw zero, N-4(sp)
+      // becomes
+      //   sd zero, N-4(sp)
+      // only when N-4 is a multiple of 8.
+      if (isa<StoreOp>(next) &&
+          RS(op) == Reg::zero && RS2(op) == Reg::sp &&
+          RS(next) == Reg::zero && RS2(next) == Reg::sp &&
+          op->get<IntAttr>()->value % 8 == 4 && op->get<SizeAttr>()->value == 4 &&
+          next->get<IntAttr>()->value == op->get<IntAttr>()->value - 4 && next->get<SizeAttr>()->value == 4) {
+        converted++;
+        changed = true;
+
+        auto offset = op->get<IntAttr>()->value;
+        builder.replace<StoreOp>(op, {
+          new RsAttr(Reg::zero),
+          new Rs2Attr(Reg::sp),
+          new IntAttr(offset - 4),
+          new SizeAttr(8),
+        });
+        next->erase();
+        break;
+      }
+    }
+  } while (changed);
 
   // Eliminate useless MvOp.
   runRewriter(funcOp, [&](MvOp *op) {

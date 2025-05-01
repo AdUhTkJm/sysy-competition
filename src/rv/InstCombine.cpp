@@ -98,6 +98,24 @@ void InstCombine::run() {
     return false;
   });
 
+  runRewriter([&](AndOp *op) {
+    auto x = op->getOperand(0).defining;
+    auto y = op->getOperand(1).defining;
+    if (isa<LiOp>(x) && inRange(x)) {
+      combined++;
+      builder.replace<AndiOp>(op, { y }, { x->get<IntAttr>() });
+      return true;
+    }
+
+    if (isa<LiOp>(y) && inRange(y)) {
+      combined++;
+      builder.replace<AndiOp>(op, { x }, { y->get<IntAttr>() });
+      return true;
+    }
+
+    return false;
+  });
+
   runRewriter([&](StoreOp *op) {
     auto value = op->getOperand(0);
     auto addr = op->getOperand(1).defining;

@@ -54,6 +54,9 @@ RVOP(MulhuOp); // Higher bits of mul, unsigned.
 RVOP(AndOp);
 RVOP(OrOp);
 RVOP(XorOp);
+RVOP(AndiOp);
+RVOP(OriOp);
+RVOP(XoriOp);
 RVOP(BneOp);
 RVOP(BeqOp);
 RVOP(BltOp);
@@ -103,6 +106,9 @@ inline bool hasRd(Op *op) {
     isa<AndOp>(op) ||
     isa<OrOp>(op) ||
     isa<XorOp>(op) ||
+    isa<AndiOp>(op) ||
+    isa<OriOp>(op) ||
+    isa<XoriOp>(op) ||
     isa<GetArgOp>(op);
 }
 
