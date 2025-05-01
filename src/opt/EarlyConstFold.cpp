@@ -50,6 +50,13 @@ int EarlyConstFold::foldImpl() {
       builder.replace<IntOp>(op, { new IntAttr(V(x) * V(y)) });
       return true;
     }
+
+    // Canonicalize.
+    if (INT(x) && !INT(y)) {
+      builder.replace<MulIOp>(op, { y, x }, op->getAttrs());
+      return true;
+    }
+    
     return false;
   });
 
@@ -60,12 +67,6 @@ int EarlyConstFold::foldImpl() {
     if (INT(x) && INT(y)) {
       folded++;
       builder.replace<IntOp>(op, { new IntAttr(V(x) / V(y)) });
-      return true;
-    }
-
-    // Canonicalize.
-    if (INT(x) && !INT(y)) {
-      builder.replace<MulIOp>(op, { y, x }, op->getAttrs());
       return true;
     }
 
@@ -157,8 +158,8 @@ int EarlyConstFold::foldImpl() {
       return true;
     }
 
-    // (a * b == i) becomes (a == i / b)
-    if (isa<MulIOp>(x) && INT(b)) {
+    // (a * b == i) becomes (a == i / b), if (i % b == 0)
+    if (isa<MulIOp>(x) && INT(b) && i % V(b) == 0) {
       folded++;
       builder.setBeforeOp(op);
       auto value = builder.create<IntOp>({ new IntAttr(i / V(b)) });
@@ -166,19 +167,30 @@ int EarlyConstFold::foldImpl() {
       return true;
     }
 
-    // (a / b == i) becomes (a == i * b)
-    if (isa<DivIOp>(x) && INT(b)) {
+    // (a * b == i) becomes 0, if (i % b != 0)
+    if (isa<MulIOp>(x) && INT(b) && i % V(b) != 0) {
       folded++;
-      builder.setBeforeOp(op);
-      auto value = builder.create<IntOp>({ new IntAttr(i * V(b)) });
-      builder.replace<EqOp>(op, { a, value });
+      builder.replace<IntOp>(op, { new IntAttr(0) });
       return true;
     }
 
-    // Note that (b / x == i) doesn't necessarily mean (x == b / i).
-    // For example 255 / 16 == 15 but 255 / 17 is also 15.
+    // (a / b == i) becomes (a < (i + 1) * b) && (a >= i * b), if (b > 0)
+    if (isa<DivIOp>(x) && INT(b) && V(b) > 0) {
+      folded++;
+      builder.setBeforeOp(op);
+      auto lowerBound = builder.create<IntOp>({ new IntAttr(i * V(b)) });
+      auto upperBound = builder.create<IntOp>({ new IntAttr((i + 1) * V(b)) });
+      auto comp1 = builder.create<LtOp>({ a, upperBound });
+      auto comp2 = builder.create<LeOp>({ lowerBound, a });
+      builder.replace<AndIOp>(op, { comp1, comp2 });
+      return true;
+    }
 
-    // Note that we can't easily fold (x % b == i).
+    // Note that (b / a == i) doesn't necessarily mean (a == b / i).
+    // For example 255 / 16 == 15 but 255 / 17 is also 15.
+    // Not sure how to find bounds. Is the range (b / (i + 1), b / i] correct?
+
+    // We can't easily fold (a % b == i).
     return false;
   });
 
@@ -259,7 +271,13 @@ int EarlyConstFold::foldImpl() {
       return true;
     }
 
-    // Note that we can't easily fold (x % b == i).
+    // (a % b < i) becomes 1 if (i >= b > 0).
+    if (isa<ModIOp>(x) && INT(b) && i >= V(b) && V(b) > 0) {
+      folded++;
+      builder.replace<IntOp>(op, { new IntAttr(1) });
+      return true;
+    }
+
     return false;
   });
 
@@ -284,7 +302,7 @@ int EarlyConstFold::foldImpl() {
       }
 
       // We can't directly use a rewriter, 
-      // because this might recursively delete other IfOp.
+      // because this might recursively delete another IfOp.
       op->erase();
       break;
     }
