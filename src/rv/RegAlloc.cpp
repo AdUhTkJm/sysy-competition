@@ -674,15 +674,29 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
   // Now let's deal with spilled registers.
   for (auto bb : region->getBlocks()) {
-    std::vector<Op*> spilling;
+    int delta = 0;
     for (auto op : bb->getOps()) {
-      if (hasSpilled(op))
-        spilling.push_back(op);
-    }
+      // We might encounter spilling around calls.
+      // For example:
+      //   addi sp, sp, -192    ; setting up 24 extra arguments
+      //   mv a0, ...
+      //   ld s11, OFFSET(sp)   ; !!! ADJUST HERE
+      //
+      // That's why we need an extra "delta".
+      // No need for dominance analysis etc. because the SubSp is well-bracketed inside a block.
+      //
+      // Note that we need to ignore the SubSp at the very beginning of the function.
+      // It's irrelevant to calls.
+      if (isa<SubSpOp>(op) && op != region->getFirstBlock()->getFirstOp()) {
+        delta += op->get<IntAttr>()->value;
+        continue;
+      }
+      
+      if (!hasSpilled(op))
+        continue;
 
-    for (auto op : spilling) {
       if (auto rs = op->find<RsAttr>(); rs && (int) rs->reg < 0) {
-        int offset = -(int) rs->reg;
+        int offset = delta - (int) rs->reg;
 
         builder.setBeforeOp(op);
         if (offset < 2048) {
@@ -725,7 +739,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       }
 
       if (auto rs2 = op->find<Rs2Attr>(); rs2 && (int) rs2->reg < 0) {
-        int offset = -(int) rs2->reg;
+        int offset = delta - (int) rs2->reg;
 
         builder.setBeforeOp(op);
         // Similar to the sequence above.
@@ -757,7 +771,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       }
 
       if (auto rd = op->find<RdAttr>(); rd && (int) rd->reg < 0) {
-        int offset = -(int) rd->reg;
+        int offset = delta - (int) rd->reg;
 
         builder.setAfterOp(op);
         if (offset < 2048) {

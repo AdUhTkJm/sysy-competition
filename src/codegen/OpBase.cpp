@@ -127,23 +127,23 @@ void Op::removeAllOperands() {
   operands.clear();
 }
 
+void Op::removeRegion(Region *region) {
+  for (auto it = regions.begin(); it != regions.end(); it++) {
+    if (*it == region) {
+      regions.erase(it);
+      break;
+    }
+  }
+}
+
 void Op::erase() {
   assert(uses.size() == 0);
   
   parent->remove(place);
   removeAllOperands();
 
-  for (auto region : regions) {
-    auto bbs = region->getBlocks();
-    // Clear all uses.
-    for (auto bb : bbs) {
-      for (auto op : bb->getOps())
-        op->removeAllOperands();
-    }
-    for (auto bb : bbs)
-      bb->forceErase();
-    delete region;
-  }
+  for (auto region : regions)
+    region->erase();
   
   for (auto attr : attrs) {
     if (!--attr->refcnt)
@@ -338,6 +338,21 @@ std::pair<BasicBlock*, BasicBlock*> Region::moveTo(BasicBlock *bb) {
   }
 
   return result;
+}
+
+void Region::erase() {
+  for (auto bb : bbs) {
+    for (auto op : bb->getOps()) {
+      op->removeAllOperands();
+      for (auto region : op->getRegions())
+        region->erase();
+    }
+  }
+  auto copy = bbs;
+  for (auto bb : copy)
+    bb->forceErase();
+  parent->removeRegion(this);
+  delete this;
 }
 
 void Region::updatePreds() {

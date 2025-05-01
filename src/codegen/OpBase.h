@@ -74,6 +74,8 @@ public:
   // Returns the first and final block.
   std::pair<BasicBlock*, BasicBlock*> moveTo(BasicBlock *insertionPoint);
 
+  void erase();
+
   Region(Op *parent): parent(parent) {}
 };
 
@@ -200,6 +202,8 @@ public:
 
   void pushOperand(Value v);
   void removeAllOperands();
+  // This does a linear search, as Ops at most have 2 regions.
+  void removeRegion(Region *region);
 
   Value getResult() { return Value(this); }
   Value::Type getResultType() const { return resultTy; }
