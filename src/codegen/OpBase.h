@@ -190,7 +190,7 @@ public:
   const auto &getUses() const { return uses; }
   const auto &getRegions() const { return regions; }
   const auto &getOperands() const { return operands; }
-  const auto &gets() const { return attrs; }
+  const auto &getAttrs() const { return attrs; }
 
   Region *getRegion(int i = 0) { return regions[i]; }
   Value getOperand(int i = 0) { return operands[i]; }

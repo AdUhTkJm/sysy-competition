@@ -250,7 +250,7 @@ int StrengthReduct::runImpl() {
     //   x - %mul
     converted++;
     builder.setBeforeOp(op);
-    auto quot = builder.create<DivIOp>(op->getOperands(), op->gets());
+    auto quot = builder.create<DivIOp>(op->getOperands(), op->getAttrs());
     auto mul = builder.create<MulIOp>({ quot, y });
     builder.replace<SubIOp>(op, { x, mul });
 

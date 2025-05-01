@@ -521,7 +521,7 @@ void Region::updateLiveness() {
         );
         for (auto phi : phis[succ]) {
           auto &ops = phi->getOperands();
-          auto &attrs = phi->gets();
+          auto &attrs = phi->getAttrs();
           for (size_t i = 0; i < ops.size(); i++) {
             if (bb->reachable(cast<FromAttr>(attrs[i])->bb))
               liveOut.insert(ops[i].defining);

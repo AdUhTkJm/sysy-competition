@@ -107,7 +107,7 @@ void InstCombine::run() {
       if (inRange(offset + currentOffset)) {
         currentOffset += offset;
         auto base = addr->getOperand();
-        builder.replace<StoreOp>(op, { value, base }, op->gets());
+        builder.replace<StoreOp>(op, { value, base }, op->getAttrs());
         return true;
       }
     }
@@ -122,7 +122,7 @@ void InstCombine::run() {
       if (inRange(offset + currentOffset)) {
         currentOffset += offset;
         auto base = addr->getOperand();
-        builder.replace<LoadOp>(op, { base }, op->gets());
+        builder.replace<LoadOp>(op, { base }, op->getAttrs());
         return true;
       }
     }

@@ -542,7 +542,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     // Rename the blocks of the phis.
     for (auto succ : bb->getSuccs()) {
       for (auto phis : succ->getPhis()) {
-        for (auto attr : phis->gets()) {
+        for (auto attr : phis->getAttrs()) {
           auto from = cast<FromAttr>(attr);
           if (from->bb != bb)
             continue;
@@ -561,7 +561,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     std::vector<Op*> moves;
     for (auto phi : phis) {
       auto &ops = phi->getOperands();
-      auto &attrs = phi->gets();
+      auto &attrs = phi->getAttrs();
       for (size_t i = 0; i < ops.size(); i++) {
         auto bb = cast<FromAttr>(attrs[i])->bb;
         auto terminator = *--bb->getOps().end();

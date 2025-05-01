@@ -198,6 +198,9 @@ public:
 
 // Folds before flattening CFG.
 class EarlyConstFold : public Pass {
+  int foldedTotal = 0;
+
+  int foldImpl();
 public:
   EarlyConstFold(ModuleOp *module): Pass(module) {}
     
