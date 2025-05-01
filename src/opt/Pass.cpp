@@ -32,7 +32,7 @@ std::map<std::string, FuncOp*> Pass::getFunctionMap() {
   auto block = region->getFirstBlock();
   for (auto op : block->getOps()) {
     if (auto func = dyn_cast<FuncOp>(op))
-      funcs[op->getAttr<NameAttr>()->name] = func;
+      funcs[op->get<NameAttr>()->name] = func;
   }
   
   return funcs;

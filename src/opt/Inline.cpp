@@ -9,8 +9,8 @@ std::map<std::string, int> Inline::stats() {
 }
 
 bool isRecursive(Op *op) {
-  const auto &callers = op->getAttr<CallerAttr>()->callers;
-  const auto &name = op->getAttr<NameAttr>()->name;
+  const auto &callers = op->get<CallerAttr>()->callers;
+  const auto &name = op->get<NameAttr>()->name;
   return std::find(callers.begin(), callers.end(), name) != callers.end();
 }
 
@@ -21,7 +21,7 @@ void Inline::run() {
   fnMap = getFunctionMap();
 
   runRewriter([&](CallOp *call) {
-    const auto &fname = call->getAttr<NameAttr>()->name;
+    const auto &fname = call->get<NameAttr>()->name;
     if (isExtern(fname))
       return false;
 
@@ -101,17 +101,17 @@ void Inline::run() {
     for (auto [_, v] : cloneMap) {
       // Rewire jump targets.
       // As it's a shallow copy, we need to create a new one to avoid affecting the original version.
-      if (auto attr = v->findAttr<TargetAttr>()) {
+      if (auto attr = v->find<TargetAttr>()) {
         assert(retargetMap.count(attr->bb));
         attr->bb = retargetMap[attr->bb];
       }
-      if (auto attr = v->findAttr<ElseAttr>()) {
+      if (auto attr = v->find<ElseAttr>()) {
         assert(retargetMap.count(attr->bb));
         attr->bb = retargetMap[attr->bb];
       }
 
       if (isa<GetArgOp>(v)) {
-        auto i = v->getAttr<IntAttr>()->value;
+        auto i = v->get<IntAttr>()->value;
         auto def = call->getOperand(i).defining;
         v->replaceAllUsesWith(def);
         v->erase();

@@ -49,10 +49,10 @@ std::map<std::string, int> RegAlloc::stats() {
 // otherwise, make the target <bb1>, and add another `j <bb2>`.
 #define REPLACE_BRANCH_IMPL(BeforeTy, AfterTy) \
   runRewriter(funcOp, [&](BeforeTy *op) { \
-    if (!op->hasAttr<ElseAttr>()) \
+    if (!op->has<ElseAttr>()) \
       return false; \
-    auto &target = op->getAttr<TargetAttr>()->bb; \
-    auto ifnot = op->getAttr<ElseAttr>()->bb; \
+    auto &target = op->get<TargetAttr>()->bb; \
+    auto ifnot = op->get<ElseAttr>()->bb; \
     auto me = op->getParent(); \
     /* If there's no "next block", then give up */ \
     if (me == me->getParent()->getLastBlock()) { \
@@ -61,8 +61,8 @@ std::map<std::string, int> RegAlloc::stats() {
     } \
     if (me->nextBlock() == target) { \
       builder.replace<AfterTy>(op, { \
-        op->getAttr<RsAttr>(), \
-        op->getAttr<Rs2Attr>(), \
+        op->get<RsAttr>(), \
+        op->get<Rs2Attr>(), \
         new TargetAttr(ifnot), \
       }); \
       return true; \
@@ -84,10 +84,10 @@ std::map<std::string, int> RegAlloc::stats() {
   op->removeAttr<ElseAttr>(); \
   return true
 
-#define RD(op) (op)->getAttr<RdAttr>()->reg
-#define RS(op) (op)->getAttr<RsAttr>()->reg
-#define RS2(op) (op)->getAttr<Rs2Attr>()->reg
-#define IMM(op) (op)->getAttr<IntAttr>()->value
+#define RD(op) (op)->get<RdAttr>()->reg
+#define RS(op) (op)->get<RsAttr>()->reg
+#define RS2(op) (op)->get<Rs2Attr>()->reg
+#define IMM(op) (op)->get<IntAttr>()->value
 
 // In OpBase.cpp
 std::ostream &operator<<(std::ostream &os, Value value);
@@ -113,11 +113,11 @@ void dumpAssignment(Region *region, const std::map<Op*, Reg> &assignment) {
 }
 
 bool hasSpilled(Op *op) {
-  if (auto rd = op->findAttr<RdAttr>(); rd && (int) rd->reg < 0)
+  if (auto rd = op->find<RdAttr>(); rd && (int) rd->reg < 0)
     return true;
-  if (auto rs = op->findAttr<RsAttr>(); rs && (int) rs->reg < 0)
+  if (auto rs = op->find<RsAttr>(); rs && (int) rs->reg < 0)
     return true;
-  if (auto rs2 = op->findAttr<Rs2Attr>(); rs2 && (int) rs2->reg < 0)
+  if (auto rs2 = op->find<Rs2Attr>(); rs2 && (int) rs2->reg < 0)
     return true;
   return false;
 }
@@ -194,9 +194,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
   // Similarly, add placeholders around each GetArg.
   runRewriter(funcOp, [&](GetArgOp *op) {
-    auto value = op->getAttr<IntAttr>()->value;
-    // TODO: spilling
-    assert(value < 8);
+    auto value = op->get<IntAttr>()->value;
     
     // The i'th argument cannot take registers from argReg[i + 1] ~ argReg[argcnt - 1].
     // So we do it like (take `a0` as example):
@@ -207,7 +205,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     // This prevents %ARG being allocated a1 or a2, but doesn't affect any other ops.
 
     builder.setBeforeOp(op);
-    int argcnt = funcOp->getAttr<ArgCountAttr>()->count;
+    int argcnt = funcOp->get<ArgCountAttr>()->count;
     std::vector<Value> holders;
     for (int i = value + 1; i < std::min(argcnt, 8); i++) {
       auto placeholder = builder.create<PlaceHolderOp>();
@@ -218,8 +216,13 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     builder.setAfterOp(op);
     builder.create<PlaceHolderOp>(holders);
 
-    builder.replace<ReadRegOp>(op, { new RegAttr(argRegs[value]) });
-    return true;
+    if (value < 8) {
+      builder.replace<ReadRegOp>(op, { new RegAttr(argRegs[value]) });
+      return true;
+    }
+
+    // Read from stack. The stack offset might change further, so wait till the end.
+    return false;
   });
 
   region->updateLiveness();
@@ -252,7 +255,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
       // Precolor.
       if (isa<WriteRegOp>(op)) {
-        assignment[op] = op->getAttr<RegAttr>()->reg;
+        assignment[op] = op->get<RegAttr>()->reg;
         priority[op] = 1;
       }
       if (isa<ReadRegOp>(op)) {
@@ -318,11 +321,14 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   std::map<Op*, int> spillOffset;
   int currentOffset = 0;
   auto subsp = region->getFirstBlock()->getFirstOp();
-  if (isa<SubSpOp>(subsp)) {
-    currentOffset = subsp->getAttr<IntAttr>()->value;
-  }
+  if (isa<SubSpOp>(subsp))
+    currentOffset = subsp->get<IntAttr>()->value;
   
   for (auto op : ops) {
+    // Do not allocate colored instructions.
+    if (assignment.count(op))
+      continue;
+
     std::set<Reg> forbidden;
     for (auto v1 : interf[op]) {
       // In the whole function, `sp` and `zero` are read-only.
@@ -343,7 +349,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     int preferred = -1;
     for (auto use : op->getUses()) {
       if (isa<WriteRegOp>(use)) {
-        auto reg = use->getAttr<RegAttr>()->reg;
+        auto reg = use->get<RegAttr>()->reg;
         if (!forbidden.count(reg)) {
           preferred = (int) reg;
           break;
@@ -351,7 +357,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       }
     }
     if (isa<ReadRegOp>(op)) {
-      auto reg = op->getAttr<RegAttr>()->reg;
+      auto reg = op->get<RegAttr>()->reg;
       if (!forbidden.count(reg))
         preferred = (int) reg;
     }
@@ -378,7 +384,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   // Allocate more stack space for it.
   if (currentOffset != 0) {
     if (isa<SubSpOp>(subsp)) {
-      subsp->getAttr<IntAttr>()->value += currentOffset + 8;
+      subsp->get<IntAttr>()->value = currentOffset + 8;
     } else {
       builder.setToRegionStart(region);
       builder.create<SubSpOp>({ new IntAttr(currentOffset + 8) });
@@ -453,7 +459,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   //   mv a0, assignment[%1]
   // As RdAttr is supplied, though `assignment[]` won't have the new op recorded, it's fine.
   runRewriter(funcOp, [&](WriteRegOp *op) {
-    auto rd = new RdAttr(op->getAttr<RegAttr>()->reg);
+    auto rd = new RdAttr(op->get<RegAttr>()->reg);
     auto rs = new RsAttr(getReg(op->getOperand(0).defining));
     builder.replace<MvOp>(op, { rd, rs });
     return true;
@@ -464,7 +470,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   //   mv assignment[%1], a0
   // Note that rd will be placed later. We must update assignment.
   runRewriter(funcOp, [&](ReadRegOp *op) {
-    auto rs = new RsAttr(op->getAttr<RegAttr>()->reg);
+    auto rs = new RsAttr(op->get<RegAttr>()->reg);
     // Now a new MvOp is constructed. Update it in assignment[].
     auto rd = getReg(op);
     auto mv = builder.replace<MvOp>(op, { rs });
@@ -518,7 +524,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     auto bbTerm = bb->getLastOp();
 
     // Create edge for target branch.
-    auto target = bbTerm->getAttr<TargetAttr>();
+    auto target = bbTerm->get<TargetAttr>();
     auto oldTarget = target->bb;
     target->bb = edge1;
 
@@ -526,7 +532,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     builder.create<JOp>({ new TargetAttr(oldTarget) });
 
     // Create edge for else branch.
-    auto ifnot = bbTerm->getAttr<ElseAttr>();
+    auto ifnot = bbTerm->get<ElseAttr>();
     auto oldElse = ifnot->bb;
     ifnot->bb = edge2;
 
@@ -536,7 +542,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     // Rename the blocks of the phis.
     for (auto succ : bb->getSuccs()) {
       for (auto phis : succ->getPhis()) {
-        for (auto attr : phis->getAttrs()) {
+        for (auto attr : phis->gets()) {
           auto from = cast<FromAttr>(attr);
           if (from->bb != bb)
             continue;
@@ -555,7 +561,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     std::vector<Op*> moves;
     for (auto phi : phis) {
       auto &ops = phi->getOperands();
-      auto &attrs = phi->getAttrs();
+      auto &attrs = phi->gets();
       for (size_t i = 0; i < ops.size(); i++) {
         auto bb = cast<FromAttr>(attrs[i])->bb;
         auto terminator = *--bb->getOps().end();
@@ -658,7 +664,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
   for (auto bb : region->getBlocks()) {
     for (auto op : bb->getOps()) {
-      if (hasRd(op) && !op->hasAttr<RdAttr>())
+      if (hasRd(op) && !op->has<RdAttr>())
         op->addAttr<RdAttr>(getReg(op));
     }
   }
@@ -672,7 +678,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     }
 
     for (auto op : spilling) {
-      if (auto rs = op->findAttr<RsAttr>(); rs && (int) rs->reg < 0) {
+      if (auto rs = op->find<RsAttr>(); rs && (int) rs->reg < 0) {
         int offset = -(int) rs->reg;
 
         builder.setBeforeOp(op);
@@ -715,7 +721,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         rs->reg = spillReg;
       }
 
-      if (auto rs2 = op->findAttr<Rs2Attr>(); rs2 && (int) rs2->reg < 0) {
+      if (auto rs2 = op->find<Rs2Attr>(); rs2 && (int) rs2->reg < 0) {
         int offset = -(int) rs2->reg;
 
         builder.setBeforeOp(op);
@@ -747,7 +753,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         rs2->reg = spillReg2;
       }
 
-      if (auto rd = op->findAttr<RdAttr>(); rd && (int) rd->reg < 0) {
+      if (auto rd = op->find<RdAttr>(); rd && (int) rd->reg < 0) {
         int offset = -(int) rd->reg;
 
         builder.setAfterOp(op);
@@ -809,7 +815,7 @@ int RegAlloc::latePeephole(Op *funcOp) {
       return false;
 
     auto load = op->nextOp();
-    if (RS(load) == RS2(op) && IMM(load) == IMM(op) && load->getAttr<SizeAttr>()->value == op->getAttr<SizeAttr>()->value) {
+    if (RS(load) == RS2(op) && IMM(load) == IMM(op) && load->get<SizeAttr>()->value == op->get<SizeAttr>()->value) {
       converted++;
       builder.replace<MvOp>(load, {
         new RdAttr(RD(load)),
@@ -848,7 +854,7 @@ void RegAlloc::tidyup(Region *region) {
   std::map<BasicBlock*, BasicBlock*> jumpTo;
   for (auto bb : region->getBlocks()) {
     if (bb->getOps().size() == 1 && isa<JOp>(bb->getLastOp())) {
-      auto target = bb->getLastOp()->getAttr<TargetAttr>()->bb;
+      auto target = bb->getLastOp()->get<TargetAttr>()->bb;
       jumpTo[bb] = target;
     }
   }
@@ -867,12 +873,12 @@ void RegAlloc::tidyup(Region *region) {
 
   for (auto bb : region->getBlocks()) { 
     auto term = bb->getLastOp();
-    if (auto target = term->findAttr<TargetAttr>()) {
+    if (auto target = term->find<TargetAttr>()) {
       if (jumpTo.count(target->bb))
         target->bb = jumpTo[target->bb];
     }
 
-    if (auto ifnot = term->findAttr<ElseAttr>()) {
+    if (auto ifnot = term->find<ElseAttr>()) {
       if (jumpTo.count(ifnot->bb))
         ifnot->bb = jumpTo[ifnot->bb];
     }
@@ -890,7 +896,7 @@ void RegAlloc::tidyup(Region *region) {
 
   // Also, eliminate useless JOp.
   runRewriter(funcOp, [&](JOp *op) {
-    auto &target = op->getAttr<TargetAttr>()->bb;
+    auto &target = op->get<TargetAttr>()->bb;
     auto me = op->getParent();
     if (me == me->getParent()->getLastBlock())
       return false;
@@ -987,7 +993,7 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
   auto op = region->getFirstBlock()->getFirstOp();
   int offset = 0;
   if (isa<SubSpOp>(op)) {
-    offset = op->getAttr<IntAttr>()->value;
+    offset = op->get<IntAttr>()->value;
     op->removeAttr<IntAttr>();
     op->addAttr<IntAttr>(offset += 8 * preserve.size());
   } else if (!preserve.empty()) {
@@ -998,7 +1004,7 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
   // Round op to the nearest multiple of 16.
   // This won't be entered in the special case where offset == 0.
   if (offset % 16 != 0) {
-    int &value = op->getAttr<IntAttr>()->value;
+    int &value = op->get<IntAttr>()->value;
     offset = value = offset / 16 * 16 + 16;
   }
 
@@ -1020,51 +1026,40 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
     builder.create<RetOp>();
   }
 
-  // For each call, preserve caller-preserved ones.
-  std::vector<Reg> callPreserve;
-  for (auto x : usedRegs) {
-    if (callerSaved.count(x))
-      callPreserve.push_back(x);
-  }
+  // Caller preserved registers are marked correctly as interfered,
+  // because of the placeholders.
 
-  if (!callPreserve.empty()) {
-    auto calls = funcOp->findAll<CallOp>();
-    for (auto call : calls) {
-      std::vector<Reg> caller;
-      auto callName = call->getAttr<NameAttr>()->name;
-      // Surely we don't need to preserve arguments.
-      // TODO: handle this.
-      break;
-      
-      if (isExtern(callName))
-        caller = callPreserve;
-      else {
-        // If we know what registers that function would use,
-        // then we only need to preserve those registers that get tampered with.
-        auto calledFunc = fnMap[callName];
-        for (auto r : callPreserve) {
-          if (usedRegisters[calledFunc].count(r))
-            caller.push_back(r);
-        }
-      }
+  // Deal with remaining GetArg.
+  runRewriter(funcOp, [&](GetArgOp *op) {
+    auto value = op->get<IntAttr>()->value;
+    assert(value >= 8);
 
-      int offset = caller.size() * 4;
-
-      builder.setBeforeOp(call);
-      builder.create<SubSpOp>({ new IntAttr(offset) });
-      save(builder, caller, offset);
-
-      builder.setAfterOp(call);
-      load(builder, caller, offset);
-      builder.create<SubSpOp>({ new IntAttr(-offset) });
-    }
-  }
+    // Read from stack.
+    int offset = 0;
+    auto subsp = region->getFirstBlock()->getFirstOp();
+    if (isa<SubSpOp>(subsp))
+      offset = subsp->get<IntAttr>()->value;
+    // `sp + offset` is the base pointer.
+    // We read past the base pointer (starting from 0):
+    //    <arg 8> bp + 0
+    //    <arg 9> bp + 8
+    // ...
+    offset += (value - 8) * 8;
+    builder.setBeforeOp(op);
+    builder.replace<LoadOp>(op, {
+      new RdAttr(RD(op)),
+      new RsAttr(Reg::sp),
+      new IntAttr(offset),
+      new SizeAttr(8)
+    });
+    return false;
+  });
 
   //   subsp <4>
   // becomes
   //   addi <rd = sp> <rs = sp> <-4>
   runRewriter(funcOp, [&](SubSpOp *op) {
-    int offset = op->getAttr<IntAttr>()->value;
+    int offset = op->get<IntAttr>()->value;
     if (offset <= 2048 && offset > -2048) {
       builder.replace<AddiOp>(op, {
         new RdAttr(Reg::sp),
@@ -1104,12 +1099,12 @@ void RegAlloc::run() {
     auto &set = usedRegisters[func];
     for (auto bb : func->getRegion()->getBlocks()) {
       for (auto op : bb->getOps()) {
-        if (op->hasAttr<RdAttr>())
-          set.insert(op->getAttr<RdAttr>()->reg);
-        if (op->hasAttr<RsAttr>())
-          set.insert(op->getAttr<RsAttr>()->reg);
-        if (op->hasAttr<Rs2Attr>())
-          set.insert(op->getAttr<Rs2Attr>()->reg);
+        if (op->has<RdAttr>())
+          set.insert(op->get<RdAttr>()->reg);
+        if (op->has<RsAttr>())
+          set.insert(op->get<RsAttr>()->reg);
+        if (op->has<Rs2Attr>())
+          set.insert(op->get<Rs2Attr>()->reg);
       }
     }
   }

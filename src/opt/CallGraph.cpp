@@ -10,9 +10,9 @@ void CallGraph::run() {
   auto calls = module->findAll<CallOp>();
   for (auto call : calls) {
     auto func = call->getParentOp<FuncOp>();
-    auto calledName = call->getAttr<NameAttr>()->name;
+    auto calledName = call->get<NameAttr>()->name;
     if (!isExtern(calledName))
-      calledBy[calledName].insert(func->getAttr<NameAttr>()->name);
+      calledBy[calledName].insert(func->get<NameAttr>()->name);
   }
 
   auto toplevel = module->getRegion()->getFirstBlock()->getOps();
@@ -21,10 +21,10 @@ void CallGraph::run() {
       continue;
 
     // Remove the old version.
-    if (op->hasAttr<CallerAttr>())
+    if (op->has<CallerAttr>())
       op->removeAttr<CallerAttr>();
 
-    const auto &name = op->getAttr<NameAttr>()->name;
+    const auto &name = op->get<NameAttr>()->name;
     const auto &callersSet = calledBy[name];
     std::vector<std::string> callers(callersSet.begin(), callersSet.end());
     op->addAttr<CallerAttr>(callers);

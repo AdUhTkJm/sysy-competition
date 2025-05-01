@@ -174,7 +174,7 @@ void tidy(FuncOp *func) {
       continue;
 
     auto last = bb->getLastOp();
-    auto target = last->getAttr<TargetAttr>();
+    auto target = last->get<TargetAttr>();
     inliner[bb] = target->bb;
   }
 
@@ -186,13 +186,13 @@ void tidy(FuncOp *func) {
 
   for (auto bb : body->getBlocks()) {
     auto last = bb->getLastOp();
-    if (last->hasAttr<TargetAttr>()) {
-      auto target = last->getAttr<TargetAttr>();
+    if (last->has<TargetAttr>()) {
+      auto target = last->get<TargetAttr>();
       update(target->bb);
     }
 
-    if (last->hasAttr<ElseAttr>()) {
-      auto ifnot = last->getAttr<ElseAttr>();
+    if (last->has<ElseAttr>()) {
+      auto ifnot = last->get<ElseAttr>();
       update(ifnot->bb);
     }
   }

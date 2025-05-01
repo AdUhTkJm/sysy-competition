@@ -15,7 +15,7 @@ std::map<std::string, int> InstCombine::stats() {
 }
 
 bool inRange(Op *op) {
-  auto attr = op->getAttr<IntAttr>();
+  auto attr = op->get<IntAttr>();
   return attr->value >= -2048 && attr->value <= 2047;
 }
 
@@ -31,13 +31,13 @@ void InstCombine::run() {
     auto y = op->getOperand(1).defining;
     if (isa<LiOp>(x) && inRange(x)) {
       combined++;
-      builder.replace<AddiOp>(op, { y }, { x->getAttr<IntAttr>() });
+      builder.replace<AddiOp>(op, { y }, { x->get<IntAttr>() });
       return true;
     }
 
     if (isa<LiOp>(y) && inRange(y)) {
       combined++;
-      builder.replace<AddiOp>(op, { x }, { y->getAttr<IntAttr>() });
+      builder.replace<AddiOp>(op, { x }, { y->get<IntAttr>() });
       return true;
     }
 
@@ -49,13 +49,13 @@ void InstCombine::run() {
     auto y = op->getOperand(1).defining;
     if (isa<LiOp>(x) && inRange(x)) {
       combined++;
-      builder.replace<AddiwOp>(op, { y }, { x->getAttr<IntAttr>() });
+      builder.replace<AddiwOp>(op, { y }, { x->get<IntAttr>() });
       return true;
     }
 
     if (isa<LiOp>(y) && inRange(y)) {
       combined++;
-      builder.replace<AddiwOp>(op, { x }, { y->getAttr<IntAttr>() });
+      builder.replace<AddiwOp>(op, { x }, { y->get<IntAttr>() });
       return true;
     }
 
@@ -68,7 +68,7 @@ void InstCombine::run() {
     // Note we can't fold on `x`.
 
     if (isa<LiOp>(y) && inRange(y)) {
-      auto val = -y->getAttr<IntAttr>()->value;
+      auto val = -y->get<IntAttr>()->value;
       if (!inRange(val))
         return false;
 
@@ -86,7 +86,7 @@ void InstCombine::run() {
     // Note we can't fold on `x`.
 
     if (isa<LiOp>(y) && inRange(y)) {
-      auto val = -y->getAttr<IntAttr>()->value;
+      auto val = -y->get<IntAttr>()->value;
       if (!inRange(val))
         return false;
 
@@ -102,12 +102,12 @@ void InstCombine::run() {
     auto value = op->getOperand(0);
     auto addr = op->getOperand(1).defining;
     if (isa<AddiOp>(addr)) {
-      auto offset = addr->getAttr<IntAttr>()->value;
-      auto &currentOffset = op->getAttr<IntAttr>()->value;
+      auto offset = addr->get<IntAttr>()->value;
+      auto &currentOffset = op->get<IntAttr>()->value;
       if (inRange(offset + currentOffset)) {
         currentOffset += offset;
         auto base = addr->getOperand();
-        builder.replace<StoreOp>(op, { value, base }, op->getAttrs());
+        builder.replace<StoreOp>(op, { value, base }, op->gets());
         return true;
       }
     }
@@ -117,12 +117,12 @@ void InstCombine::run() {
   runRewriter([&](LoadOp *op) {
     auto addr = op->getOperand(0).defining;
     if (isa<AddiOp>(addr)) {
-      auto offset = addr->getAttr<IntAttr>()->value;
-      auto &currentOffset = op->getAttr<IntAttr>()->value;
+      auto offset = addr->get<IntAttr>()->value;
+      auto &currentOffset = op->get<IntAttr>()->value;
       if (inRange(offset + currentOffset)) {
         currentOffset += offset;
         auto base = addr->getOperand();
-        builder.replace<LoadOp>(op, { base }, op->getAttrs());
+        builder.replace<LoadOp>(op, { base }, op->gets());
         return true;
       }
     }
@@ -130,7 +130,7 @@ void InstCombine::run() {
   });
 
   runRewriter([&](AddiwOp *op) {
-    if (op->getAttr<IntAttr>()->value == 0) {
+    if (op->get<IntAttr>()->value == 0) {
       op->replaceAllUsesWith(op->getOperand().defining);
       op->erase();
       return true;
@@ -139,7 +139,7 @@ void InstCombine::run() {
   });
 
   runRewriter([&](AddiOp *op) {
-    if (op->getAttr<IntAttr>()->value == 0) {
+    if (op->get<IntAttr>()->value == 0) {
       op->replaceAllUsesWith(op->getOperand().defining);
       op->erase();
       return true;
@@ -150,7 +150,7 @@ void InstCombine::run() {
   // Only run this after all int-related fold completes.
   // Rewrite `li a0, 0` into reading from `zero`.
   runRewriter([&](LiOp *op) {
-    if (op->getAttr<IntAttr>()->value == 0) {
+    if (op->get<IntAttr>()->value == 0) {
       builder.replace<ReadRegOp>(op, { new RegAttr(Reg::zero)} );
     }
     return false;

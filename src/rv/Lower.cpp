@@ -28,7 +28,7 @@ void rewriteAlloca(FuncOp *func) {
     if (!isa<AllocaOp>(op))
       continue;
 
-    size_t size = op->getAttr<SizeAttr>()->value;
+    size_t size = op->get<SizeAttr>()->value;
     total += size;
     allocas.push_back(cast<AllocaOp>(op));
   }
@@ -46,7 +46,7 @@ void rewriteAlloca(FuncOp *func) {
     auto add = builder.create<AddOp>({ spValue, offsetValue });
     op->replaceAllUsesWith(add);
 
-    size_t size = op->getAttr<SizeAttr>()->value;
+    size_t size = op->get<SizeAttr>()->value;
     offset += size;
     op->erase();
   }
@@ -60,7 +60,7 @@ void rewriteAlloca(FuncOp *func) {
 
 #define REPLACE(BeforeTy, AfterTy) \
   runRewriter([&](BeforeTy *op) { \
-    builder.replace<AfterTy>(op, op->getOperands(), op->getAttrs()); \
+    builder.replace<AfterTy>(op, op->getOperands(), op->gets()); \
     return true; \
   });
 
@@ -95,7 +95,7 @@ void Lower::run() {
     
     builder.setBeforeOp(op);
     auto zero = builder.create<LiOp>({ new IntAttr(0) });
-    builder.replace<SubOp>(op, { zero, value }, op->getAttrs());
+    builder.replace<SubOp>(op, { zero, value }, op->gets());
     return true;
   });
 
@@ -104,7 +104,7 @@ void Lower::run() {
     auto nom = op->getOperand(1);
 
     builder.setBeforeOp(op);
-    auto quot = builder.create<DivwOp>(op->getOperands(), op->getAttrs());
+    auto quot = builder.create<DivwOp>(op->getOperands(), op->gets());
     auto mul = builder.create<MulwOp>({ quot, nom });
     builder.replace<SubOp>(op, { denom, mul });
     return true;
@@ -114,12 +114,12 @@ void Lower::run() {
     auto cond = op->getOperand().defining;
 
     if (isa<EqOp>(cond)) {
-      builder.replace<BeqOp>(op, cond->getOperands(), op->getAttrs());
+      builder.replace<BeqOp>(op, cond->getOperands(), op->gets());
       return true;
     }
 
     if (isa<NeOp>(cond)) {
-      builder.replace<BneOp>(op, cond->getOperands(), op->getAttrs());
+      builder.replace<BneOp>(op, cond->getOperands(), op->gets());
       return true;
     }
 
@@ -127,18 +127,18 @@ void Lower::run() {
     if (isa<LeOp>(cond)) {
       auto v1 = cond->getOperand(0);
       auto v2 = cond->getOperand(1);
-      builder.replace<BgeOp>(op, { v2, v1 }, op->getAttrs());
+      builder.replace<BgeOp>(op, { v2, v1 }, op->gets());
       return true;
     }
 
     if (isa<LtOp>(cond)) {
-      builder.replace<BltOp>(op, cond->getOperands(), op->getAttrs());
+      builder.replace<BltOp>(op, cond->getOperands(), op->gets());
       return true;
     }
 
     builder.setBeforeOp(op);
     auto zero = builder.create<ReadRegOp>({ new RegAttr(Reg::zero) });
-    builder.replace<BneOp>(op, { cond, zero }, op->getAttrs());
+    builder.replace<BneOp>(op, { cond, zero }, op->gets());
     return true;
   });
 
@@ -148,7 +148,7 @@ void Lower::run() {
   runRewriter([&](EqOp *op) {
     builder.setBeforeOp(op);
     // 'xor' is a keyword of C++.
-    auto xorOp = builder.create<XorOp>(op->getOperands(), op->getAttrs());
+    auto xorOp = builder.create<XorOp>(op->getOperands(), op->gets());
     builder.replace<SeqzOp>(op,{ xorOp });
     return true;
   });
@@ -156,7 +156,7 @@ void Lower::run() {
   runRewriter([&](NeOp *op) {
     builder.setBeforeOp(op);
     // 'xor' is a keyword of C++.
-    auto xorOp = builder.create<XorOp>(op->getOperands(), op->getAttrs());
+    auto xorOp = builder.create<XorOp>(op->getOperands(), op->gets());
     builder.replace<SnezOp>(op,{ xorOp });
     return true;
   });
@@ -166,19 +166,19 @@ void Lower::run() {
     auto l = op->getOperand(0);
     auto r = op->getOperand(1);
     // Turn (l <= r) into !(r < l).
-    auto xorOp = builder.create<SltOp>({ r, l }, op->getAttrs());
+    auto xorOp = builder.create<SltOp>({ r, l }, op->gets());
     builder.replace<SeqzOp>(op,{ xorOp });
     return true;
   });
 
   runRewriter([&](sys::LoadOp *op) {
-    auto load = builder.replace<sys::rv::LoadOp>(op, op->getOperands(), op->getAttrs());
+    auto load = builder.replace<sys::rv::LoadOp>(op, op->getOperands(), op->gets());
     load->addAttr<IntAttr>(0);
     return true;
   });
 
   runRewriter([&](sys::StoreOp *op) {
-    auto store = builder.replace<sys::rv::StoreOp>(op, op->getOperands(), op->getAttrs());
+    auto store = builder.replace<sys::rv::StoreOp>(op, op->getOperands(), op->gets());
     store->addAttr<IntAttr>(0);
     return true;
   });
@@ -206,22 +206,32 @@ void Lower::run() {
   runRewriter([&](sys::CallOp *op) {
     builder.setBeforeOp(op);
     const auto &args = op->getOperands();
-    // TODO: spilling
-    assert(args.size() <= 8);
 
     std::vector<Value> argsNew;
-    for (int i = 0; i < args.size(); i++)
-      argsNew.push_back(
-      builder.create<WriteRegOp>({ args[i] },
-       {
-            new RegAttr(regs[i])
-          })
-      );
+    for (int i = 0; i < std::min((int) args.size(), 8); i++)
+      argsNew.push_back(builder.create<WriteRegOp>({ args[i] }, { new RegAttr(regs[i]) }));
+
+    // More registers must get spilled to stack.
+    int stackOffset = (args.size() - 8) * 8;
+    // Align to 16 bytes.
+    if (stackOffset % 16 != 0)
+      stackOffset = stackOffset / 16 * 16 + 16;
+    if (args.size() > 8)
+      builder.create<SubSpOp>({ new IntAttr(stackOffset) });
+    
+    for (int i = 8; i < args.size(); i++) {
+      auto sp = builder.create<ReadRegOp>({ new RegAttr(Reg::sp) });
+      builder.create<StoreOp>({ op->getOperand(i), sp }, { new SizeAttr(8), new IntAttr((i - 8) * 8) });
+    }
 
     builder.create<sys::rv::CallOp>(argsNew, { 
-      op->getAttr<NameAttr>(),
+      op->get<NameAttr>(),
       new ArgCountAttr(args.size())
     });
+
+    // Restore stack pointer.
+    if (args.size() > 8)
+      builder.create<SubSpOp>({ new IntAttr(-stackOffset) });
 
     // Read result from a0.
     builder.replace<ReadRegOp>(op, { new RegAttr(Reg::a0) });

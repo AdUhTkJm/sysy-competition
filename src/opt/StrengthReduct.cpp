@@ -53,8 +53,8 @@ int StrengthReduct::runImpl() {
     // Const fold if possible.
     if (isa<IntOp>(x.defining) && isa<IntOp>(y.defining)) {
       converted++;
-      auto vx = x.defining->getAttr<IntAttr>()->value;
-      auto vy = y.defining->getAttr<IntAttr>()->value;
+      auto vx = x.defining->get<IntAttr>()->value;
+      auto vy = y.defining->get<IntAttr>()->value;
       builder.replace<IntOp>(op, { new IntAttr(vx * vy) });
       return true;
     }
@@ -68,7 +68,7 @@ int StrengthReduct::runImpl() {
     if (!isa<IntOp>(y.defining)) 
       return false;
 
-    auto i = y.defining->getAttr<IntAttr>()->value;
+    auto i = y.defining->get<IntAttr>()->value;
     if (i < 0)
       return false;
 
@@ -142,8 +142,8 @@ int StrengthReduct::runImpl() {
     // Const fold if possible.
     if (isa<IntOp>(x.defining) && isa<IntOp>(y.defining)) {
       converted++;
-      auto vx = x.defining->getAttr<IntAttr>()->value;
-      auto vy = y.defining->getAttr<IntAttr>()->value;
+      auto vx = x.defining->get<IntAttr>()->value;
+      auto vy = y.defining->get<IntAttr>()->value;
       builder.replace<IntOp>(op, { new IntAttr(vx / vy) });
       return true;
     }
@@ -151,7 +151,7 @@ int StrengthReduct::runImpl() {
     if (!isa<IntOp>(y.defining))
       return false;
 
-    auto i = y.defining->getAttr<IntAttr>()->value;
+    auto i = y.defining->get<IntAttr>()->value;
     if (i == 1) {
       converted++;
       op->replaceAllUsesWith(x.defining);
@@ -217,8 +217,8 @@ int StrengthReduct::runImpl() {
 
     // Const fold if possible.
     if (isa<IntOp>(x.defining) && isa<IntOp>(y.defining)) {
-      auto vx = x.defining->getAttr<IntAttr>()->value;
-      auto vy = y.defining->getAttr<IntAttr>()->value;
+      auto vx = x.defining->get<IntAttr>()->value;
+      auto vy = y.defining->get<IntAttr>()->value;
       builder.replace<IntOp>(op, { new IntAttr(vx % vy) });
       return true;
     }
@@ -226,7 +226,7 @@ int StrengthReduct::runImpl() {
     if (!isa<IntOp>(y.defining))
       return false;
 
-    int i = y.defining->getAttr<IntAttr>()->value;
+    int i = y.defining->get<IntAttr>()->value;
 
     if (i < 0)
       return false;
@@ -250,7 +250,7 @@ int StrengthReduct::runImpl() {
     //   x - %mul
     converted++;
     builder.setBeforeOp(op);
-    auto quot = builder.create<DivIOp>(op->getOperands(), op->getAttrs());
+    auto quot = builder.create<DivIOp>(op->getOperands(), op->gets());
     auto mul = builder.create<MulIOp>({ quot, y });
     builder.replace<SubIOp>(op, { x, mul });
 

@@ -1,7 +1,7 @@
 #ifndef RV_OPS_H
 #define RV_OPS_H
 
-#include "../codegen/OpBase.h"
+#include "../codegen/Ops.h"
 
 // Don't forget that we actually rely on OpID, and __LINE__ can duplicate with codegen/Ops.h.
 #define RVOPBASE(ValueTy, Ty) \
@@ -102,7 +102,8 @@ inline bool hasRd(Op *op) {
     isa<LaOp>(op) ||
     isa<AndOp>(op) ||
     isa<OrOp>(op) ||
-    isa<XorOp>(op);
+    isa<XorOp>(op) ||
+    isa<GetArgOp>(op);
 }
 
 }

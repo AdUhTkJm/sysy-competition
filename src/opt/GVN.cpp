@@ -27,7 +27,7 @@ bool GVN::Expr::operator<(const Expr &other) const {
 #define ALLOW(Ty) || isa<Ty>(op)
 bool allowed(Op *op) {
   return
-    (isa<CallOp>(op) && !op->hasAttr<ImpureAttr>())
+    (isa<CallOp>(op) && !op->has<ImpureAttr>())
     ALLOW(AddIOp)
     ALLOW(SubIOp)
     ALLOW(MulIOp)
@@ -127,11 +127,11 @@ void GVN::dvnt(BasicBlock *bb, Domtree &domtree) {
         isa<MulIOp>(op) || isa<MulFOp>(op) || isa<MulLOp>(op))
       std::sort(key.operands.begin(), key.operands.end());
 
-    if (auto attr = op->findAttr<IntAttr>())
+    if (auto attr = op->find<IntAttr>())
       key.vi = attr->value;
-    if (auto attr = op->findAttr<FloatAttr>())
+    if (auto attr = op->find<FloatAttr>())
       key.vf = attr->value;
-    if (auto attr = op->findAttr<NameAttr>())
+    if (auto attr = op->find<NameAttr>())
       key.name = attr->name;
 
     if (exprNum.count(key)) {

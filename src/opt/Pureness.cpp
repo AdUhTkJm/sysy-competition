@@ -53,7 +53,7 @@ void Pureness::predetermineImpure(FuncOp *func) {
 
       // This is a load, retrieving the underlying argument, which is an address.
       // If anything stores to the address then the function is impure.
-      if (hasStoresTo(use) && !func->hasAttr<ImpureAttr>()) {
+      if (hasStoresTo(use) && !func->has<ImpureAttr>()) {
         func->addAttr<ImpureAttr>();
         return;
       }
@@ -73,10 +73,10 @@ void Pureness::run() {
   auto calls = module->findAll<CallOp>();
   for (auto call : calls) {
     auto func = call->getParentOp<FuncOp>();
-    auto calledName = call->getAttr<NameAttr>()->name;
+    auto calledName = call->get<NameAttr>()->name;
     if (!isExtern(calledName))
       callGraph[func].insert(fnMap[calledName]);
-    else if (!func->hasAttr<ImpureAttr>())
+    else if (!func->has<ImpureAttr>())
       // External functions are impure.
       func->addAttr<ImpureAttr>();
   }
@@ -88,7 +88,7 @@ void Pureness::run() {
 
   // Every function that accesses globals is impure.
   for (auto func : funcs) {
-    if (!func->hasAttr<ImpureAttr>() && !func->findAll<GetGlobalOp>().empty())
+    if (!func->has<ImpureAttr>() && !func->findAll<GetGlobalOp>().empty())
       func->addAttr<ImpureAttr>();
   }
 
@@ -100,12 +100,12 @@ void Pureness::run() {
     for (auto func : funcs) {
       bool impure = false;
       for (auto v : callGraph[func]) {
-        if (v->hasAttr<ImpureAttr>()) {
+        if (v->has<ImpureAttr>()) {
           impure = true;
           break;
         }
       }
-      if (!func->hasAttr<ImpureAttr>() && impure) {
+      if (!func->has<ImpureAttr>() && impure) {
         changed = true;
         func->addAttr<ImpureAttr>();
       }

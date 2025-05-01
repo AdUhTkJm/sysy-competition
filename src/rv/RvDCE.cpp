@@ -26,7 +26,7 @@ bool RvDCE::isImpure(Op *op) {
 void RvDCE::markImpure(Region *region) {
   for (auto bb : region->getBlocks()) {
     for (auto op : bb->getOps()) {
-      if (isImpure(op) && !op->hasAttr<ImpureAttr>())
+      if (isImpure(op) && !op->has<ImpureAttr>())
         op->addAttr<ImpureAttr>();
     }
   }
@@ -36,7 +36,7 @@ void RvDCE::runOnRegion(Region *region) {
   markImpure(region);
   for (auto bb : region->getBlocks()) {
     for (auto op : bb->getOps()) {
-      if (!op->hasAttr<ImpureAttr>() && op->getUses().size() == 0)
+      if (!op->has<ImpureAttr>() && op->getUses().size() == 0)
         removeable.push_back(op);
       else for (auto r : op->getRegions())
         runOnRegion(r);

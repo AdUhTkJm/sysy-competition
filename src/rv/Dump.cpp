@@ -37,7 +37,7 @@ void dumpOp(Op *op, std::ostream &os) {
   // Vary opname based on the size attribute.
   // TODO.
   if (isa<sys::rv::StoreOp>(op)) {
-    auto size = op->getAttr<SizeAttr>()->value;
+    auto size = op->get<SizeAttr>()->value;
     switch (size) {
     case 8:
       name = "sd";
@@ -49,15 +49,15 @@ void dumpOp(Op *op, std::ostream &os) {
       assert(false);
     }
     // Dump as `sw a0, 4(a1)`
-    auto rs = op->getAttr<RsAttr>()->reg;
-    auto rs2 = op->getAttr<Rs2Attr>()->reg;
-    auto offset = op->getAttr<IntAttr>()->value;
+    auto rs = op->get<RsAttr>()->reg;
+    auto rs2 = op->get<Rs2Attr>()->reg;
+    auto offset = op->get<IntAttr>()->value;
     os << name << " " << rs << ", " << offset << "(" << rs2 << ")\n";
     return;
   }
 
   if (isa<sys::rv::LoadOp>(op)) {
-    auto size = op->getAttr<SizeAttr>()->value;
+    auto size = op->get<SizeAttr>()->value;
     switch (size) {
     case 8:
       name = "ld";
@@ -68,9 +68,9 @@ void dumpOp(Op *op, std::ostream &os) {
     default:
       assert(false);
     }
-    auto rd = op->getAttr<RdAttr>()->reg;
-    auto rs = op->getAttr<RsAttr>()->reg;
-    auto offset = op->getAttr<IntAttr>()->value;
+    auto rd = op->get<RdAttr>()->reg;
+    auto rs = op->get<RsAttr>()->reg;
+    auto offset = op->get<IntAttr>()->value;
     os << name << " " << rd << ", " << offset << "(" << rs << ")\n";
     return;
   }
@@ -78,33 +78,33 @@ void dumpOp(Op *op, std::ostream &os) {
   std::stringstream ss;
   ss << name << " ";
   
-  if (op->hasAttr<RdAttr>()) {
-    auto rd = op->getAttr<RdAttr>()->reg;
+  if (op->has<RdAttr>()) {
+    auto rd = op->get<RdAttr>()->reg;
     ss << rd << ", ";
   }
 
-  if (op->hasAttr<RsAttr>()) {
-    auto rs = op->getAttr<RsAttr>()->reg;
+  if (op->has<RsAttr>()) {
+    auto rs = op->get<RsAttr>()->reg;
     ss << rs << ", ";
   }
 
-  if (op->hasAttr<Rs2Attr>()) {
-    auto rs2 = op->getAttr<Rs2Attr>()->reg;
+  if (op->has<Rs2Attr>()) {
+    auto rs2 = op->get<Rs2Attr>()->reg;
     ss << rs2 << ", ";
   }
 
-  if (op->hasAttr<IntAttr>()) {
-    auto vi = op->getAttr<IntAttr>()->value;
+  if (op->has<IntAttr>()) {
+    auto vi = op->get<IntAttr>()->value;
     ss << vi << ", ";
   }
 
-  if (op->hasAttr<TargetAttr>()) {
-    auto bb = op->getAttr<TargetAttr>()->bb;
+  if (op->has<TargetAttr>()) {
+    auto bb = op->get<TargetAttr>()->bb;
     ss << "bb" << getCount(bb) << ", ";
   }
 
-  if (op->hasAttr<NameAttr>()) {
-    auto name = op->getAttr<NameAttr>()->name;
+  if (op->has<NameAttr>()) {
+    auto name = op->get<NameAttr>()->name;
     ss << name << ", ";
   }
 
@@ -123,7 +123,7 @@ void Dump::dump(std::ostream &os) {
   auto funcs = module->findAll<FuncOp>();
 
   for (auto func : funcs) {
-    os << func->getAttr<NameAttr>()->name << ":\n";
+    os << func->get<NameAttr>()->name << ":\n";
     for (auto bb : func->getRegion()->getBlocks()) {
       os << "bb" << getCount(bb) << ":\n";
 
@@ -144,16 +144,16 @@ void Dump::dump(std::ostream &os) {
   for (auto global : globals) {
     // It must have been 4 bytes long for each element.
     // Here `size` is the total number of bytes.
-    auto size = global->getAttr<SizeAttr>()->value;
+    auto size = global->get<SizeAttr>()->value;
     assert(size >= 1);
 
-    if (auto intArr = global->findAttr<IntArrayAttr>()) {
+    if (auto intArr = global->find<IntArrayAttr>()) {
       if (intArr->allZero) {
         bss.push_back(global);
         continue;
       }
 
-      os << global->getAttr<NameAttr>()->name << ":\n";
+      os << global->get<NameAttr>()->name << ":\n";
       os << "  .word " << intArr->vi[0];
       for (size_t i = 1; i < size / 4; i++)
         os << ", " << intArr->vi[i];
@@ -165,8 +165,8 @@ void Dump::dump(std::ostream &os) {
   if (!bss.empty())
     os << "\n.bss\n  .align 4\n";
   for (auto global : bss) {
-    os << global->getAttr<NameAttr>()->name << ":\n  .space ";
-    os << global->getAttr<SizeAttr>()->value << "\n";
+    os << global->get<NameAttr>()->name << ":\n  .space ";
+    os << global->get<SizeAttr>()->value << "\n";
   }
 }
 

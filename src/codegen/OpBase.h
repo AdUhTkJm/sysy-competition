@@ -190,7 +190,7 @@ public:
   const auto &getUses() const { return uses; }
   const auto &getRegions() const { return regions; }
   const auto &getOperands() const { return operands; }
-  const auto &getAttrs() const { return attrs; }
+  const auto &gets() const { return attrs; }
 
   Region *getRegion(int i = 0) { return regions[i]; }
   Value getOperand(int i = 0) { return operands[i]; }
@@ -216,7 +216,7 @@ public:
   void moveToEnd(BasicBlock *block);
 
   template<class T>
-  bool hasAttr() {
+  bool has() {
     for (auto x : attrs)
       if (isa<T>(x))
         return true;
@@ -224,7 +224,7 @@ public:
   }
 
   template<class T>
-  T *getAttr() {
+  T *get() {
     for (auto x : attrs)
       if (isa<T>(x))
         return cast<T>(x);
@@ -232,7 +232,7 @@ public:
   }
 
   template<class T>
-  T *findAttr() {
+  T *find() {
     for (auto x : attrs)
       if (isa<T>(x))
         return cast<T>(x);

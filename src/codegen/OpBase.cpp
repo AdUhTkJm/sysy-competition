@@ -334,13 +334,13 @@ void Region::updatePreds() {
   for (auto bb : bbs) {
     assert(bb->getOps().size() > 0);
     auto last = bb->getLastOp();
-    if (last->hasAttr<TargetAttr>()) {
-      auto target = last->getAttr<TargetAttr>();
+    if (last->has<TargetAttr>()) {
+      auto target = last->get<TargetAttr>();
       target->bb->preds.insert(bb);
     }
 
-    if (last->hasAttr<ElseAttr>()) {
-      auto ifnot = last->getAttr<ElseAttr>();
+    if (last->has<ElseAttr>()) {
+      auto ifnot = last->get<ElseAttr>();
       ifnot->bb->preds.insert(bb);
     }
   }
@@ -521,7 +521,7 @@ void Region::updateLiveness() {
         );
         for (auto phi : phis[succ]) {
           auto &ops = phi->getOperands();
-          auto &attrs = phi->getAttrs();
+          auto &attrs = phi->gets();
           for (size_t i = 0; i < ops.size(); i++) {
             if (bb->reachable(cast<FromAttr>(attrs[i])->bb))
               liveOut.insert(ops[i].defining);

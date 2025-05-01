@@ -19,10 +19,10 @@ bool DCE::isImpure(Op *op) {
     return true;
 
   if (isa<CallOp>(op)) {
-    auto name = op->getAttr<NameAttr>()->name;
+    auto name = op->get<NameAttr>()->name;
     if (isExtern(name))
       return true;
-    return fnMap[name]->hasAttr<ImpureAttr>();
+    return fnMap[name]->has<ImpureAttr>();
   }
 
   return false;
@@ -38,7 +38,7 @@ bool DCE::markImpure(Region *region) {
       for (auto r : op->getRegions())
         opImpure |= markImpure(r);
 
-      if (opImpure && !op->hasAttr<ImpureAttr>()) {
+      if (opImpure && !op->has<ImpureAttr>()) {
         impure = true;
         op->addAttr<ImpureAttr>();
       }
@@ -50,7 +50,7 @@ bool DCE::markImpure(Region *region) {
 void DCE::runOnRegion(Region *region) {
   for (auto bb : region->getBlocks()) {
     for (auto op : bb->getOps()) {
-      if (!op->hasAttr<ImpureAttr>() && op->getUses().size() == 0)
+      if (!op->has<ImpureAttr>() && op->getUses().size() == 0)
         removeable.push_back(op);
       else for (auto r : op->getRegions())
         runOnRegion(r);
@@ -84,10 +84,10 @@ void DCE::run() {
     changed = false;
     for (auto func : funcs) {
       // main() might not be used, but it must be preserved.
-      if (func->getAttr<NameAttr>()->name == "main")
+      if (func->get<NameAttr>()->name == "main")
         continue;
 
-      if (!func->getAttr<CallerAttr>()->callers.size()) {
+      if (!func->get<CallerAttr>()->callers.size()) {
         func->erase();
         changed = true;
         elimFn++;

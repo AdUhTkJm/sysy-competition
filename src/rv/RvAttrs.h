@@ -56,7 +56,7 @@ inline std::string showReg(Reg reg) {
     REGS
 #undef X
   }
-  return "unknown";
+  return "<unknown = " + std::to_string((int) reg) + ">";
 }
 
 #undef REGS
