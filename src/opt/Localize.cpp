@@ -10,7 +10,13 @@ void Localize::run() {
   auto funcs = collectFuncs();
   auto fnMap = getFunctionMap();
 
-  for (auto func : funcs) {
+  // The pass would be called multiple times,
+  // as Inline will reveal new opportunities of localization.
+  if (!beforeFlatten)
+    // We have lost structured control flow.
+    // The only thing we can guarantee is that main() is called at most once.
+    atMostOnce = { fnMap["main"] };
+  else for (auto func : funcs) {
     const auto &callers = func->get<CallerAttr>()->callers;
 
     if (callers.size() == 0) {
@@ -94,16 +100,37 @@ void Localize::run() {
     // Now we can replace the global with a local variable.
     auto user = *v.begin();
     auto region = user->getRegion();
-    builder.setToBlockEnd(region->getFirstBlock());
-    auto bb = region->insertAfter(region->getFirstBlock());
-    // We must make sure the whole entry block contains only alloca.
-    // This is also for further transformations that append allocas to the first block.
-    builder.setToBlockStart(bb);
-    auto addr = builder.create<AllocaOp>();
-    auto init = builder.create<IntOp>({
-      new IntAttr(k->get<IntArrayAttr>()->vi[0])
-    });
-    builder.create<StoreOp>({ init, addr });
+
+    auto entry = region->getFirstBlock();
+    Op *addr;
+    if (beforeFlatten) {
+      builder.setToBlockEnd(entry);
+      addr = builder.create<AllocaOp>();
+      
+      auto bb = region->insertAfter(entry);
+      // We must make sure the whole entry block contains only alloca.
+      // This is also for further transformations that append allocas to the first block.
+      builder.setToBlockStart(bb);
+      auto init = builder.create<IntOp>({
+        new IntAttr(k->get<IntArrayAttr>()->vi[0])
+      });
+      builder.create<StoreOp>({ init, addr });
+    } else {
+      // Remember to supply terminators for after FlattenCFG.
+      builder.setBeforeOp(entry->getLastOp());
+      addr = builder.create<AllocaOp>();
+
+      auto bb = region->insertAfter(entry);
+      builder.setToBlockStart(bb);
+      auto init = builder.create<IntOp>({
+        new IntAttr(k->get<IntArrayAttr>()->vi[0])
+      });
+      builder.create<StoreOp>({ init, addr });
+      entry->getLastOp()->moveToEnd(bb);
+
+      builder.setToBlockEnd(entry);
+      builder.create<GotoOp>({ new TargetAttr(bb) });
+    }
 
     // Replace all "getglobal" to use the addr instead.
     auto gets = user->findAll<GetGlobalOp>();

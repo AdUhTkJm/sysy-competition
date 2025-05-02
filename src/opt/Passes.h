@@ -222,9 +222,12 @@ public:
 
 // Localizes global variables.
 class Localize : public Pass {
+  bool beforeFlatten;
+
   void runImpl(Region *region);
 public:
-  Localize(ModuleOp *module): Pass(module) {}
+  Localize(ModuleOp *module, bool beforeFlatten):
+    Pass(module), beforeFlatten(beforeFlatten) {}
     
   std::string name() { return "localize"; };
   std::map<std::string, int> stats() { return {}; }
