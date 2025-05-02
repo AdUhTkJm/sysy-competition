@@ -170,6 +170,13 @@ static const std::set<Reg> calleeSaved = {
 constexpr int leafRegCnt = 25;
 constexpr int normalRegCnt = 25;
 
+// Used in constructing interference graph.
+struct Event {
+  int timestamp;
+  bool start;
+  Op *op;
+};
+
 void RegAlloc::runImpl(Region *region, bool isLeaf) {
   const Reg *order = isLeaf ? leafOrder : normalOrder;
   const int regcount = isLeaf ? leafRegCnt : normalRegCnt;
@@ -280,6 +287,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     // then they interfere.
     // Note that if lastUsed == defined then they don't overlap.
     // Also, only checking for `ops` isn't enough. Variables can overlap with liveIns as well.
+
+    // This is the naive approach, O(n^2). Incredibly slow for large basic blocks.
+#if 0
     for (auto [op1, v1] : lastUsed) {
       for (auto [op2, v2] : lastUsed) {
         if (op1 == op2)
@@ -294,6 +304,39 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         }
       }
     }
+#endif
+#if 1
+    // We use event-driven approach to optimize it into O(n log n + E).
+    // Is this actually an improvement? Still very slow for test case 84.
+    // Perhaps GCM is required.
+    std::vector<Event> events;
+    for (auto [op, v] : lastUsed) {
+      // Don't push empty live range. It's not handled properly.
+      if (defined[op] == v)
+        continue;
+      
+      events.push_back(Event { defined[op], true, op });
+      events.push_back(Event { v, false, op });
+    }
+
+    // Sort with ascending time (i.e. instruction count).
+    std::sort(events.begin(), events.end(), [](Event a, Event b) {
+      // For the same timestamp, we first set END events as inactive, then deal with START events.
+      return a.timestamp == b.timestamp ? (!a.start && b.start) : a.timestamp < b.timestamp;
+    });
+
+    std::set<Op*> active;
+    for (const auto& event : events) {
+      if (event.start) {
+        for (Op* activeOp : active) {
+          interf[event.op].insert(activeOp);
+          interf[activeOp].insert(event.op);
+        }
+        active.insert(event.op);
+      } else
+        active.erase(event.op);
+    }
+#endif
   }
 
   // dumpInterf(region, interf);
