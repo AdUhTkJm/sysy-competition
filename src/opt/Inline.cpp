@@ -16,6 +16,8 @@ bool isRecursive(Op *op) {
 
 // This pass must run before Mem2Reg but after FlattenCFG.
 void Inline::run() {
+  CallGraph(module).run();
+  
   Builder builder;
 
   fnMap = getFunctionMap();

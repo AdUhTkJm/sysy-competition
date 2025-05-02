@@ -15,18 +15,15 @@ void CallGraph::run() {
       calledBy[calledName].insert(func->get<NameAttr>()->name);
   }
 
-  auto toplevel = module->getRegion()->getFirstBlock()->getOps();
-  for (auto op : toplevel) {
-    if (!isa<FuncOp>(op))
-      continue;
-
+  auto funcs = collectFuncs();
+  for (auto func : funcs) {
     // Remove the old version.
-    if (op->has<CallerAttr>())
-      op->removeAttr<CallerAttr>();
+    if (func->has<CallerAttr>())
+      func->removeAttr<CallerAttr>();
 
-    const auto &name = op->get<NameAttr>()->name;
+    const auto &name = func->get<NameAttr>()->name;
     const auto &callersSet = calledBy[name];
     std::vector<std::string> callers(callersSet.begin(), callersSet.end());
-    op->addAttr<CallerAttr>(callers);
+    func->addAttr<CallerAttr>(callers);
   }
 }

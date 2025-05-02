@@ -38,6 +38,19 @@ std::map<std::string, FuncOp*> Pass::getFunctionMap() {
   return funcs;
 }
 
+std::map<std::string, GlobalOp*> Pass::getGlobalMap() {
+  std::map<std::string, GlobalOp*> funcs;
+
+  auto region = module->getRegion();
+  auto block = region->getFirstBlock();
+  for (auto op : block->getOps()) {
+    if (auto glob = dyn_cast<GlobalOp>(op))
+      funcs[op->get<NameAttr>()->name] = glob;
+  }
+  
+  return funcs;
+}
+
 PassManager::~PassManager() {
   for (auto pass : passes)
     delete pass;
@@ -49,6 +62,16 @@ std::vector<FuncOp*> Pass::collectFuncs() {
   for (auto op : toplevel) {
     if (auto fn = dyn_cast<FuncOp>(op))
       result.push_back(fn);
+  }
+  return result;
+}
+
+std::vector<GlobalOp*> Pass::collectGlobals() {
+  std::vector<GlobalOp*> result;
+  auto toplevel = module->getRegion()->getFirstBlock()->getOps();
+  for (auto op : toplevel) {
+    if (auto glob = dyn_cast<GlobalOp>(op))
+      result.push_back(glob);
   }
   return result;
 }

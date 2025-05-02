@@ -43,7 +43,10 @@ protected:
   // This will be faster than module->findAll<FuncOp>,
   // as it doesn't need to iterate through the contents of functions.
   std::vector<FuncOp*> collectFuncs();
+  // Same as above, only that it's for global variables.
+  std::vector<GlobalOp*> collectGlobals();
   std::map<std::string, FuncOp*> getFunctionMap();
+  std::map<std::string, GlobalOp*> getGlobalMap();
 public:
   Pass(ModuleOp *module): module(module) {}
   virtual ~Pass() {}

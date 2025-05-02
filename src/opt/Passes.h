@@ -166,7 +166,7 @@ class GVN : public Pass {
 public:
   GVN(ModuleOp *module): Pass(module) {}
     
-  std::string name() { return "global-value-numbering"; };
+  std::string name() { return "gvn"; };
   std::map<std::string, int> stats();
   void run();
   void runImpl(Region *region);
@@ -205,6 +205,28 @@ public:
   EarlyConstFold(ModuleOp *module): Pass(module) {}
     
   std::string name() { return "early-const-fold"; };
+  std::map<std::string, int> stats() { return {}; }
+  void run();
+};
+
+// Rewrites WhileOp into ForOp, if possible.
+class RecognizeFor : public Pass {
+  void runImpl(Region *region);
+public:
+  RecognizeFor(ModuleOp *module): Pass(module) {}
+    
+  std::string name() { return "for-recognition"; };
+  std::map<std::string, int> stats() { return {}; }
+  void run();
+};
+
+// Localizes global variables.
+class Localize : public Pass {
+  void runImpl(Region *region);
+public:
+  Localize(ModuleOp *module): Pass(module) {}
+    
+  std::string name() { return "localize"; };
   std::map<std::string, int> stats() { return {}; }
   void run();
 };

@@ -190,6 +190,7 @@ public:
   const std::string &getName() { return opname; }
   BasicBlock *getParent() { return parent; }
   Op *getParentOp();
+  Op *prevOp();
   Op *nextOp();
 
   const auto &getUses() const { return uses; }

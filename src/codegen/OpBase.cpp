@@ -39,6 +39,11 @@ BasicBlock *BasicBlock::nextBlock() {
   return *++it;
 }
 
+Op *Op::prevOp() {
+  auto it = place;
+  return *--it;
+}
+
 Op *Op::nextOp() {
   auto it = place;
   return *++it;

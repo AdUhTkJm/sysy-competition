@@ -10,6 +10,6 @@ void MoveAlloca::run() {
     auto region = func->getRegion();
     auto begin = region->insert(region->getFirstBlock());
     for (auto alloca : allocas)
-      alloca->moveToEnd( begin);
+      alloca->moveToEnd(begin);
   }
 }

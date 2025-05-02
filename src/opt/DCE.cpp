@@ -83,11 +83,14 @@ void DCE::run() {
 
     changed = false;
     for (auto func : funcs) {
+      const auto &name = func->get<NameAttr>()->name;
       // main() might not be used, but it must be preserved.
-      if (func->get<NameAttr>()->name == "main")
+      if (name == "main")
         continue;
 
-      if (!func->get<CallerAttr>()->callers.size()) {
+      // If a function is only used by itself, then it's also unused.
+      const auto &callers = func->get<CallerAttr>()->callers;
+      if (!callers.size() || (callers.size() == 1 && callers[0] == name)) {
         func->erase();
         changed = true;
         elimFn++;
