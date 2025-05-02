@@ -276,12 +276,6 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     for (auto op : bb->getLiveOut())
       lastUsed[op] = ops.size();
 
-    static auto overlap = [](int b1, int e1, int b2, int e2) {
-      // The overlap is of course [max(b1, b2), min(e1, e2)).
-      // We check if the range has any elements.
-      return std::max(b1, b2) < std::min(e1, e2);
-    };
-
     // If the range [defined, lastUsed) overlap for two variables,
     // then they interfere.
     // Note that if lastUsed == defined then they don't overlap.
@@ -291,7 +285,10 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         if (op1 == op2)
           continue;
 
-        if (overlap(defined[op1], v1, defined[op2], v2)) {
+        // Test if [defined[op1], v1) intersects with [defined[op2], v2).
+        // The overlap is of course [max(b1, b2), min(e1, e2)).
+        // We check if the range has any elements.
+        if (std::max(defined[op1], defined[op2]) < std::min(v1, v2)) {
           interf[op1].insert(op2);
           interf[op2].insert(op1);
         }

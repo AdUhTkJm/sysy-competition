@@ -131,6 +131,8 @@ public:
   BasicBlock *nextBlock();
 
   bool reachable(BasicBlock *bb) { return reachables.count(bb); }
+  bool dominatedBy(BasicBlock *bb) { return doms.count(bb); }
+  bool dominates(BasicBlock *bb) { return bb->doms.count(this); }
 
   // Inserts before `at`.
   void insert(iterator at, Op *op);
