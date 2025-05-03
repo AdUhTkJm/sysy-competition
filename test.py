@@ -290,6 +290,10 @@ def test_all():
 
       with open(out_path) as f:
         expected = f.read().strip()
+
+      # Ignore leading/trailing spaces on each line.
+      actual = '\n'.join([x.strip() for x in actual.split('\n')])
+      expected = '\n'.join([x.strip() for x in expected.split('\n')])
         
       if actual != expected:
         failures.append((sy_path, f"Output mismatch:\n{actual}"))

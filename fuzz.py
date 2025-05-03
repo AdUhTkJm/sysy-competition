@@ -15,7 +15,7 @@ error_cnt = 0
 def run(file: str, input: bytes):
   basename = os.path.splitext(os.path.basename(file))[0]
   try:
-    proc.run(["build/sysc", file, "-o", f"{basename}.s"], check=True, timeout=5)
+    proc.run(["build/sysc", file, "-o", f"temp/{basename}.s"], check=True, timeout=5)
   except:
     print("Compiler internal error.")
     with open(f"temp/bad_program.txt", "w") as f:
@@ -23,12 +23,12 @@ def run(file: str, input: bytes):
     exit(1)
   
   gcc = "riscv64-linux-gnu-gcc"
-  proc.run([gcc, f"{basename}.s", "test/official/sylib.c", "-static", "-o", basename])
+  proc.run([gcc, f"temp/{basename}.s", "test/official/sylib.c", "-static", "-o", f"temp/{basename}"])
 
   # Run the file.
   qemu = "qemu-riscv64-static"
   try:
-    return proc.run([qemu, basename], input=input, stdout=proc.PIPE, timeout=5)
+    return proc.run([qemu, f"temp/{basename}"], input=input, stdout=proc.PIPE, timeout=5)
   except:
     print("Program timeout.")
     with open(f"temp/bad_program.txt", "w") as f:
@@ -44,9 +44,9 @@ def fuzz_arithmetic_fold(dir: str):
   global error_cnt
 
   testcases = []
-  for i in range(0, 50):
-    c1 = random.randint(-10000, 10000)
-    c2 = random.randint(-10000, 10000)
+  for i in range(0, 500):
+    c1 = random.randint(-2000, 10000)
+    c2 = random.randint(-2000, 10000)
     op = random.choice(operators)
     comp = random.choice(comparisons)
     testcases.append(f"x {op} {c1} {comp} {c2}")
@@ -79,5 +79,5 @@ def fuzz_arithmetic_fold(dir: str):
     error_cnt += 1
 
 with tempfile.TemporaryDirectory() as dir:
-  for i in range(0, 1):
+  for i in range(0, 20):
     fuzz_arithmetic_fold(dir)

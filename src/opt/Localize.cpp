@@ -3,70 +3,8 @@
 using namespace sys;
 
 void Localize::run() {
-  CallGraph(module).run();
-
-  // Identify functions called at most once.
-  std::set<FuncOp*> atMostOnce;
   auto funcs = collectFuncs();
   auto fnMap = getFunctionMap();
-
-  // The pass would be called multiple times,
-  // as Inline will reveal new opportunities of localization.
-  if (!beforeFlatten)
-    // We have lost structured control flow.
-    // The only thing we can guarantee is that main() is called at most once.
-    atMostOnce = { fnMap["main"] };
-  else for (auto func : funcs) {
-    const auto &callers = func->get<CallerAttr>()->callers;
-
-    if (callers.size() == 0) {
-      atMostOnce.insert(func);
-      continue;
-    }
-
-    if (callers.size() > 2)
-      continue;
-
-    FuncOp *caller = fnMap[callers[0]];
-    const auto &selfName = func->get<NameAttr>()->name;
-    // Recursive functions aren't candidates.
-    if (caller == func)
-      continue;
-
-    auto calls = caller->findAll<CallOp>();
-    bool good = true;
-    CallOp *call = nullptr;
-
-    // First, make sure there's only one call that calls the function.
-    for (auto op : calls) {
-      if (op->get<NameAttr>()->name == selfName) {
-        if (call) {
-          good = false;
-          break;
-        }
-        call = op;
-      }
-    }
-
-    if (!good)
-      continue;
-
-    // Next, make sure the call isn't enclosed in a WhileOp.
-    Op *father = call;
-    while (!isa<FuncOp>(father)) {
-      father = father->getParentOp();
-      if (isa<WhileOp>(father)) {
-        good = false;
-        break;
-      }
-    }
-
-    if (!good)
-      continue;
-
-    // Now we know the function is called at most once.
-    atMostOnce.insert(func);
-  }
 
   auto getglobs = module->findAll<GetGlobalOp>();
   auto gMap = getGlobalMap();
@@ -94,7 +32,7 @@ void Localize::run() {
     if (v.size() > 1)
       continue;
 
-    if (!atMostOnce.count(*v.begin()))
+    if (!(*v.begin())->has<AtMostOnceAttr>())
       continue;
 
     // Now we can replace the global with a local variable.
@@ -105,7 +43,7 @@ void Localize::run() {
     Op *addr;
     if (beforeFlatten) {
       builder.setToBlockEnd(entry);
-      addr = builder.create<AllocaOp>();
+      addr = builder.create<AllocaOp>({ new SizeAttr(4) });
       
       auto bb = region->insertAfter(entry);
       // We must make sure the whole entry block contains only alloca.
@@ -118,7 +56,7 @@ void Localize::run() {
     } else {
       // Remember to supply terminators for after FlattenCFG.
       builder.setBeforeOp(entry->getLastOp());
-      addr = builder.create<AllocaOp>();
+      addr = builder.create<AllocaOp>({ new SizeAttr(4) });
 
       auto bb = region->insertAfter(entry);
       builder.setToBlockStart(bb);

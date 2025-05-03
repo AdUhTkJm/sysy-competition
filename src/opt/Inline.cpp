@@ -148,7 +148,17 @@ void Inline::run() {
     auto allocas = func->findAll<AllocaOp>();
     auto region = func->getRegion();
     auto begin = region->getFirstBlock();
+    
+    // It's possible we've inlined a function into another one without alloca's.
+    // In that case we must create a new block for it.
+    if (!isa<AllocaOp>(begin->getFirstOp())) {
+      auto last = begin;
+      begin = region->insert(begin);
+      builder.setToBlockEnd(begin);
+      builder.create<GotoOp>({ new TargetAttr(last) });
+    }
+
     for (auto alloca : allocas)
-      alloca->moveBefore( begin->getLastOp());
+      alloca->moveBefore(begin->getLastOp());
   }
 }

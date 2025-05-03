@@ -317,12 +317,15 @@ int EarlyConstFold::foldImpl() {
       return true;
     }
 
-    // (A / b < I) becomes (A / I < b) if A >= 0, I > 0
+    // (A / b < I) becomes ((A / I < b) || b < 0) if A >= 0, I > 0
     if (isa<DivIOp>(x) && INT(a) && V(a) >= 0 && i > 0) {
       folded++;
       builder.setBeforeOp(op);
       auto value = builder.create<IntOp>({ new IntAttr(V(a) / i) });
-      builder.replace<LtOp>(op, { value, b });
+      Value lval = builder.create<LtOp>({ value, b });
+      auto zero = builder.create<IntOp>({ new IntAttr(0) });
+      Value ltz = builder.create<LtOp>({ b, zero });
+      builder.replace<OrIOp>(op, { lval, ltz });
       return true;
     }
 

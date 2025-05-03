@@ -32,6 +32,7 @@ void initPipeline(sys::PassManager &pm) {
 
   // ===== Structured control flow =====
 
+  pm.addPass<sys::AtMostOnce>();
   pm.addPass<sys::Localize>(/*beforeFlattenCFG=*/ true);
   pm.addPass<sys::EarlyConstFold>();
   pm.addPass<sys::StrengthReduct>();
@@ -41,9 +42,12 @@ void initPipeline(sys::PassManager &pm) {
   // ===== Flattened CFG =====
 
   pm.addPass<sys::FlattenCFG>();
-  pm.addPass<sys::Inline>(/*inlineThreshold=*/ 50);
+  pm.addPass<sys::GVN>();
+  pm.addPass<sys::DCE>();
+  pm.addPass<sys::Inline>(/*inlineThreshold=*/ 200);
   pm.addPass<sys::DCE>();
   pm.addPass<sys::Localize>(/*beforeFlattenCFG=*/ false);
+  pm.addPass<sys::Globalize>();
   pm.addPass<sys::Mem2Reg>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::DCE>();

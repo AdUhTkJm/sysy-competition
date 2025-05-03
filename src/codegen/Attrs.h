@@ -85,6 +85,8 @@ public:
 class IntArrayAttr : public AttrImpl<IntArrayAttr, __LINE__> {
 public:
   int *vi;
+  // This is the number of elements in `vi`, rather than byte size,
+  // For example, if vi = { 2, 3 }, then `size` is 2, rather than sizeof(int) * 2.
   int size;
   bool allZero;
 
@@ -98,6 +100,12 @@ class ImpureAttr : public AttrImpl<ImpureAttr, __LINE__> {
 public:
   std::string toString() { return "<impure>"; }
   ImpureAttr *clone() { return new ImpureAttr; }
+};
+
+class AtMostOnceAttr : public AttrImpl<AtMostOnceAttr, __LINE__> {
+public:
+  std::string toString() { return "<once>"; }
+  AtMostOnceAttr *clone() { return new AtMostOnceAttr; }
 };
 
 class ArgCountAttr : public AttrImpl<ArgCountAttr, __LINE__> {

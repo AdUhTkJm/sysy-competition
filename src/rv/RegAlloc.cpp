@@ -200,30 +200,28 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   });
 
   // Similarly, add placeholders around each GetArg.
+  // First create placeholders for a0-a7.
+  builder.setToRegionStart(region);
+  std::vector<Value> argHolders;
+  auto argcnt = funcOp->get<ArgCountAttr>()->count;
+  for (int i = 0; i < std::min(argcnt, 8); i++) {
+    auto placeholder = builder.create<PlaceHolderOp>();
+    assignment[placeholder] = argRegs[i];
+    argHolders.push_back(placeholder);
+  }
+
   runRewriter(funcOp, [&](GetArgOp *op) {
     auto value = op->get<IntAttr>()->value;
     
     // The i'th argument cannot take registers from argReg[i + 1] ~ argReg[argcnt - 1].
-    // So we do it like (take `a0` as example):
-    //   %0 = placeholder [a1]
-    //   %1 = placeholder [a2]
+    // So we do it like (take `a1` as example):
+    //   %holder = placeholder %argHolders[a1]
     //   %ARG = getarg <0>
-    //   placeholder %0, %1
-    // This prevents %ARG being allocated a1 or a2, but doesn't affect any other ops.
-
-    builder.setBeforeOp(op);
-    int argcnt = funcOp->get<ArgCountAttr>()->count;
-    std::vector<Value> holders;
-    for (int i = value + 1; i < std::min(argcnt, 8); i++) {
-      auto placeholder = builder.create<PlaceHolderOp>();
-      assignment[placeholder] = argRegs[i];
-      holders.push_back(placeholder);
-    }
-
-    builder.setAfterOp(op);
-    builder.create<PlaceHolderOp>(holders);
+    // This will make sure `a1` is live from function beginning to %ARG.
 
     if (value < 8) {
+      builder.setBeforeOp(op);
+      builder.create<PlaceHolderOp>({ argHolders[value] });
       builder.replace<ReadRegOp>(op, { new RegAttr(argRegs[value]) });
       return true;
     }

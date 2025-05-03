@@ -220,16 +220,35 @@ public:
   void run();
 };
 
+// Mark functions that are called at most once.
+class AtMostOnce : public Pass {
+public:
+  AtMostOnce(ModuleOp *module): Pass(module) {}
+    
+  std::string name() { return "at-most-once"; };
+  std::map<std::string, int> stats() { return {}; }
+  void run();
+};
+
 // Localizes global variables.
 class Localize : public Pass {
   bool beforeFlatten;
-
-  void runImpl(Region *region);
 public:
   Localize(ModuleOp *module, bool beforeFlatten):
     Pass(module), beforeFlatten(beforeFlatten) {}
     
   std::string name() { return "localize"; };
+  std::map<std::string, int> stats() { return {}; }
+  void run();
+};
+
+// Globalizes local arrays.
+class Globalize : public Pass {
+  void runImpl(Region *region);
+public:
+  Globalize(ModuleOp *module): Pass(module) {}
+    
+  std::string name() { return "globalize"; };
   std::map<std::string, int> stats() { return {}; }
   void run();
 };
