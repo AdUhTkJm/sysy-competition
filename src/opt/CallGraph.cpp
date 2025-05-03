@@ -10,9 +10,9 @@ void CallGraph::run() {
   auto calls = module->findAll<CallOp>();
   for (auto call : calls) {
     auto func = call->getParentOp<FuncOp>();
-    auto calledName = call->get<NameAttr>()->name;
+    auto calledName = NAME(call);
     if (!isExtern(calledName))
-      calledBy[calledName].insert(func->get<NameAttr>()->name);
+      calledBy[calledName].insert(NAME(func));
   }
 
   auto funcs = collectFuncs();
@@ -21,7 +21,7 @@ void CallGraph::run() {
     if (func->has<CallerAttr>())
       func->removeAttr<CallerAttr>();
 
-    const auto &name = func->get<NameAttr>()->name;
+    const auto &name = NAME(func);
     const auto &callersSet = calledBy[name];
     std::vector<std::string> callers(callersSet.begin(), callersSet.end());
     func->addAttr<CallerAttr>(callers);

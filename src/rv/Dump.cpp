@@ -37,7 +37,7 @@ void dumpOp(Op *op, std::ostream &os) {
   // Vary opname based on the size attribute.
   // TODO.
   if (isa<sys::rv::StoreOp>(op)) {
-    auto size = op->get<SizeAttr>()->value;
+    auto size = SIZE(op);
     switch (size) {
     case 8:
       name = "sd";
@@ -51,13 +51,13 @@ void dumpOp(Op *op, std::ostream &os) {
     // Dump as `sw a0, 4(a1)`
     auto rs = op->get<RsAttr>()->reg;
     auto rs2 = op->get<Rs2Attr>()->reg;
-    auto offset = op->get<IntAttr>()->value;
+    auto offset = V(op);
     os << name << " " << rs << ", " << offset << "(" << rs2 << ")\n";
     return;
   }
 
   if (isa<sys::rv::LoadOp>(op)) {
-    auto size = op->get<SizeAttr>()->value;
+    auto size = SIZE(op);
     switch (size) {
     case 8:
       name = "ld";
@@ -70,7 +70,7 @@ void dumpOp(Op *op, std::ostream &os) {
     }
     auto rd = op->get<RdAttr>()->reg;
     auto rs = op->get<RsAttr>()->reg;
-    auto offset = op->get<IntAttr>()->value;
+    auto offset = V(op);
     os << name << " " << rd << ", " << offset << "(" << rs << ")\n";
     return;
   }
@@ -94,17 +94,17 @@ void dumpOp(Op *op, std::ostream &os) {
   }
 
   if (op->has<IntAttr>()) {
-    auto vi = op->get<IntAttr>()->value;
+    auto vi = V(op);
     ss << vi << ", ";
   }
 
   if (op->has<TargetAttr>()) {
-    auto bb = op->get<TargetAttr>()->bb;
+    auto bb = TARGET(op);
     ss << "bb" << getCount(bb) << ", ";
   }
 
   if (op->has<NameAttr>()) {
-    auto name = op->get<NameAttr>()->name;
+    auto name = NAME(op);
     ss << name << ", ";
   }
 
@@ -123,7 +123,7 @@ void Dump::dump(std::ostream &os) {
   auto funcs = module->findAll<FuncOp>();
 
   for (auto func : funcs) {
-    os << func->get<NameAttr>()->name << ":\n";
+    os << NAME(func) << ":\n";
     for (auto bb : func->getRegion()->getBlocks()) {
       os << "bb" << getCount(bb) << ":\n";
 
@@ -144,7 +144,7 @@ void Dump::dump(std::ostream &os) {
   for (auto global : globals) {
     // It must have been 4 bytes long for each element.
     // Here `size` is the total number of bytes.
-    auto size = global->get<SizeAttr>()->value;
+    auto size = SIZE(global);
     assert(size >= 1);
 
     if (auto intArr = global->find<IntArrayAttr>()) {
@@ -153,7 +153,7 @@ void Dump::dump(std::ostream &os) {
         continue;
       }
 
-      os << global->get<NameAttr>()->name << ":\n";
+      os << NAME(global) << ":\n";
       os << "  .word " << intArr->vi[0];
       for (size_t i = 1; i < size / 4; i++)
         os << ", " << intArr->vi[i];
@@ -165,8 +165,8 @@ void Dump::dump(std::ostream &os) {
   if (!bss.empty())
     os << "\n.bss\n  .align 4\n";
   for (auto global : bss) {
-    os << global->get<NameAttr>()->name << ":\n  .space ";
-    os << global->get<SizeAttr>()->value << "\n";
+    os << NAME(global) << ":\n  .space ";
+    os << SIZE(global) << "\n";
   }
 }
 

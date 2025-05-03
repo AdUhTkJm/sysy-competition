@@ -32,7 +32,7 @@ std::map<std::string, FuncOp*> Pass::getFunctionMap() {
   auto block = region->getFirstBlock();
   for (auto op : block->getOps()) {
     if (auto func = dyn_cast<FuncOp>(op))
-      funcs[op->get<NameAttr>()->name] = func;
+      funcs[NAME(op)] = func;
   }
   
   return funcs;
@@ -45,7 +45,7 @@ std::map<std::string, GlobalOp*> Pass::getGlobalMap() {
   auto block = region->getFirstBlock();
   for (auto op : block->getOps()) {
     if (auto glob = dyn_cast<GlobalOp>(op))
-      funcs[op->get<NameAttr>()->name] = glob;
+      funcs[NAME(op)] = glob;
   }
   
   return funcs;

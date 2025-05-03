@@ -12,7 +12,7 @@ using namespace sys;
 // (The language prohibits negative offsets from an array.)
 std::pair<bool, int> isAddrOf(Op *addr, const std::string &gName) {
   if (isa<GetGlobalOp>(addr))
-    return { addr->get<NameAttr>()->name == gName, 0 };
+    return { NAME(addr) == gName, 0 };
   
   if (isa<AddLOp>(addr)) {
     auto x = addr->getOperand(0).defining;
@@ -20,12 +20,12 @@ std::pair<bool, int> isAddrOf(Op *addr, const std::string &gName) {
 
     if (isa<IntOp>(x)) {
       auto [success, offset] = isAddrOf(y, gName);
-      return { success, offset + x->get<IntAttr>()->value };
+      return { success, offset + V(x) };
     }
 
     if (isa<IntOp>(y)) {
       auto [success, offset] = isAddrOf(x, gName);
-      return { success, offset + y->get<IntAttr>()->value };
+      return { success, offset + V(y) };
     }
 
     // Now x and y are both unknown.
@@ -47,14 +47,14 @@ void Globalize::runImpl(Region *region) {
   Builder builder;
 
   auto funcOp = region->getParent();
-  const auto &fnName = funcOp->get<NameAttr>()->name;
+  const auto &fnName = NAME(funcOp);
   auto allocas = funcOp->findAll<AllocaOp>();
   std::vector<Op*> unused;
 
   int allocaCnt = 0;
 
   for (auto alloca : allocas) {
-    auto size = alloca->get<SizeAttr>()->value;
+    auto size = SIZE(alloca);
     if (size <= 32)
       continue;
 
@@ -104,7 +104,7 @@ void Globalize::runImpl(Region *region) {
             continue;
           }
 
-          int v = value->get<IntAttr>()->value;
+          int v = V(value);
 
           // We're storing to an unknown place. Break.
           if (success && offset < 0) {

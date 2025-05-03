@@ -12,7 +12,7 @@ void AtMostOnce::run() {
     if (func->has<AtMostOnceAttr>())
       continue;
 
-    const auto &callers = func->get<CallerAttr>()->callers;
+    const auto &callers = CALLER(func);
 
     if (callers.size() == 0) {
       func->addAttr<AtMostOnceAttr>();
@@ -23,7 +23,7 @@ void AtMostOnce::run() {
       continue;
 
     FuncOp *caller = fnMap[callers[0]];
-    const auto &selfName = func->get<NameAttr>()->name;
+    const auto &selfName = NAME(func);
     // Recursive functions aren't candidates.
     if (caller == func)
       continue;
@@ -34,7 +34,7 @@ void AtMostOnce::run() {
 
     // First, make sure there's only one call that calls the function.
     for (auto op : calls) {
-      if (op->get<NameAttr>()->name == selfName) {
+      if (NAME(op) == selfName) {
         if (call) {
           good = false;
           break;

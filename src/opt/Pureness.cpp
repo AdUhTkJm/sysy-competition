@@ -73,7 +73,7 @@ void Pureness::run() {
   auto calls = module->findAll<CallOp>();
   for (auto call : calls) {
     auto func = call->getParentOp<FuncOp>();
-    auto calledName = call->get<NameAttr>()->name;
+    auto calledName = NAME(call);
     if (!isExtern(calledName))
       callGraph[func].insert(fnMap[calledName]);
     else if (!func->has<ImpureAttr>())

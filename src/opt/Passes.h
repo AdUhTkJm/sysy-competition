@@ -230,6 +230,17 @@ public:
   void run();
 };
 
+// Gives an AliasAttr to values, if they are addresses.
+class Alias : public Pass {
+  void runImpl(Region *region);
+public:
+  Alias(ModuleOp *module): Pass(module) {}
+
+  std::string name() { return "alias"; };
+  std::map<std::string, int> stats() { return {}; }
+  void run();
+};
+
 // Localizes global variables.
 class Localize : public Pass {
   bool beforeFlatten;

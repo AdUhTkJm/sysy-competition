@@ -13,13 +13,13 @@ void Localize::run() {
   Builder builder;
 
   for (auto get : getglobs) {
-    const auto &name = get->get<NameAttr>()->name;
+    const auto &name = NAME(get);
     accessed[gMap[name]].insert(get->getParentOp<FuncOp>());
   }
 
   for (auto [name, k] : gMap) {
     // We don't want to localize an array. In fact, we hope to globalize them.
-    if (k->get<SizeAttr>()->value != 4)
+    if (SIZE(k) != 4)
       continue;
 
     if (!accessed.count(k)) {
@@ -73,7 +73,7 @@ void Localize::run() {
     // Replace all "getglobal" to use the addr instead.
     auto gets = user->findAll<GetGlobalOp>();
     for (auto get : gets) {
-      if (get->get<NameAttr>()->name == name) {
+      if (NAME(get) == name) {
         get->replaceAllUsesWith(addr);
         get->erase();
       }

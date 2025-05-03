@@ -19,7 +19,7 @@ bool DCE::isImpure(Op *op) {
     return true;
 
   if (isa<CallOp>(op)) {
-    auto name = op->get<NameAttr>()->name;
+    auto name = NAME(op);
     if (isExtern(name))
       return true;
     return fnMap[name]->has<ImpureAttr>();
@@ -83,13 +83,13 @@ void DCE::run() {
 
     changed = false;
     for (auto func : funcs) {
-      const auto &name = func->get<NameAttr>()->name;
+      const auto &name = NAME(func);
       // main() might not be used, but it must be preserved.
       if (name == "main")
         continue;
 
       // If a function is only used by itself, then it's also unused.
-      const auto &callers = func->get<CallerAttr>()->callers;
+      const auto &callers = CALLER(func);
       if (!callers.size() || (callers.size() == 1 && callers[0] == name)) {
         func->erase();
         changed = true;

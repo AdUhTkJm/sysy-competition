@@ -29,12 +29,12 @@ std::map<std::string, int> RegAlloc::stats() {
 
 // If assignment does not contain the value, then it doesn't clash with any other one.
 // In that case just give it a random register.
-#define V(Index, AttrTy) \
+#define ADD_ATTR(Index, AttrTy) \
   auto v##Index = op->getOperand(Index).defining; \
   op->addAttr<AttrTy>(getReg(v##Index));
 
-#define BINARY V(0, RsAttr) V(1, Rs2Attr)
-#define UNARY V(0, RsAttr)
+#define BINARY ADD_ATTR(0, RsAttr) ADD_ATTR(1, Rs2Attr)
+#define UNARY ADD_ATTR(0, RsAttr)
 
 #define REPLACE_BRANCH(T1, T2) \
   REPLACE_BRANCH_IMPL(T1, T2); \
@@ -51,8 +51,8 @@ std::map<std::string, int> RegAlloc::stats() {
   runRewriter(funcOp, [&](BeforeTy *op) { \
     if (!op->has<ElseAttr>()) \
       return false; \
-    auto &target = op->get<TargetAttr>()->bb; \
-    auto ifnot = op->get<ElseAttr>()->bb; \
+    auto &target = TARGET(op); \
+    auto ifnot = ELSE(op); \
     auto me = op->getParent(); \
     /* If there's no "next block", then give up */ \
     if (me == me->getParent()->getLastBlock()) { \
@@ -211,7 +211,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   }
 
   runRewriter(funcOp, [&](GetArgOp *op) {
-    auto value = op->get<IntAttr>()->value;
+    auto value = IMM(op);
     
     // The i'th argument cannot take registers from argReg[i + 1] ~ argReg[argcnt - 1].
     // So we do it like (take `a1` as example):
@@ -360,7 +360,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   int currentOffset = 0;
   auto subsp = region->getFirstBlock()->getFirstOp();
   if (isa<SubSpOp>(subsp))
-    currentOffset = subsp->get<IntAttr>()->value;
+    currentOffset = IMM(subsp);
   
   for (auto op : ops) {
     // Do not allocate colored instructions.
@@ -422,7 +422,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   // Allocate more stack space for it.
   if (currentOffset != 0) {
     if (isa<SubSpOp>(subsp)) {
-      subsp->get<IntAttr>()->value = currentOffset + 8;
+      IMM(subsp) = currentOffset + 8;
     } else {
       builder.setToRegionStart(region);
       builder.create<SubSpOp>({ new IntAttr(currentOffset + 8) });
@@ -726,7 +726,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       // Note that we need to ignore the SubSp at the very beginning of the function.
       // It's irrelevant to calls.
       if (isa<SubSpOp>(op) && op != region->getFirstBlock()->getFirstOp()) {
-        delta += op->get<IntAttr>()->value;
+        delta += IMM(op);
         continue;
       }
       
@@ -871,7 +871,7 @@ int RegAlloc::latePeephole(Op *funcOp) {
     //   mv a1, a0
     auto next = op->nextOp();
     if (isa<LoadOp>(next) &&
-        RS(next) == RS2(op) && IMM(next) == IMM(op) && next->get<SizeAttr>()->value == op->get<SizeAttr>()->value) {
+        RS(next) == RS2(op) && IMM(next) == IMM(op) && SIZE(next) == SIZE(op)) {
       converted++;
       builder.replace<MvOp>(next, {
         new RdAttr(RD(next)),
@@ -905,12 +905,12 @@ int RegAlloc::latePeephole(Op *funcOp) {
       if (isa<StoreOp>(next) &&
           RS(op) == Reg::zero && RS2(op) == Reg::sp &&
           RS(next) == Reg::zero && RS2(next) == Reg::sp &&
-          op->get<IntAttr>()->value % 8 == 0 && op->get<SizeAttr>()->value == 4 &&
-          next->get<IntAttr>()->value == op->get<IntAttr>()->value + 4 && next->get<SizeAttr>()->value == 4) {
+          IMM(op) % 8 == 0 && SIZE(op) == 4 &&
+          IMM(next) == IMM(op) + 4 && SIZE(next) == 4) {
         converted++;
         changed = true;
 
-        auto offset = op->get<IntAttr>()->value;
+        auto offset = IMM(op);
         builder.replace<StoreOp>(op, {
           new RsAttr(Reg::zero),
           new Rs2Attr(Reg::sp),
@@ -930,12 +930,12 @@ int RegAlloc::latePeephole(Op *funcOp) {
       if (isa<StoreOp>(next) &&
           RS(op) == Reg::zero && RS2(op) == Reg::sp &&
           RS(next) == Reg::zero && RS2(next) == Reg::sp &&
-          op->get<IntAttr>()->value % 8 == 4 && op->get<SizeAttr>()->value == 4 &&
-          next->get<IntAttr>()->value == op->get<IntAttr>()->value - 4 && next->get<SizeAttr>()->value == 4) {
+          IMM(op) % 8 == 4 && SIZE(op) == 4 &&
+          IMM(next) == IMM(op) - 4 && SIZE(next) == 4) {
         converted++;
         changed = true;
 
-        auto offset = op->get<IntAttr>()->value;
+        auto offset = IMM(op);
         builder.replace<StoreOp>(op, {
           new RsAttr(Reg::zero),
           new Rs2Attr(Reg::sp),
@@ -1018,7 +1018,7 @@ void RegAlloc::tidyup(Region *region) {
 
   // Also, eliminate useless JOp.
   runRewriter(funcOp, [&](JOp *op) {
-    auto &target = op->get<TargetAttr>()->bb;
+    auto &target = TARGET(op);
     auto me = op->getParent();
     if (me == me->getParent()->getLastBlock())
       return false;
@@ -1115,7 +1115,7 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
   auto op = region->getFirstBlock()->getFirstOp();
   int offset = 0;
   if (isa<SubSpOp>(op)) {
-    offset = op->get<IntAttr>()->value;
+    offset = IMM(op);
     op->removeAttr<IntAttr>();
     op->addAttr<IntAttr>(offset += 8 * preserve.size());
   } else if (!preserve.empty()) {
@@ -1126,7 +1126,7 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
   // Round op to the nearest multiple of 16.
   // This won't be entered in the special case where offset == 0.
   if (offset % 16 != 0) {
-    int &value = op->get<IntAttr>()->value;
+    int &value = IMM(op);
     offset = value = offset / 16 * 16 + 16;
   }
 
@@ -1153,14 +1153,14 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
 
   // Deal with remaining GetArg.
   runRewriter(funcOp, [&](GetArgOp *op) {
-    auto value = op->get<IntAttr>()->value;
+    auto value = IMM(op);
     assert(value >= 8);
 
     // Read from stack.
     int offset = 0;
     auto subsp = region->getFirstBlock()->getFirstOp();
     if (isa<SubSpOp>(subsp))
-      offset = subsp->get<IntAttr>()->value;
+      offset = IMM(subsp);
     // `sp + offset` is the base pointer.
     // We read past the base pointer (starting from 0):
     //    <arg 8> bp + 0
@@ -1181,7 +1181,7 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
   // becomes
   //   addi <rd = sp> <rs = sp> <-4>
   runRewriter(funcOp, [&](SubSpOp *op) {
-    int offset = op->get<IntAttr>()->value;
+    int offset = IMM(op);
     if (offset <= 2048 && offset > -2048) {
       builder.replace<AddiOp>(op, {
         new RdAttr(Reg::sp),

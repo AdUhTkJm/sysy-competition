@@ -1,4 +1,5 @@
 #include "Attrs.h"
+#include "Ops.h"
 #include <sstream>
 
 using namespace sys;
@@ -55,5 +56,28 @@ std::string CallerAttr::toString() {
   for (int i = 1; i < callers.size(); i++)
     ss << ", " << callers[i];
   ss << ">";
+  return ss.str();
+}
+
+// Implemented in OpBase.cpp.
+std::ostream &operator<<(std::ostream&, Value);
+
+std::string AliasAttr::toString() {
+  std::stringstream ss;
+
+  if (isa<GlobalOp>(base))
+    ss << "<global " << NAME(base);
+  else
+    ss << "<alloca " << base->getResult();
+  
+  ss << ", ";
+
+  if (isa<IntOp>(offset))
+    ss << V(offset);
+  else
+    ss << offset->getResult();
+
+  ss << ">";
+
   return ss.str();
 }

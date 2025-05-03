@@ -28,7 +28,7 @@ void rewriteAlloca(FuncOp *func) {
     if (!isa<AllocaOp>(op))
       continue;
 
-    size_t size = op->get<SizeAttr>()->value;
+    size_t size = SIZE(op);
     total += size;
     allocas.push_back(cast<AllocaOp>(op));
   }
@@ -46,7 +46,7 @@ void rewriteAlloca(FuncOp *func) {
     auto add = builder.create<AddOp>({ spValue, offsetValue });
     op->replaceAllUsesWith(add);
 
-    size_t size = op->get<SizeAttr>()->value;
+    size_t size = SIZE(op);
     offset += size;
     op->erase();
   }

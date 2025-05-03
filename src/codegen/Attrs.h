@@ -133,6 +133,27 @@ public:
   CallerAttr *clone() { return new CallerAttr(callers); }
 };
 
+class AliasAttr : public AttrImpl<AliasAttr, __LINE__> {
+public:
+  Op *base;
+  Op *offset;
+
+  AliasAttr(Op *base, Op *offset): base(base), offset(offset) {}
+
+  int getConstOffset() const;
+  bool mustAlias(const AliasAttr *other) const;
+  bool neverAlias(const AliasAttr *other) const;
+  std::string toString();
+  AliasAttr *clone() { return new AliasAttr(base, offset); }
+};
+
 }
+
+#define V(op) (op)->get<IntAttr>()->value
+#define SIZE(op) (op)->get<SizeAttr>()->value
+#define NAME(op) (op)->get<NameAttr>()->name
+#define TARGET(op) (op)->get<TargetAttr>()->bb
+#define ELSE(op) (op)->get<ElseAttr>()->bb
+#define CALLER(op) (op)->get<CallerAttr>()->callers
 
 #endif

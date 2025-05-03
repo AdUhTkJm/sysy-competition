@@ -2,7 +2,6 @@
 
 using namespace sys;
 
-#define V(op) (op)->get<IntAttr>()->value
 #define INT(op) isa<IntOp>(op)
 
 // Defined in Pureness.cpp.
@@ -381,7 +380,7 @@ void EarlyConstFold::run() {
 
   for (auto get : getglobs) {
     if (hasStoresTo(get)) {
-      const auto &name = get->get<NameAttr>()->name;
+      const auto &name = NAME(get);
       nonConst.insert(gMap[name]);
     }
   }
@@ -440,7 +439,7 @@ void EarlyConstFold::run() {
     // Next we fold access to constant globals.
     // We do not erase any GetGlobalOp, so it's safe to reuse the vector.
     for (auto get : getglobs) {
-      const auto &name = get->get<NameAttr>()->name;
+      const auto &name = NAME(get);
       auto global = gMap[name];
       if (nonConst.count(global))
         continue;
@@ -467,7 +466,7 @@ void EarlyConstFold::run() {
           for (auto target : targets) {
             assert(!isa<StoreOp>(target));
 
-            auto size = global->get<SizeAttr>()->value;
+            auto size = SIZE(global);
             if (V(y) >= size) {
               std::cerr << "warning: out of bounds access\n";
               std::cerr << "array has " << size / 4 << " elements, but accessing subscript " << V(y) / 4 << "\n";

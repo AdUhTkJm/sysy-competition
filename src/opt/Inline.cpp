@@ -9,8 +9,8 @@ std::map<std::string, int> Inline::stats() {
 }
 
 bool isRecursive(Op *op) {
-  const auto &callers = op->get<CallerAttr>()->callers;
-  const auto &name = op->get<NameAttr>()->name;
+  const auto &callers = CALLER(op);
+  const auto &name = NAME(op);
   return std::find(callers.begin(), callers.end(), name) != callers.end();
 }
 
@@ -23,7 +23,7 @@ void Inline::run() {
   fnMap = getFunctionMap();
 
   runRewriter([&](CallOp *call) {
-    const auto &fname = call->get<NameAttr>()->name;
+    const auto &fname = NAME(call);
     if (isExtern(fname))
       return false;
 
@@ -113,7 +113,7 @@ void Inline::run() {
       }
 
       if (isa<GetArgOp>(v)) {
-        auto i = v->get<IntAttr>()->value;
+        auto i = V(v);
         auto def = call->getOperand(i).defining;
         v->replaceAllUsesWith(def);
         v->erase();

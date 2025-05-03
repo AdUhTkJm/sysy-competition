@@ -164,14 +164,14 @@ void Mem2Reg::fillPhi(BasicBlock *bb, BasicBlock *last) {
     if (auto branch = dyn_cast<BranchOp>(op)) {
       {
         SemanticScope scope(*this);
-        fillPhi(branch->get<TargetAttr>()->bb, bb);
+        fillPhi(TARGET(branch), bb);
       }
       SemanticScope scope(*this);
-      fillPhi(branch->get<ElseAttr>()->bb, bb);
+      fillPhi(ELSE(branch), bb);
     }
 
     if (auto jmp = dyn_cast<GotoOp>(op))
-      fillPhi(jmp->get<TargetAttr>()->bb, bb);
+      fillPhi(TARGET(jmp), bb);
   }
 
   for (auto [load, value] : loads) {
