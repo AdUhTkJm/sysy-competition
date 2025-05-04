@@ -250,7 +250,7 @@ public:
   }
 
   template<class T>
-  void removeAttr() {
+  void remove() {
     for (auto it = attrs.begin(); it != attrs.end(); it++)
       if (isa<T>(*it)) {
         (*it)->refcnt--;
@@ -260,7 +260,7 @@ public:
   }
 
   template<class T, class... Args>
-  void addAttr(Args... args) {
+  void add(Args... args) {
     auto attr = new T(std::forward<Args>(args)...);
     attr->refcnt++;
     attrs.push_back(attr);

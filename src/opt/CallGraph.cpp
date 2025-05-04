@@ -19,11 +19,11 @@ void CallGraph::run() {
   for (auto func : funcs) {
     // Remove the old version.
     if (func->has<CallerAttr>())
-      func->removeAttr<CallerAttr>();
+      func->remove<CallerAttr>();
 
     const auto &name = NAME(func);
     const auto &callersSet = calledBy[name];
     std::vector<std::string> callers(callersSet.begin(), callersSet.end());
-    func->addAttr<CallerAttr>(callers);
+    func->add<CallerAttr>(callers);
   }
 }

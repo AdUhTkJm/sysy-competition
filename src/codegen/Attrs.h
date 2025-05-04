@@ -135,16 +135,32 @@ public:
 
 class AliasAttr : public AttrImpl<AliasAttr, __LINE__> {
 public:
-  Op *base;
-  Op *offset;
+  // All possible bases and offsets.
+  // For most variables, the vectors contain only 1 element;
+  // For function arguments and their strides, they might contain more.
+  //
+  // Semantics:
+  //    auto [base, offset] = location[i];
+  //
+  // Here `base` is either an alloca or a global. 
+  // It's the GlobalOp rather than the GetGlobalOp, for deduplication.
+  //
+  // `offset` is an integer. When it's non-negative, it represents a known, constant offset;
+  // when it's negative, it means an unknown offset. 
+  // The language prohibits negative offset in source code, so this is safe.
+  std::vector<std::pair<Op*, int>> location;
+  bool unknown;
 
-  AliasAttr(Op *base, Op *offset): base(base), offset(offset) {}
+  AliasAttr(): unknown(true) {}
+  AliasAttr(Op *base, int offset): location({ { base, offset } }) {}
+  AliasAttr(const decltype(location) &location): location(location) {}
 
+  void add(Op *base, Op *offset);
   int getConstOffset() const;
   bool mustAlias(const AliasAttr *other) const;
   bool neverAlias(const AliasAttr *other) const;
   std::string toString();
-  AliasAttr *clone() { return new AliasAttr(base, offset); }
+  AliasAttr *clone() { return new AliasAttr(location); }
 };
 
 }

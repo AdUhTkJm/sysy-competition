@@ -105,7 +105,7 @@ void Mem2Reg::fillPhi(BasicBlock *bb, BasicBlock *last) {
 
     op->pushOperand(value);
     assert(last);
-    op->addAttr<FromAttr>(last);
+    op->add<FromAttr>(last);
     symbols[alloca] = op;
   }
 

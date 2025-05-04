@@ -49,6 +49,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::Localize>(/*beforeFlattenCFG=*/ false);
   pm.addPass<sys::Globalize>();
   pm.addPass<sys::Mem2Reg>();
+  pm.addPass<sys::Alias>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::DCE>();
 

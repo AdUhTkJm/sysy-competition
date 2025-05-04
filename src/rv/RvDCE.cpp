@@ -27,7 +27,7 @@ void RvDCE::markImpure(Region *region) {
   for (auto bb : region->getBlocks()) {
     for (auto op : bb->getOps()) {
       if (isImpure(op) && !op->has<ImpureAttr>())
-        op->addAttr<ImpureAttr>();
+        op->add<ImpureAttr>();
     }
   }
 }

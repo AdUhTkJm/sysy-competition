@@ -40,7 +40,7 @@ bool DCE::markImpure(Region *region) {
 
       if (opImpure && !op->has<ImpureAttr>()) {
         impure = true;
-        op->addAttr<ImpureAttr>();
+        op->add<ImpureAttr>();
       }
     }
   }

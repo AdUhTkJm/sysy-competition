@@ -15,7 +15,7 @@ void AtMostOnce::run() {
     const auto &callers = CALLER(func);
 
     if (callers.size() == 0) {
-      func->addAttr<AtMostOnceAttr>();
+      func->add<AtMostOnceAttr>();
       continue;
     }
 
@@ -60,6 +60,6 @@ void AtMostOnce::run() {
       continue;
 
     // Now we know the function is called at most once.
-    func->addAttr<AtMostOnceAttr>();
+    func->add<AtMostOnceAttr>();
   }
 }

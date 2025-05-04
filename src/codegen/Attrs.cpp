@@ -65,19 +65,27 @@ std::ostream &operator<<(std::ostream&, Value);
 std::string AliasAttr::toString() {
   std::stringstream ss;
 
-  if (isa<GlobalOp>(base))
-    ss << "<global " << NAME(base);
-  else
-    ss << "<alloca " << base->getResult();
-  
-  ss << ", ";
+  if (unknown)
+    return "<alias = unknown>";
 
-  if (isa<IntOp>(offset))
-    ss << V(offset);
-  else
-    ss << offset->getResult();
+  if (location.size() == 0)
+    return "<alias = none>";
 
-  ss << ">";
+  ss << "<alias = ";
+  for (auto [base, offset] : location) {
+    if (isa<GlobalOp>(base))
+      ss << "global " << NAME(base);
+    else
+      ss << "alloca " << base->getResult();
+    
+    ss << ", " << offset << "; ";
+  }
 
-  return ss.str();
+  auto str = ss.str();
+  // Pop the last "; "
+  str.pop_back();
+  str.pop_back();
+  // Push the final '>'
+  str.push_back('>');
+  return str;
 }

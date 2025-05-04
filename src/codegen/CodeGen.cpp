@@ -423,7 +423,7 @@ void CodeGen::emit(ASTNode *node) {
 
       auto value = emitExpr(vardecl->init);
       auto store = builder.create<StoreOp>({ value, addr });
-      store->addAttr<SizeAttr>(getSize(vardecl->type));
+      store->add<SizeAttr>(getSize(vardecl->type));
     }
     return;
   }

@@ -173,13 +173,13 @@ void Lower::run() {
 
   runRewriter([&](sys::LoadOp *op) {
     auto load = builder.replace<sys::rv::LoadOp>(op, op->getOperands(), op->getAttrs());
-    load->addAttr<IntAttr>(0);
+    load->add<IntAttr>(0);
     return true;
   });
 
   runRewriter([&](sys::StoreOp *op) {
     auto store = builder.replace<sys::rv::StoreOp>(op, op->getOperands(), op->getAttrs());
-    store->addAttr<IntAttr>(0);
+    store->add<IntAttr>(0);
     return true;
   });
 

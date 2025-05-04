@@ -31,7 +31,7 @@ std::map<std::string, int> RegAlloc::stats() {
 // In that case just give it a random register.
 #define ADD_ATTR(Index, AttrTy) \
   auto v##Index = op->getOperand(Index).defining; \
-  op->addAttr<AttrTy>(getReg(v##Index));
+  op->add<AttrTy>(getReg(v##Index));
 
 #define BINARY ADD_ATTR(0, RsAttr) ADD_ATTR(1, Rs2Attr)
 #define UNARY ADD_ATTR(0, RsAttr)
@@ -81,7 +81,7 @@ std::map<std::string, int> RegAlloc::stats() {
   builder.create<JOp>({ new TargetAttr(ifnot) })
 
 #define END_REPLACE \
-  op->removeAttr<ElseAttr>(); \
+  op->remove<ElseAttr>(); \
   return true
 
 #define RD(op) (op)->get<RdAttr>()->reg
@@ -706,7 +706,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   for (auto bb : region->getBlocks()) {
     for (auto op : bb->getOps()) {
       if (hasRd(op) && !op->has<RdAttr>())
-        op->addAttr<RdAttr>(getReg(op));
+        op->add<RdAttr>(getReg(op));
     }
   }
 
@@ -1116,8 +1116,8 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
   int offset = 0;
   if (isa<SubSpOp>(op)) {
     offset = IMM(op);
-    op->removeAttr<IntAttr>();
-    op->addAttr<IntAttr>(offset += 8 * preserve.size());
+    op->remove<IntAttr>();
+    op->add<IntAttr>(offset += 8 * preserve.size());
   } else if (!preserve.empty()) {
     builder.setToRegionStart(region);
     op = builder.create<SubSpOp>({ new IntAttr(offset += 8 * preserve.size()) });

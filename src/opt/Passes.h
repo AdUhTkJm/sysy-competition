@@ -232,6 +232,7 @@ public:
 
 // Gives an AliasAttr to values, if they are addresses.
 class Alias : public Pass {
+  std::map<std::string, GlobalOp*> gMap;
   void runImpl(Region *region);
 public:
   Alias(ModuleOp *module): Pass(module) {}
