@@ -61,12 +61,14 @@ class PassManager {
 
   bool verbose = false;
   bool print = false;
+  std::string printAfter;
 public:
   PassManager(ModuleOp *module): module(module) {}
   ~PassManager();
 
   void setVerbose(bool verbose);
   void setPrintStats(bool print);
+  void setPrintAfter(const std::string &passName);
 
   void run();
   ModuleOp *getModule() { return module; }

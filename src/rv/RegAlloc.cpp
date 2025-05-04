@@ -170,6 +170,52 @@ static const std::set<Reg> calleeSaved = {
 constexpr int leafRegCnt = 25;
 constexpr int normalRegCnt = 25;
 
+static const Reg leafOrderf[] = {
+  Reg::fa0, Reg::fa1, Reg::fa2, Reg::fa3,
+  Reg::fa4, Reg::fa5, Reg::fa6, Reg::fa7,
+
+  Reg::ft0, Reg::ft1, Reg::ft2, Reg::ft3,
+  Reg::ft4, Reg::ft5, Reg::ft6, Reg::ft7,
+  Reg::ft8, Reg::ft9, Reg::ft10, // Reg::ft11
+  
+  Reg::fs0, Reg::fs1, Reg::fs2, Reg::fs3, 
+  Reg::fs4, Reg::fs5, Reg::fs6, Reg::fs7,
+  Reg::fs8, Reg::fs9, Reg::fs10, // Reg::fs11,
+};
+// Order for non-leaf functions.
+static const Reg normalOrderf[] = {
+  Reg::fs0, Reg::fs1, Reg::fs2, Reg::fs3, 
+  Reg::fs4, Reg::fs5, Reg::fs6, Reg::fs7,
+  Reg::fs8, Reg::fs9, Reg::fs10, // Reg::fs11,
+
+  Reg::ft0, Reg::ft1, Reg::ft2, Reg::ft3,
+  Reg::ft4, Reg::ft5, Reg::ft6, Reg::ft7,
+  Reg::ft8, Reg::ft9, Reg::ft10, // Reg::ft11
+
+  Reg::fa0, Reg::fa1, Reg::fa2, Reg::fa3,
+  Reg::fa4, Reg::fa5, Reg::fa6, Reg::fa7,
+};
+static const Reg argRegsf[] = {
+  Reg::fa0, Reg::fa1, Reg::fa2, Reg::fa3,
+  Reg::fa4, Reg::fa5, Reg::fa6, Reg::fa7,
+};
+static const std::set<Reg> callerSavedf = {
+  Reg::ft0, Reg::ft1, Reg::ft2, Reg::ft3,
+  Reg::ft4, Reg::ft5, Reg::ft6, Reg::ft7,
+  Reg::ft8, Reg::ft9, Reg::ft10, Reg::ft11,
+
+  Reg::fa0, Reg::fa1, Reg::fa2, Reg::fa3,
+  Reg::fa4, Reg::fa5, Reg::fa6, Reg::fa7,
+};
+
+static const std::set<Reg> calleeSavedf = {
+  Reg::fs0, Reg::fs1, Reg::fs2, Reg::fs3, 
+  Reg::fs4, Reg::fs5, Reg::fs6, Reg::fs7,
+  Reg::fs8, Reg::fs9, Reg::fs10, Reg::fs11,
+};
+constexpr int leafRegCntf = 30;
+constexpr int normalRegCntf = 30;
+
 // Used in constructing interference graph.
 struct Event {
   int timestamp;
@@ -179,7 +225,9 @@ struct Event {
 
 void RegAlloc::runImpl(Region *region, bool isLeaf) {
   const Reg *order = isLeaf ? leafOrder : normalOrder;
+  const Reg *orderf = isLeaf ? leafOrderf : normalOrderf;
   const int regcount = isLeaf ? leafRegCnt : normalRegCnt;
+  const int regcountf = isLeaf ? leafRegCntf : normalRegCntf;
 
   Builder builder;
   

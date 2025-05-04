@@ -31,6 +31,12 @@ Options sys::parseArgs(int argc, char **argv) {
       continue;
     }
 
+    if (strcmp(argv[i], "--print-after") == 0) {
+      opts.printAfter = argv[i + 1];
+      i++;
+      continue;
+    }
+
     PARSEOPT("--dump-ast", dumpAST);
     PARSEOPT("--dump-mid-ir", dumpMidIR);
     PARSEOPT("--rv", rv);

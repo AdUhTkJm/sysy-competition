@@ -21,6 +21,7 @@ struct Options {
 
   std::string inputFile;
   std::string outputFile;
+  std::string printAfter;
   
   Options();
 };

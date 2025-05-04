@@ -265,6 +265,25 @@ public:
   void run();
 };
 
+// Dead store elimination.
+class DSE : public Pass {
+  using Location = std::pair<Op*, int>;
+  // LiveIn and LiveOut for stores.
+  std::map<BasicBlock*, std::vector<Location>> liveIn;
+  std::map<BasicBlock*, std::vector<Location>> liveOut;
+
+  int elim = 0;
+
+  void updateLiveness(Region *region);
+  void runImpl(Region *region);
+public:
+  DSE(ModuleOp *module): Pass(module) {}
+
+  std::string name() { return "dse"; };
+  std::map<std::string, int> stats();
+  void run();
+};
+
 }
 
 #endif

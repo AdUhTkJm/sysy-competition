@@ -49,6 +49,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::Localize>(/*beforeFlattenCFG=*/ false);
   pm.addPass<sys::Globalize>();
   pm.addPass<sys::Mem2Reg>();
+  pm.addPass<sys::DCE>();
   pm.addPass<sys::Alias>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::DCE>();
@@ -86,6 +87,7 @@ int main(int argc, char **argv) {
   sys::PassManager pm(cg.getModule());
   pm.setVerbose(opts.verbose);
   pm.setPrintStats(opts.stats);
+  pm.setPrintAfter(opts.printAfter);
   
   initPipeline(pm);
   pm.run();

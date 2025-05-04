@@ -78,7 +78,12 @@ std::string AliasAttr::toString() {
     else
       ss << "alloca " << base->getResult();
     
-    ss << ", " << offset << "; ";
+    assert(offset.size() > 0);
+    ss << ": " << offset[0];
+    for (int i = 1; i < offset.size(); i++)
+      ss << ", " << offset[i];
+    
+    ss << "; ";
   }
 
   auto str = ss.str();
@@ -88,4 +93,43 @@ std::string AliasAttr::toString() {
   // Push the final '>'
   str.push_back('>');
   return str;
+}
+
+bool AliasAttr::add(Op *base, int offset) {
+  if (unknown)
+    return false;
+
+  // Known base, but unknown offset.
+  if (offset == -1) {
+    if (!location.count(base)) {
+      location[base] = { -1 };
+      return true;
+    }
+    auto &set = location[base];
+    if (set.size() == 1 && set[0] == -1)
+      return false;
+    set = { -1 };
+    return true;
+  }
+
+  // Both known base and known offset.
+  auto &set = location[base];
+  for (auto value : set) {
+    if (value == offset)
+      return false;
+  }
+  set.push_back(offset);
+  return true;
+}
+
+bool AliasAttr::addAll(const AliasAttr *other) {
+  if (unknown)
+    return false;
+  
+  bool changed = false;
+  for (auto [b, o] : other->location) {
+    for (auto v : o)
+      changed = add(b, v);
+  }
+  return changed;
 }

@@ -23,6 +23,7 @@ parser.add_argument("--timeout", type=float, default=0.5)
 parser.add_argument("--asm", type=str)
 parser.add_argument("-t", "--test", type=str)
 parser.add_argument("-i", "--input", type=str) # Input to the executable
+parser.add_argument("-p", "--print-after", type=str)
 
 args = parser.parse_args()
 
@@ -185,6 +186,9 @@ def run(full_file: str, no_exec: bool):
   
   if args.stats:
     command.append("--stats")
+
+  if args.print_after:
+    command.extend(["--print-after", args.print_after])
 
   command.extend(["-o", f"temp/{basename}.s"])
   

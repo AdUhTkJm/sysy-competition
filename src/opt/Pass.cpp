@@ -84,11 +84,15 @@ void PassManager::setPrintStats(bool print) {
   this->print = print;
 }
 
+void PassManager::setPrintAfter(const std::string &printAfter) {
+  this->printAfter = printAfter;
+}
+
 void PassManager::run() {
   for (auto pass : passes) {
     pass->run();
 
-    if (verbose) {
+    if (verbose || pass->name() == printAfter) {
       std::cerr << "===== After " << pass->name() << " =====\n\n";
       module->dump(std::cerr);
       std::cerr << "\n\n";

@@ -140,7 +140,7 @@ public:
   // For function arguments and their strides, they might contain more.
   //
   // Semantics:
-  //    auto [base, offset] = location[i];
+  //    location[base] = offset;
   //
   // Here `base` is either an alloca or a global. 
   // It's the GlobalOp rather than the GetGlobalOp, for deduplication.
@@ -148,19 +148,21 @@ public:
   // `offset` is an integer. When it's non-negative, it represents a known, constant offset;
   // when it's negative, it means an unknown offset. 
   // The language prohibits negative offset in source code, so this is safe.
-  std::vector<std::pair<Op*, int>> location;
+  std::map<Op*, std::vector<int>> location;
   bool unknown;
 
   AliasAttr(): unknown(true) {}
-  AliasAttr(Op *base, int offset): location({ { base, offset } }) {}
-  AliasAttr(const decltype(location) &location): location(location) {}
+  AliasAttr(Op *base, int offset): location({ { base, { offset } } }), unknown(false) {}
+  AliasAttr(const decltype(location) &location): location(location), unknown(false) {}
 
-  void add(Op *base, Op *offset);
-  int getConstOffset() const;
+  // Returns true if changed.
+  bool add(Op *base, int offset);
+  // Returns true if changed.
+  bool addAll(const AliasAttr *other);
   bool mustAlias(const AliasAttr *other) const;
   bool neverAlias(const AliasAttr *other) const;
   std::string toString();
-  AliasAttr *clone() { return new AliasAttr(location); }
+  AliasAttr *clone() { return unknown ? new AliasAttr() : new AliasAttr(location); }
 };
 
 }
@@ -171,5 +173,6 @@ public:
 #define TARGET(op) (op)->get<TargetAttr>()->bb
 #define ELSE(op) (op)->get<ElseAttr>()->bb
 #define CALLER(op) (op)->get<CallerAttr>()->callers
+#define ALIAS(op) (op)->get<AliasAttr>()
 
 #endif

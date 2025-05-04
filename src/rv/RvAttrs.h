@@ -41,7 +41,39 @@ namespace rv {
   X(a4) \
   X(a5) \
   X(a6) \
-  X(a7)
+  X(a7) \
+  X(ft0) \
+  X(ft1) \
+  X(ft2) \
+  X(ft3) \
+  X(ft4) \
+  X(ft5) \
+  X(ft6) \
+  X(ft7) \
+  X(ft8) \
+  X(ft9) \
+  X(ft10) \
+  X(ft11) \
+  X(fs0) \
+  X(fs1) \
+  X(fs2) \
+  X(fs3) \
+  X(fs4) \
+  X(fs5) \
+  X(fs6) \
+  X(fs7) \
+  X(fs8) \
+  X(fs9) \
+  X(fs10) \
+  X(fs11) \
+  X(fa0) \
+  X(fa1) \
+  X(fa2) \
+  X(fa3) \
+  X(fa4) \
+  X(fa5) \
+  X(fa6) \
+  X(fa7)
 
 #define X(name) name,
 enum class Reg : signed int {
