@@ -304,7 +304,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       // Even though the op is not used, it still lives in the instruction that defines it.
       // Actually this should be eliminated with DCE, but we need to take care of it.
       if (!lastUsed.count(op))
-          lastUsed[op] = i + 1;
+        lastUsed[op] = i + 1;
 
       // Precolor.
       if (isa<WriteRegOp>(op)) {
@@ -569,6 +569,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
   // Finally, after everything has been erased:
   // Destruct phi.
+
+  // This contains all phis to be removed.
   std::vector<Op*> allPhis;
   auto bbs = region->getBlocks();
 

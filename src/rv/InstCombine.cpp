@@ -164,6 +164,17 @@ void InstCombine::run() {
     }
     return false;
   });
+
+  runRewriter([&](PhiOp *op) {
+    // Remove phi with a single operand.
+    if (op->getOperands().size() == 1) {
+      auto def = op->getOperand().defining;
+      op->replaceAllUsesWith(def);
+      op->erase();
+      return true;
+    }
+    return false;
+  });
   
   // Only run this after all int-related fold completes.
   // Rewrite `li a0, 0` into reading from `zero`.

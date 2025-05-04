@@ -75,6 +75,15 @@ RVOP(ReadRegOp); // Read from real register
 RVOP(WriteRegOp); // Write to real register; the SSA value is used and pre-colored in RegAlloc.
 RVOP(CallOp);
 RVOP(PlaceHolderOp); // See regalloc; holds a place to denote a register isn't available.
+RVOPF(FcvtswOp); // i32 -> f32
+RVOP(FcvtwsOp); // f32 -> i32
+RVOP(FeqOp); // Note these Ops must have been added with a `.s` in Dump.
+RVOP(FltOp);
+RVOP(FleOp);
+RVOPF(FaddOp);
+RVOPF(FsubOp);
+RVOPF(FmulOp);
+RVOPF(FdivOp);
 
 inline bool hasRd(Op *op) {
   return 
@@ -109,7 +118,16 @@ inline bool hasRd(Op *op) {
     isa<AndiOp>(op) ||
     isa<OriOp>(op) ||
     isa<XoriOp>(op) ||
-    isa<GetArgOp>(op);
+    isa<GetArgOp>(op) ||
+    isa<FaddOp>(op) ||
+    isa<FsubOp>(op) ||
+    isa<FmulOp>(op) ||
+    isa<FdivOp>(op) ||
+    isa<FcvtswOp>(op) ||
+    isa<FcvtwsOp>(op) ||
+    isa<FeqOp>(op) ||
+    isa<FltOp>(op) ||
+    isa<FleOp>(op);
 }
 
 }

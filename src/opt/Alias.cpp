@@ -60,7 +60,10 @@ void Alias::runImpl(Region *region) {
             offset = { -1 };
         }
 
-        op->add<AliasAttr>(alias->location);
+        if (ALIAS(x)->unknown)
+          op->add<AliasAttr>(/*unknown*/);
+        else
+          op->add<AliasAttr>(alias->location);
         delete alias;
         continue;
       }

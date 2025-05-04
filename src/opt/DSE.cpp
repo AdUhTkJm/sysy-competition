@@ -142,8 +142,10 @@ void DSE::runImpl(Region *region) {
     if (used[store])
       continue;
 
-    bool canElim = true;
-    for (auto [base, _] : ALIAS(store->getOperand(1).defining)->location) {
+    auto alias = ALIAS(store->getOperand(1).defining);
+    // Never eliminate unknown things.
+    bool canElim = !alias->unknown;
+    for (auto [base, _] : alias->location) {
       // We can only eliminate if this stores to a local variable.
       // If parent of `base` is a ModuleOp (i.e. global), or another function,
       // then it's not a candidate of removal.

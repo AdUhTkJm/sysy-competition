@@ -205,6 +205,11 @@ public:
 
   void pushOperand(Value v);
   void removeAllOperands();
+  void setOperand(int i, Value v);
+  void replaceOperand(Op *before, Value v);
+
+  void removeAllAttributes();
+
   // This does a linear search, as Ops at most have 2 regions.
   void removeRegion(Region *region);
 

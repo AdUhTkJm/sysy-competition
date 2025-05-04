@@ -21,9 +21,9 @@ namespace sys {
 // Note the difference of the last two terms.
 class LoopInfo {
   std::vector<LoopInfo*> subloops;
-  std::vector<BasicBlock*> exitings;
-  std::vector<BasicBlock*> exits;
-  std::vector<BasicBlock*> latches;
+  std::set<BasicBlock*> exitings;
+  std::set<BasicBlock*> exits;
+  std::set<BasicBlock*> latches;
   std::set<BasicBlock*> bbs;
   BasicBlock *preheader;
   BasicBlock *header;
@@ -36,6 +36,7 @@ public:
   const auto &getExits() const { return exits; }
   const auto &getExitingBlocks() const { return exitings; }
   const auto &getSubloops() const { return subloops; }
+  const auto &getBlocks() const { return bbs; }
   auto getPreheader() const { return preheader; }
   auto getHeader() const { return header; }
 
@@ -75,12 +76,17 @@ public:
   auto getResult() { return info; }
 };
 
-// Turn loops into loop-closed SSA form.
-class CloseLoop : public Pass {
+// Canonicalize loops. Ensures:
+//   1) A single preheader;
+//   2) A single latch; (do I really need this?)
+//   3) In LCSSA.
+class CanonicalizeLoop : public Pass {
+  void canonicalize(LoopInfo *loop);
+  void runImpl(Region *region, LoopForest forest);
 public:
-  CloseLoop(ModuleOp *module): Pass(module) {}
+  CanonicalizeLoop(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "close-loop"; }
+  std::string name() { return "canonicalize-loop"; }
   std::map<std::string, int> stats() { return {}; }
   void run();
 };
