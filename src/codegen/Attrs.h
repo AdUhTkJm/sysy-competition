@@ -161,6 +161,7 @@ public:
   bool addAll(const AliasAttr *other);
   bool mustAlias(const AliasAttr *other) const;
   bool neverAlias(const AliasAttr *other) const;
+  bool mayAlias(const AliasAttr *other) const;
   std::string toString();
   AliasAttr *clone() { return unknown ? new AliasAttr() : new AliasAttr(location); }
 };

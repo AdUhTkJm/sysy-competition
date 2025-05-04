@@ -2,8 +2,6 @@
 
 using namespace sys;
 
-using DomTree = std::unordered_map<BasicBlock*, std::vector<BasicBlock*>>;
-
 void postorder(BasicBlock *current, DomTree &tree, std::vector<BasicBlock*> &order) {
   for (auto bb : tree[current])
     postorder(bb, tree, order);
@@ -14,11 +12,7 @@ void Alias::runImpl(Region *region) {
   // Run local analysis over RPO of the dominator tree.
 
   // First calculate RPO.
-  DomTree tree;
-  for (auto bb : region->getBlocks()) {
-    if (auto idom = bb->getIdom())
-      tree[idom].push_back(bb);
-  }
+  DomTree tree = getDomTree(region);
 
   BasicBlock *entry = region->getFirstBlock();
   std::vector<BasicBlock*> rpo;

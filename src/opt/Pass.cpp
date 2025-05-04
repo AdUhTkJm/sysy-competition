@@ -76,6 +76,17 @@ std::vector<GlobalOp*> Pass::collectGlobals() {
   return result;
 }
 
+DomTree Pass::getDomTree(Region *region) {
+  region->updateDoms();
+
+  DomTree tree;
+  for (auto bb : region->getBlocks()) {
+    if (auto idom = bb->getIdom())
+      tree[idom].push_back(bb);
+  }
+  return tree;
+}
+
 void PassManager::setVerbose(bool verbose) {
   this->verbose = verbose;
 }

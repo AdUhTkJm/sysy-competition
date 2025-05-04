@@ -267,14 +267,11 @@ public:
 
 // Dead store elimination.
 class DSE : public Pass {
-  using Location = std::pair<Op*, int>;
-  // LiveIn and LiveOut for stores.
-  std::map<BasicBlock*, std::vector<Location>> liveIn;
-  std::map<BasicBlock*, std::vector<Location>> liveOut;
+  std::map<Op*, bool> used;
 
   int elim = 0;
 
-  void updateLiveness(Region *region);
+  void dfs(BasicBlock *current, DomTree &dom, std::set<Op*> live);
   void runImpl(Region *region);
 public:
   DSE(ModuleOp *module): Pass(module) {}

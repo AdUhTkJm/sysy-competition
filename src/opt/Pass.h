@@ -6,10 +6,13 @@
 #include <type_traits>
 #include <vector>
 #include <iostream>
+#include <unordered_map>
 
 #include "../codegen/Ops.h"
 
 namespace sys {
+  
+using DomTree = std::unordered_map<BasicBlock*, std::vector<BasicBlock*>>;
 
 class Pass {
   template<typename F, typename Ret, typename A>
@@ -47,6 +50,7 @@ protected:
   std::vector<GlobalOp*> collectGlobals();
   std::map<std::string, FuncOp*> getFunctionMap();
   std::map<std::string, GlobalOp*> getGlobalMap();
+  DomTree getDomTree(Region *region);
 public:
   Pass(ModuleOp *module): module(module) {}
   virtual ~Pass() {}

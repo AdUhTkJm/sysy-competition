@@ -127,9 +127,66 @@ bool AliasAttr::addAll(const AliasAttr *other) {
     return false;
   
   bool changed = false;
-  for (auto [b, o] : other->location) {
+  for (auto &[b, o] : other->location) {
     for (auto v : o)
       changed = add(b, v);
   }
   return changed;
+}
+
+bool AliasAttr::mayAlias(const AliasAttr *other) const {
+  return !neverAlias(other);
+}
+
+bool AliasAttr::mustAlias(const AliasAttr *other) const {
+  if (unknown || other->unknown)
+    return false;
+
+  // When `this` must alias with `other`, then:
+  //   1) their keys (bases) must be identical;
+  //   2) their values must be identical and don't contain `-1` for unknown.
+  if (this->location != other->location)
+    return false;
+
+  // Check for unknowns.
+  for (auto &[base, offsets] : location) {
+    for (auto x : offsets) {
+      if (x == -1)
+        return false;
+    }
+  }
+
+  return true;
+}
+
+bool AliasAttr::neverAlias(const AliasAttr *other) const {
+  // When `this` never aliases with `other`, then:
+  //   1) no identical (key, value) pairs can appear;
+  //   2) no offset value of `-1` (unknown) appear on any of them.
+  if (unknown || other->unknown)
+    return false;
+
+  for (auto &[base, offsets] : location) {
+    // If `other` doesn't have this base, then no conflict at this base
+    auto it = other->location.find(base);
+    if (it == other->location.end())
+      continue;
+
+    // `it` points to a value type std::pair<key, value>.
+    const std::vector<int> &offsets2 = it->second;
+
+    // Check if any offset is -1.
+    if (std::any_of(offsets.begin(), offsets.end(), [](int o) { return o < 0; }) ||
+        std::any_of(offsets2.begin(), offsets2.end(), [](int o) { return o < 0; }))
+      return false;
+
+    // Check for any exact match.
+    for (int o1 : offsets) {
+      for (int o2 : offsets2)
+        if (o1 == o2)
+          return false;
+    }
+  }
+
+  return true;
 }
