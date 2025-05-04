@@ -143,20 +143,19 @@ bool AliasAttr::mustAlias(const AliasAttr *other) const {
     return false;
 
   // When `this` must alias with `other`, then:
-  //   1) their keys (bases) must be identical;
-  //   2) their values must be identical and don't contain `-1` for unknown.
+  //   1) they must have 1 key with 1 identical value;
+  //   2) the value is not -1.
   if (this->location != other->location)
     return false;
 
-  // Check for unknowns.
-  for (auto &[base, offsets] : location) {
-    for (auto x : offsets) {
-      if (x == -1)
-        return false;
-    }
-  }
+  if (location.size() != 1)
+    return false;
 
-  return true;
+  auto &[base, offsets] = *location.begin();
+  if (offsets.size() != 1)
+    return false;
+
+  return offsets[0] != -1;
 }
 
 bool AliasAttr::neverAlias(const AliasAttr *other) const {
