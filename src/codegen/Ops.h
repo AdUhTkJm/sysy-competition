@@ -20,6 +20,24 @@
     } \
   }
 
+// Ops that must be explicitly set a result type.
+#define OPE(Ty) \
+  class Ty : public OpImpl<Ty, __LINE__> { \
+  public: \
+    Ty(Value::Type resultTy, const std::vector<Value> &values): OpImpl(resultTy, values) { \
+      setName(#Ty); \
+    } \
+    Ty(Value::Type resultTy): OpImpl(resultTy, {}) { \
+      setName(#Ty); \
+    } \
+    Ty(Value::Type resultTy, const std::vector<Attr*> &attrs): OpImpl(resultTy, {}, attrs) { \
+      setName(#Ty); \
+    } \
+    Ty(Value::Type resultTy, const std::vector<Value> &values, const std::vector<Attr*> &attrs): OpImpl(resultTy, values, attrs) { \
+      setName(#Ty); \
+    } \
+  }
+
 #define OP(Ty) OPBASE(Value::i32, Ty)
 #define OPF(Ty) OPBASE(Value::f32, Ty)
 #define OPL(Ty) OPBASE(Value::i64, Ty)
@@ -56,9 +74,9 @@ OP(FuncOp);
 OP(IntOp);
 OPF(FloatOp);
 OPL(AllocaOp);
-OP(GetArgOp);
+OPE(GetArgOp);
 OP(StoreOp); // Operand order: value, dst
-OP(LoadOp);
+OPE(LoadOp);
 OP(ReturnOp);
 OP(IfOp);
 OP(WhileOp);
@@ -68,7 +86,7 @@ OP(BranchOp); // Branches according to the only operand.
 OP(GlobalOp);
 OP(GetGlobalOp);
 OP(MemcpyOp); // Operand order: dst, src
-OP(CallOp);
+OPE(CallOp);
 OP(PhiOp);
 OP(F2IOp);
 OPF(I2FOp);

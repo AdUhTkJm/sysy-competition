@@ -30,7 +30,7 @@ public:
   void setAfterOp(Op *op);
   void setBeforeOp(Op *op);
 
-  // We use 4 overloads because literal { ... } can't be deduced.
+  // We use 8 overloads because literal { ... } can't be deduced.
   template<class T>
   T *create(const std::vector<Value> &v) {
     auto op = new T(v);
@@ -59,7 +59,35 @@ public:
     return op;
   }
 
-  // Similarly 4 more, replacing `op` with the newly constructed one.
+  template<class T>
+  T *create(Value::Type resultTy, const std::vector<Value> &v) {
+    auto op = new T(resultTy, v);
+    bb->insert(at, op);
+    return op;
+  }
+
+  template<class T>
+  T *create(Value::Type resultTy) {
+    auto op = new T(resultTy);
+    bb->insert(at, op);
+    return op;
+  }
+
+  template<class T>
+  T *create(Value::Type resultTy, const std::vector<Attr*> &v) {
+    auto op = new T(resultTy, v);
+    bb->insert(at, op);
+    return op;
+  }
+
+  template<class T>
+  T *create(Value::Type resultTy, const std::vector<Value> &v, const std::vector<Attr*> &v2) {
+    auto op = new T(resultTy, v, v2);
+    bb->insert(at, op);
+    return op;
+  }
+
+  // Similarly 8 more, replacing `op` with the newly constructed one.
   template<class T>
   T *replace(Op *op, const std::vector<Value> &v) {
     setBeforeOp(op);
@@ -91,6 +119,42 @@ public:
   T *replace(Op *op, const std::vector<Value> &v, const std::vector<Attr*> &v2) {
     setBeforeOp(op);
     auto opnew = create<T>(v, v2);
+    op->replaceAllUsesWith(opnew);
+    op->erase();
+    return opnew;
+  }
+
+  template<class T>
+  T *replace(Op *op, Value::Type resultTy, const std::vector<Value> &v) {
+    setBeforeOp(op);
+    auto opnew = create<T>(resultTy, v);
+    op->replaceAllUsesWith(opnew);
+    op->erase();
+    return opnew;
+  }
+
+  template<class T>
+  T *replace(Op *op, Value::Type resultTy) {
+    setBeforeOp(op);
+    auto opnew = create<T>(resultTy);
+    op->replaceAllUsesWith(opnew);
+    op->erase();
+    return opnew;
+  }
+
+  template<class T>
+  T *replace(Op *op, Value::Type resultTy, const std::vector<Attr*> &v) {
+    setBeforeOp(op);
+    auto opnew = create<T>(resultTy, v);
+    op->replaceAllUsesWith(opnew);
+    op->erase();
+    return opnew;
+  }
+
+  template<class T>
+  T *replace(Op *op, Value::Type resultTy, const std::vector<Value> &v, const std::vector<Attr*> &v2) {
+    setBeforeOp(op);
+    auto opnew = create<T>(resultTy, v, v2);
     op->replaceAllUsesWith(opnew);
     op->erase();
     return opnew;

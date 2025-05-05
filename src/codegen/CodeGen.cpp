@@ -96,7 +96,7 @@ Value CodeGen::emitBinary(BinaryNode *node) {
       auto zero = builder.create<IntOp>({ new IntAttr(0) });
       builder.create<StoreOp>({ zero, alloca }, { new SizeAttr(4) });
     }
-    return builder.create<LoadOp>({ alloca }, { new SizeAttr(4) });
+    return builder.create<LoadOp>(Value::i32, { alloca }, { new SizeAttr(4) });
   }
 
   if (node->kind == BinaryNode::Or) {
@@ -130,7 +130,7 @@ Value CodeGen::emitBinary(BinaryNode *node) {
       auto sez = builder.create<SetNotZeroOp>({ r });
       builder.create<StoreOp>({ sez, alloca }, { new SizeAttr(4) });
     }
-    return builder.create<LoadOp>({ alloca }, { new SizeAttr(4) });
+    return builder.create<LoadOp>(Value::i32, { alloca }, { new SizeAttr(4) });
   }
 
   auto l = emitExpr(node->l);
@@ -217,6 +217,9 @@ Value CodeGen::emitExpr(ASTNode *node) {
     return builder.create<FloatOp>({ new FloatAttr(lfloat->value) });
 
   if (auto ref = dyn_cast<VarRefNode>(node)) {
+    bool isFloat = isa<FloatType>(node->type);
+    Value::Type resultTy = isFloat ? Value::f32 : Value::i32;
+
     if (!symbols.count(ref->name)) {
       if (globals.count(ref->name)) {
         auto addr = builder.create<GetGlobalOp>({
@@ -226,11 +229,9 @@ Value CodeGen::emitExpr(ASTNode *node) {
         if (isa<ArrayType>(ref->type) || isa<PointerType>(ref->type))
           return addr;
 
-        auto load = builder.create<LoadOp>({ addr }, {
+        auto load = builder.create<LoadOp>(resultTy, { addr }, {
           new SizeAttr(getSize(ref->type))
         });
-        if (isa<FloatType>(node->type))
-          load->setResultType(Value::f32);
         return load;
       }
 
@@ -238,11 +239,9 @@ Value CodeGen::emitExpr(ASTNode *node) {
       assert(false);
     }
     auto from = symbols[ref->name];
-    auto load = builder.create<LoadOp>({ from }, {
+    auto load = builder.create<LoadOp>(resultTy, { from }, {
       new SizeAttr(getSize(ref->type))
     });
-    if (isa<FloatType>(node->type))
-      load->setResultType(Value::f32);
     return load;
   }
   
@@ -257,11 +256,11 @@ Value CodeGen::emitExpr(ASTNode *node) {
       name = "_sysy_starttime";
     if (name == "stoptime")
       name = "_sysy_stoptime";
-    auto callOp = builder.create<CallOp>(args, {
+
+    bool isFP = isa<FloatType>(call->type);
+    auto callOp = builder.create<CallOp>(isFP ? Value::f32 : Value::i32, args, {
       new NameAttr(name),
     });
-    if (isa<FloatType>(call->type))
-      callOp->setResultType(Value::f32);
     return callOp;
   }
 
@@ -276,7 +275,7 @@ Value CodeGen::emitExpr(ASTNode *node) {
     
     Value addr;
     if (symbols.count(access->array))
-      addr = builder.create<LoadOp>({
+      addr = builder.create<LoadOp>(Value::i64, {
         symbols[access->array]
       }, { new SizeAttr(getSize(arrTy->base)) });
     else if (globals.count(access->array))
@@ -299,7 +298,8 @@ Value CodeGen::emitExpr(ASTNode *node) {
       return addr;
 
     // Store the value in addr.
-    return builder.create<LoadOp>({ addr }, {
+    bool isFP = isa<FloatType>(arrTy->base);
+    return builder.create<LoadOp>(isFP ? Value::f32 : Value::i32, { addr }, {
       new SizeAttr(getSize(arrTy->base))
     });
   }
@@ -341,9 +341,8 @@ void CodeGen::emit(ASTNode *node) {
     for (int i = 0; i < fn->args.size(); i++) {
       auto size = getSize(fnTy->params[i]);
       // Get the value of the argument and create a temp variable for it.
-      auto arg = builder.create<GetArgOp>({ new IntAttr(i) });
-      if (isa<FloatType>(fnTy->params[i]))
-        arg->setResultType(Value::f32);
+      Value::Type ty = isa<FloatType>(fnTy->params[i]) ? Value::f32 : Value::i32;
+      auto arg = builder.create<GetArgOp>(ty, { new IntAttr(i) });
       auto addr = builder.create<AllocaOp>({ new SizeAttr(size) });
       builder.create<StoreOp>({ arg, addr }, { new SizeAttr(size) });
       symbols[fn->args[i]] = addr;
@@ -532,7 +531,7 @@ void CodeGen::emit(ASTNode *node) {
     
     Value addr;
     if (symbols.count(write->array))
-      addr = builder.create<LoadOp>({
+      addr = builder.create<LoadOp>(Value::i64, {
         symbols[write->array]
       }, { new SizeAttr(getSize(arrTy->base)) });
     else if (globals.count(write->array))
