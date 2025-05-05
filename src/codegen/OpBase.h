@@ -215,6 +215,7 @@ public:
 
   Value getResult() { return Value(this); }
   Value::Type getResultType() const { return resultTy; }
+  void setResultType(Value::Type ty) { resultTy = ty; }
 
   Op(int id, Value::Type resultTy, const std::vector<Value> &values);
   Op(int id, Value::Type resultTy, const std::vector<Value> &values, const std::vector<Attr*> &attrs);

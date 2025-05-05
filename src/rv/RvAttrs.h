@@ -133,6 +133,18 @@ public:
   Rs2Attr *clone() { return new Rs2Attr(reg); }
 };
 
+// Marked to GetArgOp, denoting that it should be passed via a register.
+// Used in RegAlloc to determine which register should be preserved.
+class PassByRegAttr : public AttrImpl<PassByRegAttr, RVLINE> {
+public:
+  Reg reg;
+
+  PassByRegAttr(Reg reg): reg(reg) {}
+
+  std::string toString() { return "<pass by " + showReg(reg) + ">"; }
+  PassByRegAttr *clone() { return new PassByRegAttr(reg); }
+};
+
 }
 
 }

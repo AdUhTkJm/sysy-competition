@@ -89,6 +89,12 @@ void Lower::run() {
   REPLACE(AndIOp, AndOp);
   REPLACE(OrIOp, OrOp);
   REPLACE(XorIOp, XorOp);
+  REPLACE(AddFOp, FaddOp);
+  REPLACE(SubFOp, FsubOp);
+  REPLACE(MulFOp, FmulOp);
+  REPLACE(DivFOp, FdivOp);
+  REPLACE(F2IOp, FcvtswOp);
+  REPLACE(I2FOp, FcvtwsOp);
 
   runRewriter([&](MinusOp *op) {
     auto value = op->getOperand();
@@ -198,9 +204,13 @@ void Lower::run() {
     return true;
   });
 
-  static Reg regs[] = {
+  const static Reg regs[] = {
     Reg::a0, Reg::a1, Reg::a2, Reg::a3,
     Reg::a4, Reg::a5, Reg::a6, Reg::a7,
+  };
+  const static Reg fregs[] = {
+    Reg::fa0, Reg::fa1, Reg::fa2, Reg::fa3,
+    Reg::fa4, Reg::fa5, Reg::fa6, Reg::fa7,
   };
 
   runRewriter([&](sys::CallOp *op) {
@@ -208,20 +218,35 @@ void Lower::run() {
     const auto &args = op->getOperands();
 
     std::vector<Value> argsNew;
-    for (int i = 0; i < std::min((int) args.size(), 8); i++)
-      argsNew.push_back(builder.create<WriteRegOp>({ args[i] }, { new RegAttr(regs[i]) }));
+    std::vector<Value> fargsNew;
+    std::vector<Value> spilled;
+    for (size_t i = 0; i < args.size(); i++) {
+      Value arg = args[i];
+      int fcnt = fargsNew.size();
+      int cnt = argsNew.size();
+
+      if (arg.ty == Value::f32 && fcnt < 8) {
+        fargsNew.push_back(builder.create<WriteRegOp>({ arg }, { new RegAttr(fregs[fcnt]) }));
+        continue;
+      }
+      if (arg.ty != Value::f32 && cnt < 8) {
+        argsNew.push_back(builder.create<WriteRegOp>({ arg }, { new RegAttr(regs[cnt]) }));
+        continue;
+      }
+      spilled.push_back(arg);
+    }
 
     // More registers must get spilled to stack.
-    int stackOffset = (args.size() - 8) * 8;
+    int stackOffset = spilled.size() * 8;
     // Align to 16 bytes.
     if (stackOffset % 16 != 0)
       stackOffset = stackOffset / 16 * 16 + 16;
-    if (args.size() > 8)
+    if (stackOffset > 0)
       builder.create<SubSpOp>({ new IntAttr(stackOffset) });
     
-    for (int i = 8; i < args.size(); i++) {
+    for (int i = 0; i < spilled.size(); i++) {
       auto sp = builder.create<ReadRegOp>({ new RegAttr(Reg::sp) });
-      builder.create<StoreOp>({ op->getOperand(i), sp }, { new SizeAttr(8), new IntAttr((i - 8) * 8) });
+      builder.create<StoreOp>({ spilled[i], sp }, { new SizeAttr(8), new IntAttr(i * 8) });
     }
 
     builder.create<sys::rv::CallOp>(argsNew, { 
@@ -230,11 +255,11 @@ void Lower::run() {
     });
 
     // Restore stack pointer.
-    if (args.size() > 8)
+    if (stackOffset > 0)
       builder.create<SubSpOp>({ new IntAttr(-stackOffset) });
 
     // Read result from a0.
-    builder.replace<ReadRegOp>(op, { new RegAttr(Reg::a0) });
+    builder.replace<ReadRegOp>(op, { new RegAttr(op->getResultType() != Value::f32 ? Reg::a0 : Reg::fa0) });
     return true;
   });
 

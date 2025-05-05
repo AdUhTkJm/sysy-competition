@@ -92,6 +92,7 @@ public:
 };
 
 class LoopRotate : public Pass {
+  void runImpl(LoopInfo *info);
 public:
   LoopRotate(ModuleOp *module): Pass(module) {}
 

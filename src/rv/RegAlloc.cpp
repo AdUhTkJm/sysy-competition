@@ -3,6 +3,7 @@
 #include "RvOps.h"
 #include "../codegen/CodeGen.h"
 #include "../codegen/Attrs.h"
+#include <algorithm>
 #include <iostream>
 #include <iterator>
 #include <vector>
@@ -159,13 +160,24 @@ static const std::set<Reg> callerSaved = {
   Reg::t4, Reg::t5, Reg::t6,
 
   Reg::a0, Reg::a1, Reg::a2, Reg::a3,
-  Reg::a4, Reg::a5, Reg::a6, Reg::a7,  
+  Reg::a4, Reg::a5, Reg::a6, Reg::a7,
+
+  Reg::ft0, Reg::ft1, Reg::ft2, Reg::ft3,
+  Reg::ft4, Reg::ft5, Reg::ft6, Reg::ft7,
+  Reg::ft8, Reg::ft9, Reg::ft10, Reg::ft11,
+
+  Reg::fa0, Reg::fa1, Reg::fa2, Reg::fa3,
+  Reg::fa4, Reg::fa5, Reg::fa6, Reg::fa7,
 };
 
 static const std::set<Reg> calleeSaved = {
   Reg::s0, Reg::s1, Reg::s2, Reg::s3, 
   Reg::s4, Reg::s5, Reg::s6, Reg::s7,
   Reg::s8, Reg::s9, Reg::s10, Reg::s11,
+
+  Reg::fs0, Reg::fs1, Reg::fs2, Reg::fs3, 
+  Reg::fs4, Reg::fs5, Reg::fs6, Reg::fs7,
+  Reg::fs8, Reg::fs9, Reg::fs10, Reg::fs11,
 };
 constexpr int leafRegCnt = 25;
 constexpr int normalRegCnt = 25;
@@ -195,23 +207,9 @@ static const Reg normalOrderf[] = {
   Reg::fa0, Reg::fa1, Reg::fa2, Reg::fa3,
   Reg::fa4, Reg::fa5, Reg::fa6, Reg::fa7,
 };
-static const Reg argRegsf[] = {
+static const Reg fargRegs[] = {
   Reg::fa0, Reg::fa1, Reg::fa2, Reg::fa3,
   Reg::fa4, Reg::fa5, Reg::fa6, Reg::fa7,
-};
-static const std::set<Reg> callerSavedf = {
-  Reg::ft0, Reg::ft1, Reg::ft2, Reg::ft3,
-  Reg::ft4, Reg::ft5, Reg::ft6, Reg::ft7,
-  Reg::ft8, Reg::ft9, Reg::ft10, Reg::ft11,
-
-  Reg::fa0, Reg::fa1, Reg::fa2, Reg::fa3,
-  Reg::fa4, Reg::fa5, Reg::fa6, Reg::fa7,
-};
-
-static const std::set<Reg> calleeSavedf = {
-  Reg::fs0, Reg::fs1, Reg::fs2, Reg::fs3, 
-  Reg::fs4, Reg::fs5, Reg::fs6, Reg::fs7,
-  Reg::fs8, Reg::fs9, Reg::fs10, Reg::fs11,
 };
 constexpr int leafRegCntf = 30;
 constexpr int normalRegCntf = 30;
@@ -237,6 +235,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
   // First of all, add 15 precolored placeholders before each call.
   // This denotes that a CallOp clobbers those 15 registers.
+  // (Note that it's 35 including floating point registers.)
   runRewriter(funcOp, [&](CallOp *op) {
     builder.setBeforeOp(op);
     for (auto reg : callerSaved) {
@@ -250,33 +249,49 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   // Similarly, add placeholders around each GetArg.
   // First create placeholders for a0-a7.
   builder.setToRegionStart(region);
-  std::vector<Value> argHolders;
+  std::vector<Value> argHolders, fargHolders;
   auto argcnt = funcOp->get<ArgCountAttr>()->count;
   for (int i = 0; i < std::min(argcnt, 8); i++) {
     auto placeholder = builder.create<PlaceHolderOp>();
     assignment[placeholder] = argRegs[i];
     argHolders.push_back(placeholder);
+
+    auto fplaceholder = builder.create<PlaceHolderOp>();
+    assignment[fplaceholder] = fargRegs[i];
+    fargHolders.push_back(fplaceholder);
   }
 
-  runRewriter(funcOp, [&](GetArgOp *op) {
-    auto value = IMM(op);
-    
-    // The i'th argument cannot take registers from argReg[i + 1] ~ argReg[argcnt - 1].
-    // So we do it like (take `a1` as example):
-    //   %holder = placeholder %argHolders[a1]
-    //   %ARG = getarg <0>
-    // This will make sure `a1` is live from function beginning to %ARG.
+  auto rawGets = funcOp->findAll<GetArgOp>();
+  // We might find some getArgs missing by DCE, so it's not necessarily consecutive.
+  std::vector<Op*> getArgs;
+  getArgs.resize(argcnt);
+  for (auto x : rawGets)
+    getArgs[V(x)] = x;
 
-    if (value < 8) {
+  int fcnt = 0, cnt = 0;
+  for (size_t i = 0; i < getArgs.size(); i++) {
+    // A missing argument.
+    if (!getArgs[i])
+      continue;
+
+    Op *op = getArgs[i];
+
+    if (op->getResultType() == Value::f32 && fcnt < 8) {
       builder.setBeforeOp(op);
-      builder.create<PlaceHolderOp>({ argHolders[value] });
-      builder.replace<ReadRegOp>(op, { new RegAttr(argRegs[value]) });
-      return true;
+      builder.create<PlaceHolderOp>({ fargHolders[fcnt] });
+      builder.replace<ReadRegOp>(op, { new RegAttr(fargRegs[fcnt]) });
+      fcnt++;
+      continue;
     }
-
-    // Read from stack. The stack offset might change further, so wait till the end.
-    return false;
-  });
+    if (op->getResultType() != Value::f32 && cnt < 8) {
+      builder.setBeforeOp(op);
+      builder.create<PlaceHolderOp>({ argHolders[cnt] });
+      builder.replace<ReadRegOp>(op, { new RegAttr(argRegs[cnt]) });
+      cnt++;
+      continue;
+    }
+    // Spilled to stack; don't do anything.
+  }
 
   region->updateLiveness();
 
@@ -1202,9 +1217,24 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
   // because of the placeholders.
 
   // Deal with remaining GetArg.
+  // The arguments passed by registers have already been eliminated.
+  // Now all remaining ones are passed on stack; sort them according to index.
+  auto remainingGets = funcOp->findAll<GetArgOp>();
+  std::sort(remainingGets.begin(), remainingGets.end(), [](Op *a, Op *b) {
+    return V(a) < V(b);
+  });
+  std::map<Op*, int> argOffsets;
+  int argOffset = 0;
+
+  for (auto op : remainingGets) {
+    argOffsets[op] = argOffset;
+    argOffset += 8;
+  }
+
   runRewriter(funcOp, [&](GetArgOp *op) {
     auto value = IMM(op);
     assert(value >= 8);
+    // TODO: change it here
 
     // Read from stack.
     int offset = 0;
@@ -1216,7 +1246,8 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
     //    <arg 8> bp + 0
     //    <arg 9> bp + 8
     // ...
-    offset += (value - 8) * 8;
+    assert(argOffsets.count(op));
+    offset += argOffsets[op];
     builder.setBeforeOp(op);
     builder.replace<LoadOp>(op, {
       new RdAttr(RD(op)),

@@ -255,6 +255,8 @@ Value CodeGen::emitExpr(ASTNode *node) {
     auto callOp = builder.create<CallOp>(args, {
       new NameAttr(name),
     });
+    if (isa<FloatType>(call->type))
+      callOp->setResultType(Value::f32);
     return callOp;
   }
 
@@ -335,6 +337,8 @@ void CodeGen::emit(ASTNode *node) {
       auto size = getSize(fnTy->params[i]);
       // Get the value of the argument and create a temp variable for it.
       auto arg = builder.create<GetArgOp>({ new IntAttr(i) });
+      if (isa<FloatType>(fnTy->params[i]))
+        arg->setResultType(Value::f32);
       auto addr = builder.create<AllocaOp>({ new SizeAttr(size) });
       builder.create<StoreOp>({ arg, addr }, { new SizeAttr(size) });
       symbols[fn->args[i]] = addr;
