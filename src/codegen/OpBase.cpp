@@ -215,6 +215,8 @@ std::ostream &operator<<(std::ostream &os, Value value) {
 void Op::dump(std::ostream &os, int depth) {
   indent(os, depth * 2);
   os << getResult() << " = " << opname;
+  if (resultTy == Value::f32)
+    os << ".f";
   for (auto &operand : operands)
     os << " " << operand;
   for (auto attr : attrs)

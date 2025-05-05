@@ -188,7 +188,7 @@ void Lower::run() {
   });
 
   runRewriter([&](sys::LoadOp *op) {
-    auto load = builder.replace<sys::rv::LoadOp>(op, op->getOperands(), op->getAttrs());
+    auto load = builder.replace<sys::rv::LoadOp>(op, op->getResultType(), op->getOperands(), op->getAttrs());
     load->add<IntAttr>(0);
     return true;
   });

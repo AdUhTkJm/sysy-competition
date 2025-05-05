@@ -21,6 +21,24 @@
     } \
   }
 
+// Ops that must be explicitly set a result type.
+#define RVOPE(Ty) \
+  class Ty : public OpImpl<Ty, __LINE__ + 524288> { \
+  public: \
+    Ty(Value::Type resultTy, const std::vector<Value> &values): OpImpl(resultTy, values) { \
+      setName("rv."#Ty); \
+    } \
+    Ty(Value::Type resultTy): OpImpl(resultTy, {}) { \
+      setName("rv."#Ty); \
+    } \
+    Ty(Value::Type resultTy, const std::vector<Attr*> &attrs): OpImpl(resultTy, {}, attrs) { \
+      setName("rv."#Ty); \
+    } \
+    Ty(Value::Type resultTy, const std::vector<Value> &values, const std::vector<Attr*> &attrs): OpImpl(resultTy, values, attrs) { \
+      setName("rv."#Ty); \
+    } \
+  }
+
 #define RVOP(Ty) RVOPBASE(Value::i32, Ty)
 #define RVOPL(Ty) RVOPBASE(Value::i64, Ty)
 #define RVOPF(Ty) RVOPBASE(Value::f32, Ty)
@@ -68,7 +86,7 @@ RVOP(SltiOp);
 RVOP(JOp);
 RVOP(MvOp);
 RVOP(RetOp);
-RVOP(LoadOp);
+RVOPE(LoadOp);
 RVOP(StoreOp);
 RVOP(SubSpOp); // Allocate stack space: sub sp, sp, <IntAttr>
 RVOP(ReadRegOp); // Read from real register

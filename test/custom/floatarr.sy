@@ -1,0 +1,10 @@
+float f(float x[]) {
+  putint(x[0]);
+  putint(x[1]);
+  return x[0] + x[1];
+}
+
+int main() {
+  float a[2] = { 1.1, 2.2 };
+  return a[0] + f(a); // 4
+}

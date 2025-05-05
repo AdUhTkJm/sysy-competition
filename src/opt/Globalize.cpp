@@ -177,8 +177,9 @@ void Globalize::run() {
     if (!func->has<AtMostOnceAttr>())
       continue;
 
-    // If the function is called at most once, move any alloca of size > 32 out of it.
-    // I choose to preserve small arrays, as I guess it'd have a better data locality.
+    // If the function is called at most once, move allocas out of it.
+    // It's unsound to raise size = 8, because it might be holding address of some alloca.
+    // And I choose to allow size <= 32. Hopefully better data locality?
     runImpl(func->getRegion());
   }
 }

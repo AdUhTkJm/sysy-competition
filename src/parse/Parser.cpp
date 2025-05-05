@@ -108,7 +108,7 @@ void Parser::printSurrounding() {
 }
 
 Type *Parser::parseSimpleType() {
-switch (consume().type) {
+  switch (consume().type) {
   case Token::Void:
     return ctx.create<VoidType>();
   case Token::Int:

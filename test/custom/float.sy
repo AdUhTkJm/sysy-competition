@@ -5,5 +5,5 @@ float square(float x) {
 int main() {
   float x = 1.23;
   int y = x + 2.46; // y == 3
-  return square(y) * 4.3 - 5.5; // int(9 * 4.3 - 5.5) == 33
+  return square(y) * 4.3 - 5.5; // 9 * 4.3 - 5.5 == 33.2
 }

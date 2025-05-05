@@ -838,7 +838,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
           // becomes
           //   ld s11, offset(sp)
           //   op rd, s11
-          builder.create<LoadOp>({
+          // TODO: spilling FP registers
+          builder.create<LoadOp>(Value::i64, {
             new RdAttr(spillReg),
             new RsAttr(Reg::sp),
             new IntAttr(offset),
@@ -862,7 +863,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
             new RsAttr(spillReg),
             new Rs2Attr(Reg::sp)
           });
-          builder.create<LoadOp>({
+          builder.create<LoadOp>(Value::i64, {
             new RdAttr(spillReg),
             new RsAttr(spillReg),
             new IntAttr(0),
@@ -878,7 +879,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         builder.setBeforeOp(op);
         // Similar to the sequence above.
         if (offset < 2048) {
-          builder.create<LoadOp>({
+          builder.create<LoadOp>(Value::i64, {
             new RdAttr(spillReg2),
             new RsAttr(Reg::sp),
             new IntAttr(offset),
@@ -894,7 +895,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
             new RsAttr(spillReg2),
             new Rs2Attr(Reg::sp)
           });
-          builder.create<LoadOp>({
+          builder.create<LoadOp>(Value::i64, {
             new RdAttr(spillReg2),
             new RsAttr(spillReg2),
             new IntAttr(0),
@@ -1163,8 +1164,10 @@ void save(Builder builder, const std::vector<Reg> &regs, int offset) {
 void load(Builder builder, const std::vector<Reg> &regs, int offset) {
   for (auto reg : regs) {
     offset -= 8;
+    auto isFloat = isFP(reg);
+    Value::Type ty = isFloat ? Value::f32 : Value::i64;
     if (offset < 2048) {
-      builder.create<sys::rv::LoadOp>({
+      builder.create<sys::rv::LoadOp>(ty, {
         /*value=*/new RdAttr(reg),
         /*addr=*/new RsAttr(Reg::sp),
         /*offset=*/new IntAttr(offset),
@@ -1183,7 +1186,7 @@ void load(Builder builder, const std::vector<Reg> &regs, int offset) {
         new RsAttr(spillReg),
         new Rs2Attr(Reg::sp)
       });
-      builder.create<sys::rv::LoadOp>({
+      builder.create<sys::rv::LoadOp>(ty, {
         new RdAttr(reg),
         new RsAttr(spillReg),
         new IntAttr(0),
@@ -1280,7 +1283,7 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
     assert(argOffsets.count(op));
     offset += argOffsets[op];
     builder.setBeforeOp(op);
-    builder.replace<LoadOp>(op, {
+    builder.replace<LoadOp>(op, isFP(RD(op)) ? Value::f32 : Value::i64, {
       new RdAttr(RD(op)),
       new RsAttr(Reg::sp),
       new IntAttr(offset),

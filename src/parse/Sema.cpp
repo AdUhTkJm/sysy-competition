@@ -216,13 +216,13 @@ Type *Sema::infer(ASTNode *node) {
     auto lty = infer(assign->l);
     auto rty = infer(assign->r);
     if (isa<IntType>(lty) && isa<FloatType>(rty)) {
-      assign->r = new UnaryNode(UnaryNode::Int2Float, assign->r);
+      assign->r = new UnaryNode(UnaryNode::Float2Int, assign->r);
       assign->r->type = ctx.create<FloatType>();
       return ctx.create<VoidType>();
     }
 
     if (isa<FloatType>(lty) && isa<IntType>(rty)) {
-      assign->r = new UnaryNode(UnaryNode::Float2Int, assign->r);
+      assign->r = new UnaryNode(UnaryNode::Int2Float, assign->r);
       assign->r->type = ctx.create<IntType>();
       return ctx.create<VoidType>();
     }
@@ -337,12 +337,12 @@ Type *Sema::infer(ASTNode *node) {
     auto valueTy = infer(write->value);
 
     if (isa<FloatType>(baseTy) && isa<IntType>(valueTy)) {
-      write->value = new UnaryNode(UnaryNode::Float2Int, write->value);
+      write->value = new UnaryNode(UnaryNode::Int2Float, write->value);
       write->value->type = ctx.create<IntType>();
     }
 
     if (isa<IntType>(baseTy) && isa<FloatType>(valueTy)) {
-      write->value = new UnaryNode(UnaryNode::Int2Float, write->value);
+      write->value = new UnaryNode(UnaryNode::Float2Int, write->value);
       write->value->type = ctx.create<FloatType>();
     }
 
