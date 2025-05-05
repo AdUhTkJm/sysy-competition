@@ -76,7 +76,8 @@ RVOP(WriteRegOp); // Write to real register; the SSA value is used and pre-color
 RVOP(CallOp);
 RVOP(PlaceHolderOp); // See regalloc; holds a place to denote a register isn't available.
 RVOPF(FcvtswOp); // i32 -> f32
-RVOP(FcvtwsOp); // f32 -> i32
+RVOP(FcvtwsRtzOp); // f32 -> i32, round to zero
+RVOPF(FmvwxOp); // copies bit pattern from i32 to f32
 RVOP(FeqOp); // Note these Ops must have been added with a `.s` in Dump.
 RVOP(FltOp);
 RVOP(FleOp);
@@ -124,7 +125,8 @@ inline bool hasRd(Op *op) {
     isa<FmulOp>(op) ||
     isa<FdivOp>(op) ||
     isa<FcvtswOp>(op) ||
-    isa<FcvtwsOp>(op) ||
+    isa<FcvtwsRtzOp>(op) ||
+    isa<FmvwxOp>(op) ||
     isa<FeqOp>(op) ||
     isa<FltOp>(op) ||
     isa<FleOp>(op);

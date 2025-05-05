@@ -226,9 +226,12 @@ Value CodeGen::emitExpr(ASTNode *node) {
         if (isa<ArrayType>(ref->type) || isa<PointerType>(ref->type))
           return addr;
 
-        return builder.create<LoadOp>({ addr }, {
+        auto load = builder.create<LoadOp>({ addr }, {
           new SizeAttr(getSize(ref->type))
         });
+        if (isa<FloatType>(node->type))
+          load->setResultType(Value::f32);
+        return load;
       }
 
       std::cerr << "cannot find symbol " << ref->name << "\n";
@@ -238,6 +241,8 @@ Value CodeGen::emitExpr(ASTNode *node) {
     auto load = builder.create<LoadOp>({ from }, {
       new SizeAttr(getSize(ref->type))
     });
+    if (isa<FloatType>(node->type))
+      load->setResultType(Value::f32);
     return load;
   }
   

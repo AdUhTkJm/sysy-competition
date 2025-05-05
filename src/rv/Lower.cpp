@@ -93,8 +93,18 @@ void Lower::run() {
   REPLACE(SubFOp, FsubOp);
   REPLACE(MulFOp, FmulOp);
   REPLACE(DivFOp, FdivOp);
-  REPLACE(F2IOp, FcvtswOp);
-  REPLACE(I2FOp, FcvtwsOp);
+  REPLACE(F2IOp, FcvtwsRtzOp);
+  REPLACE(I2FOp, FcvtswOp);
+
+  runRewriter([&](FloatOp *op) {
+    float value = F(op);
+    
+    builder.setBeforeOp(op);
+    // Strict aliasing? Don't know.
+    auto li = builder.create<LiOp>({ new IntAttr(*(int*) &value) });
+    builder.replace<FmvwxOp>(op, { li });
+    return true;
+  });
 
   runRewriter([&](MinusOp *op) {
     auto value = op->getOperand();

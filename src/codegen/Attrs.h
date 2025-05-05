@@ -169,6 +169,7 @@ public:
 }
 
 #define V(op) (op)->get<IntAttr>()->value
+#define F(op) (op)->get<FloatAttr>()->value
 #define SIZE(op) (op)->get<SizeAttr>()->value
 #define NAME(op) (op)->get<NameAttr>()->name
 #define TARGET(op) (op)->get<TargetAttr>()->bb

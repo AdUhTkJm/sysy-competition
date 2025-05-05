@@ -28,25 +28,41 @@ void dumpOp(Op *op, std::ostream &os) {
   std::string name;
   auto &opname = op->getName();
 
+  static const std::map<std::string, std::string> nameMap = {
+    { "fadd", "fadd.s" },
+    { "fsub", "fsub.s" },
+    { "fmul", "fmul.s" },
+    { "fdiv", "fdiv.s" },
+    { "fcvtsw", "fcvt.s.w" },
+    { "fmvwx", "fmv.w.x" },
+  };
+
   // Skip the initial "rv."
   assert(opname[0] == 'r' && opname[1] == 'v' && opname[2] == '.');
   name.reserve(opname.size() - 3);
   for (int i = 3; i < opname.size(); i++)
     name.push_back(opname[i]);
 
+  if (nameMap.count(name))
+    name = nameMap.at(name);
+
   // Vary opname based on the size attribute.
-  // TODO.
   if (isa<sys::rv::StoreOp>(op)) {
-    auto size = SIZE(op);
-    switch (size) {
-    case 8:
-      name = "sd";
-      break;
-    case 4:
-      name = "sw";
-      break;
-    default:
-      assert(false);
+    if (!isFP(op->get<RsAttr>()->reg)) {
+      auto size = SIZE(op);
+      switch (size) {
+      case 8:
+        name = "sd";
+        break;
+      case 4:
+        name = "sw";
+        break;
+      default:
+        assert(false);
+      }
+    } else {
+      // A very ad-hoc, ugly hack. Since all FPs are float, we just ignore `size` (which might be 8).
+      name = "fsw";
     }
     // Dump as `sw a0, 4(a1)`
     auto rs = op->get<RsAttr>()->reg;
@@ -58,20 +74,33 @@ void dumpOp(Op *op, std::ostream &os) {
 
   if (isa<sys::rv::LoadOp>(op)) {
     auto size = SIZE(op);
-    switch (size) {
-    case 8:
-      name = "ld";
-      break;
-    case 4:
-      name = "lw";
-      break;
-    default:
-      assert(false);
+    if (!isFP(op->get<RdAttr>()->reg)) {
+      auto size = SIZE(op);
+      switch (size) {
+      case 8:
+        name = "ld";
+        break;
+      case 4:
+        name = "lw";
+        break;
+      default:
+        assert(false);
+      }
+    } else {
+      // A very ad-hoc, ugly hack. Since all FPs are float, we just ignore `size` (which might be 8).
+      name = "flw";
     }
     auto rd = op->get<RdAttr>()->reg;
     auto rs = op->get<RsAttr>()->reg;
     auto offset = V(op);
     os << name << " " << rd << ", " << offset << "(" << rs << ")\n";
+    return;
+  }
+
+  if (isa<FcvtwsRtzOp>(op)) {
+    auto rd = op->get<RdAttr>()->reg;
+    auto rs = op->get<RsAttr>()->reg;
+    os << "fcvt.w.s " << rd << ", " << rs << ", rtz\n";
     return;
   }
 

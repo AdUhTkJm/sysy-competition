@@ -275,15 +275,16 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       continue;
 
     Op *op = getArgs[i];
+    auto ty = op->getResultType();
 
-    if (op->getResultType() == Value::f32 && fcnt < 8) {
+    if (ty == Value::f32 && fcnt < 8) {
       builder.setBeforeOp(op);
       builder.create<PlaceHolderOp>({ fargHolders[fcnt] });
       builder.replace<ReadRegOp>(op, { new RegAttr(fargRegs[fcnt]) });
       fcnt++;
       continue;
     }
-    if (op->getResultType() != Value::f32 && cnt < 8) {
+    if (ty != Value::f32 && cnt < 8) {
       builder.setBeforeOp(op);
       builder.create<PlaceHolderOp>({ argHolders[cnt] });
       builder.replace<ReadRegOp>(op, { new RegAttr(argRegs[cnt]) });
@@ -292,6 +293,18 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     }
     // Spilled to stack; don't do anything.
   }
+
+  // If a phi has an operand of float type, then itself must also be of float type.
+  runRewriter(funcOp, [&](PhiOp *op) {
+    for (auto operand : op->getOperands()) {
+      if (operand.ty == Value::f32) {
+        op->setResultType(Value::f32);
+        return false;
+      }
+    }
+    // Do it only once.
+    return false;
+  });
 
   region->updateLiveness();
 
@@ -365,11 +378,11 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         }
       }
     }
-#endif
-#if 1
+#else
     // We use event-driven approach to optimize it into O(n log n + E).
     // Is this actually an improvement? Still very slow for test case 84.
     // Perhaps GCM is required.
+    // Update: GCM doesn't help much.
     std::vector<Event> events;
     for (auto [op, v] : lastUsed) {
       // Don't push empty live range. It's not handled properly.
@@ -390,6 +403,10 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     for (const auto& event : events) {
       if (event.start) {
         for (Op* activeOp : active) {
+          // FP and int are using different registers.
+          if (activeOp->getResultType() == Value::f32 ^ event.op->getResultType() == Value::f32)
+            continue;
+
           interf[event.op].insert(activeOp);
           interf[activeOp].insert(event.op);
         }
@@ -468,9 +485,12 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       continue;
     }
 
-    for (int i = 0; i < regcount; i++) {
-      if (!forbidden.count(order[i])) {
-        assignment[op] = order[i];
+    auto rcnt = op->getResultType() != Value::f32 ? regcount : regcountf;
+    auto rorder = op->getResultType() != Value::f32 ? order : orderf;
+
+    for (int i = 0; i < rcnt; i++) {
+      if (!forbidden.count(rorder[i])) {
+        assignment[op] = rorder[i];
         break;
       }
     }
@@ -494,8 +514,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   
   // dumpAssignment(region, assignment);
 
-  auto getReg = [&](Op *op) {
-    return assignment.count(op) ? assignment[op] : order[0];
+  const auto getReg = [&](Op *op) {
+    return assignment.count(op) ? assignment[op] :
+      op->getResultType() == Value::f32 ? orderf[0] : order[0];
   };
 
   // Convert all operands to registers.
@@ -518,6 +539,13 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(OrOp, BINARY);
   LOWER(XorOp, BINARY);
   LOWER(SltOp, BINARY);
+  LOWER(FaddOp, BINARY);
+  LOWER(FsubOp, BINARY);
+  LOWER(FmulOp, BINARY);
+  LOWER(FdivOp, BINARY);
+  LOWER(FeqOp, BINARY);
+  LOWER(FltOp, BINARY);
+  LOWER(FleOp, BINARY);
   
   LOWER(LoadOp, UNARY);
   LOWER(AddiwOp, UNARY);
@@ -532,6 +560,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(AndiOp, UNARY);
   LOWER(OriOp, UNARY);
   LOWER(XoriOp, UNARY);
+  LOWER(FcvtswOp, UNARY);
+  LOWER(FcvtwsRtzOp, UNARY);
+  LOWER(FmvwxOp, UNARY);
 
   // Remove all operands of calls and returns.
   // The "operands" are only formal and carry no real meaning.

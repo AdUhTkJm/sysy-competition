@@ -136,6 +136,7 @@ void Inline::run() {
 
     builder.setBeforeOp(call);
     auto load = builder.create<LoadOp>({ addr });
+    load->setResultType(call->getResultType());
     call->replaceAllUsesWith(load);
     call->erase();
     return true;
