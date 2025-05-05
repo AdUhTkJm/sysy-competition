@@ -56,6 +56,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DSE>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::DCE>();
+  pm.addPass<sys::GCM>();
 
   if (opts.arm)
     initArmPipeline(pm);

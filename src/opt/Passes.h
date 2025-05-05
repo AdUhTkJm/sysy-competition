@@ -281,6 +281,36 @@ public:
   void run();
 };
 
+// Global code motion.
+class LoopInfo;
+class LoopForest;
+class GCM : public Pass {
+  std::set<Op*> visited;
+  DomTree tree;
+  // This is the depth on dominator tree.
+  std::map<BasicBlock*, int> depth;
+  // This is the depth in loop forest.
+  std::map<BasicBlock*, int> loopDepth;
+  std::map<Op*, BasicBlock*> scheduled;
+
+  void updateDepth(BasicBlock *bb, int dep);
+  void updateLoopDepth(LoopInfo *info, int dep);
+
+  void scheduleEarly(BasicBlock *entry, Op *op);
+  void scheduleLate(Op *op);
+
+  // Lowest common ancestor.
+  BasicBlock *lca(BasicBlock *a, BasicBlock *b);
+
+  void runImpl(Region *region, const LoopForest &forest);
+public:
+  GCM(ModuleOp *module): Pass(module) {}
+
+  std::string name() { return "gcm"; };
+  std::map<std::string, int> stats() { return {}; }
+  void run();
+};
+
 }
 
 #endif

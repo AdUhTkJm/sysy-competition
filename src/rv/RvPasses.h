@@ -43,6 +43,17 @@ public:
   void run();
 };
 
+// A weak scheduler that only works on basic blocks.
+class InstSchedule : public Pass {
+  void runImpl(BasicBlock *bb);
+public:
+  InstSchedule(ModuleOp *module): Pass(module) {}
+
+  std::string name() { return "rv-inst-schedule"; };
+  std::map<std::string, int> stats() { return {}; }
+  void run();
+};
+
 class RegAlloc : public Pass {
   int spilled = 0;
   int convertedTotal = 0;
