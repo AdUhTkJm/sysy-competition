@@ -62,6 +62,8 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::GCM>();
+  // Note that Mem2Reg can only be executed once. 
+  // That's why we need a late inline here.
 
   if (opts.arm)
     initArmPipeline(pm);

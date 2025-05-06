@@ -36,9 +36,41 @@ int RegularFold::foldImpl() {
       auto a = x->getOperand(0).defining;
       auto b = x->getOperand(1).defining;
       if (INT(b)) {
+        folded++;
         builder.setBeforeOp(op);
         auto imm = builder.create<IntOp>({ new IntAttr(V(b) + V(y)) });
         builder.replace<AddIOp>(op, { a, imm });
+        return true;
+      }
+    }
+
+    // ((a / C) + (b / C)) becomes ((a + b) / C)
+    if (isa<DivIOp>(x) && isa<DivIOp>(y)) {
+      Value a = x->getOperand(0).defining;
+      auto c = x->getOperand(1).defining;
+      Value b = y->getOperand(0).defining;
+      auto d = y->getOperand(1).defining;
+      if (INT(c) && INT(d) && V(c) == V(d)) {
+        folded++;
+        builder.setBeforeOp(op);
+        auto addi = builder.create<AddIOp>({ a, b });
+        builder.replace<DivIOp>(op, { addi, c });
+        return true;
+      }
+    }
+
+    // ((a * C) + (b * C)) becomes ((a + b) * C)
+    if (isa<MulIOp>(x) && isa<MulIOp>(y)) {
+      Value a = x->getOperand(0).defining;
+      auto c = x->getOperand(1).defining;
+      Value b = y->getOperand(0).defining;
+      auto d = y->getOperand(1).defining;
+      if (INT(c) && INT(d) && V(c) == V(d)) {
+        folded++;
+        builder.setBeforeOp(op);
+        auto addi = builder.create<AddIOp>({ a, b });
+        builder.replace<MulIOp>(op, { addi, c });
+        return true;
       }
     }
 
@@ -61,9 +93,11 @@ int RegularFold::foldImpl() {
       auto a = x->getOperand(0).defining;
       auto b = x->getOperand(1).defining;
       if (INT(b)) {
+        folded++;
         builder.setBeforeOp(op);
         auto imm = builder.create<IntOp>({ new IntAttr(V(b) + V(y)) });
         builder.replace<AddLOp>(op, { a, imm });
+        return true;
       }
     }
 
@@ -78,6 +112,32 @@ int RegularFold::foldImpl() {
       folded++;
       builder.replace<IntOp>(op, { new IntAttr(V(x) - V(y)) });
       return true;
+    }
+
+    // ((a + A) - B) becomes (a + (A - B))
+    if (isa<AddIOp>(x) && INT(y)) {
+      auto a = x->getOperand(0).defining;
+      auto b = x->getOperand(1).defining;
+      if (INT(b)) {
+        folded++;
+        builder.setBeforeOp(op);
+        auto imm = builder.create<IntOp>({ new IntAttr(V(b) - V(y)) });
+        builder.replace<AddIOp>(op, { a, imm });
+        return true;
+      }
+    }
+
+    // ((a + b) - b) becomes (a)
+    if (isa<AddIOp>(x)) {
+      auto a = x->getOperand(0).defining;
+      auto b = x->getOperand(1).defining;
+
+      if (b == y) {
+        folded++;
+        op->replaceAllUsesWith(a);
+        op->erase();
+        return true;
+      }
     }
     return false;
   });
@@ -97,6 +157,21 @@ int RegularFold::foldImpl() {
       builder.replace<MulIOp>(op, { y, x }, op->getAttrs());
       return true;
     }
+
+    // (x * 0) becomes 0
+    if (INT(y) && V(y) == 0) {
+      folded++;
+      builder.replace<IntOp>(op, { new IntAttr(0) });
+      return true;
+    }
+
+    // (x * 1) becomes x
+    if (INT(y) && V(y) == 1) {
+      folded++;
+      op->replaceAllUsesWith(x);
+      op->erase();
+      return true;
+    }
     
     return false;
   });
@@ -111,14 +186,7 @@ int RegularFold::foldImpl() {
       return true;
     }
 
-    // (x * 0) becomes 0
-    if (INT(y) && V(y) == 0) {
-      folded++;
-      builder.replace<IntOp>(op, { new IntAttr(0) });
-      return true;
-    }
-
-    // (x * 1) becomes x
+    // (x / 1) becomes x
     if (INT(y) && V(y) == 1) {
       folded++;
       op->replaceAllUsesWith(x);
