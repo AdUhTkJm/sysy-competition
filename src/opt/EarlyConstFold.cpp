@@ -15,7 +15,7 @@ std::map<std::string, int> EarlyConstFold::stats() {
 
 int EarlyConstFold::foldImpl() {
   Builder builder;
-  
+
   RegularFold fold(module);
   fold.run();
   int folded = fold.stats()["folded-ops"];
@@ -34,10 +34,13 @@ int EarlyConstFold::foldImpl() {
       folded++;
       changed = true;
       auto ifso = op->getRegion(V(cond) ? 0 : 1);
-      for (auto bb : ifso->getBlocks()) {
-        auto ops = bb->getOps();
-        for (auto inner : ops)
-          inner->moveBefore(op);
+      // Note that the else clause can be empty.
+      if (ifso) {
+        for (auto bb : ifso->getBlocks()) {
+          auto ops = bb->getOps();
+          for (auto inner : ops)
+            inner->moveBefore(op);
+        }
       }
 
       // We can't directly use a rewriter, 

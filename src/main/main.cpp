@@ -55,8 +55,10 @@ void initPipeline(sys::PassManager &pm) {
   // Loop passes go here.
   pm.addPass<sys::GVN>();
   pm.addPass<sys::Alias>();
+  pm.addPass<sys::DAE>();
   pm.addPass<sys::DSE>();
   pm.addPass<sys::DLE>();
+  pm.addPass<sys::LateConstFold>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::GCM>();
