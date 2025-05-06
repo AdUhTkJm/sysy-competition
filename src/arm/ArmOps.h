@@ -47,25 +47,31 @@ namespace sys {
 namespace arm {
 
 // Note that ARM denotes length information on register names, rather than on instruction name.
+// We still denote it on instructions; when Dumping, we emit the same opcode but different registers.
 ARMOP(MovOp);
-ARMOP(AdrOp); // The ADR instruction only allows 1 MB range. We use pseudo-instr `ldr x0, =label` when Dumping.
-ARMOP(AddOp);
-ARMOP(SubOp);
-ARMOP(SubSOp); // Sub and set flag
-ARMOP(MulOp);
-ARMOP(SdivOp);
-ARMOP(UdivOp);
+ARMOPL(AdrOp); // The ADR instruction only allows 1 MB range. We use pseudo-instr `ldr x0, =label` when Dumping.
+ARMOP(AddWOp);
+ARMOPL(AddXOp);
+ARMOP(SubWOp);
+ARMOPL(SubXOp);
+ARMOP(SubSWOp); // Sub and set flag
+ARMOP(MulWOp);
+ARMOPL(MulXOp);
+ARMOP(SdivWOp);
+ARMOPL(SdivXOp);
+ARMOP(UdivWOp);
 ARMOP(MlaOp);
 ARMOP(NegOp);
-ARMOP(SmulhOp);
-ARMOP(UmulhOp);
+ARMOPL(SmulhOp);
+ARMOPL(UmulhOp);
 ARMOP(AndOp);
 ARMOP(OrOp);
 ARMOP(EorOp); // Xor
 ARMOP(LdrOp); // Load
 ARMOP(LslOp); // l-shift
 ARMOP(LsrOp); // Logical r-shift
-ARMOP(AsrOp); // Arithmetic r-shift
+ARMOP(AsrWOp); // Arithmetic r-shift
+ARMOPL(AsrXOp); // Arithmetic r-shift
 ARMOP(StrOp); // Store
 ARMOP(CselOp); // csel xd, xn, xm, cond; meaning: xd = cond ? xn : xm
 ARMOP(CmpOp);

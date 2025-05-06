@@ -105,7 +105,12 @@ void handleWhile(WhileOp *x) {
         disrupters.push_back(op);
     }
 
+    std::set<Op*> skipped;
+
     for (auto op : disrupters) {
+      if (skipped.count(op))
+        continue;
+      
       auto bb = op->getParent();
       // If it's not at the end of the basic block, then all Ops after it are useless.
       // This also moves `op` itself, so we move it back.
@@ -114,8 +119,14 @@ void handleWhile(WhileOp *x) {
       for (auto unused : unusedBB->getOps())
         unused->removeAllOperands();
       auto copy = unusedBB->getOps();
-      for (auto unused : copy)
+      for (auto unused : copy) {
+        // It is possible that "unused" itself is also in disrupters.
+        // In that case we must skip it in the following process.
+        if (isa<BreakOp>(op) || isa<ContinueOp>(op) || isa<ReturnOp>(op))
+          skipped.insert(unused);
+
         unused->erase();
+      }
       
       if (isa<BreakOp>(op))
         builder.replace<GotoOp>(op, { new TargetAttr(end) });

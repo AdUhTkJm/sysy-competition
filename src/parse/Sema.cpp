@@ -36,6 +36,7 @@ Type *Sema::infer(ASTNode *node) {
     assert(fn->type);
     auto fnTy = cast<FunctionType>(fn->type);
     symbols[fn->name] = fn->type;
+    currentFunc = fnTy;
 
     SemanticScope scope(*this);
     for (int i = 0; i < fn->args.size(); i++) {
@@ -151,12 +152,8 @@ Type *Sema::infer(ASTNode *node) {
       return ctx.create<VoidType>();
     
     auto ty = infer(ret->node);
-    if (!symbols.count(ret->func)) {
-      std::cerr << "cannot find symbol " << ret->func << "\n";
-      assert(false);
-    }
 
-    auto retTy = cast<FunctionType>(symbols[ret->func])->ret;
+    auto retTy = cast<FunctionType>(currentFunc)->ret;
     if (isa<IntType>(retTy) && isa<FloatType>(ty)) {
       ret->node = new UnaryNode(UnaryNode::Float2Int, ret->node);
       ret->node->type = ctx.create<FloatType>();

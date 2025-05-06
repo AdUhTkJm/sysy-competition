@@ -12,6 +12,8 @@ namespace sys {
 // We don't need to do type inference, hence no memory management needed
 class Sema {
   TypeContext &ctx;
+  // The current function we're in. Mainly used for deducing return type.
+  Type *currentFunc;
 
   using SymbolTable = std::map<std::string, Type*>;
   SymbolTable symbols;

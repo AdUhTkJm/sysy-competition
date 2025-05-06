@@ -81,7 +81,9 @@ int main(int argc, char **argv) {
   }
 
   std::stringstream ss;
-  ss << ifs.rdbuf();
+  // Add a newline at the end.
+  // Single-line comments cannot terminate with EOF.
+  ss << ifs.rdbuf() << "\n";
 
   sys::TypeContext ctx;
 
