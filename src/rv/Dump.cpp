@@ -33,6 +33,9 @@ void dumpOp(Op *op, std::ostream &os) {
     { "fsub", "fsub.s" },
     { "fmul", "fmul.s" },
     { "fdiv", "fdiv.s" },
+    { "flt", "flt.s" },
+    { "fle", "fle.s" },
+    { "feq", "feq.s" },
     { "fcvtsw", "fcvt.s.w" },
     { "fmvwx", "fmv.w.x" },
   };
@@ -188,7 +191,20 @@ void Dump::dump(std::ostream &os) {
         os << ", " << intArr->vi[i];
       os << "\n";
     }
+
     // .float for FloatArray
+    if (auto fArr = global->find<FloatArrayAttr>()) {
+      if (fArr->allZero) {
+        bss.push_back(global);
+        continue;
+      }
+
+      os << NAME(global) << ":\n";
+      os << "  .float " << fArr->vf[0];
+      for (size_t i = 1; i < size / 4; i++)
+        os << ", " << fArr->vf[i];
+      os << "\n";
+    }
   }
 
   if (!bss.empty())

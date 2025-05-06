@@ -451,7 +451,12 @@ void EarlyConstFold::run() {
         if (isa<LoadOp>(use)) {
           folded++;
           builder.setBeforeOp(use);
-          auto value = builder.create<IntOp>({ new IntAttr(global->get<IntArrayAttr>()->vi[0]) });
+          Op *value;
+          if (auto intArr = global->find<IntArrayAttr>())
+            value = builder.create<IntOp>({ new IntAttr(intArr->vi[0]) });
+          else
+            value = builder.create<FloatOp>({ new FloatAttr(global->get<FloatArrayAttr>()->vf[0]) });
+
           use->replaceAllUsesWith(value);
           use->erase();
           continue;
@@ -476,7 +481,12 @@ void EarlyConstFold::run() {
             if (isa<LoadOp>(target)) {
               folded++;
               builder.setBeforeOp(use);
-              auto value = builder.create<IntOp>({ new IntAttr(global->get<IntArrayAttr>()->vi[V(y) / 4]) });
+              Op *value;
+              int offset = V(y) / 4;
+              if (auto intArr = global->find<IntArrayAttr>())
+                value = builder.create<IntOp>({ new IntAttr(intArr->vi[offset]) });
+              else
+                value = builder.create<FloatOp>({ new FloatAttr(global->get<FloatArrayAttr>()->vf[offset]) });
               target->replaceAllUsesWith(value);
               target->erase();
               continue;

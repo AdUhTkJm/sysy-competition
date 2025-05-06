@@ -44,26 +44,30 @@ void Localize::run() {
     if (beforeFlatten) {
       builder.setToBlockEnd(entry);
       addr = builder.create<AllocaOp>({ new SizeAttr(4) });
-      
-      auto bb = region->insertAfter(entry);
-      // We must make sure the whole entry block contains only alloca.
-      // This is also for further transformations that append allocas to the first block.
-      builder.setToBlockStart(bb);
-      auto init = builder.create<IntOp>({
-        new IntAttr(k->get<IntArrayAttr>()->vi[0])
-      });
-      builder.create<StoreOp>({ init, addr });
     } else {
-      // Remember to supply terminators for after FlattenCFG.
       builder.setBeforeOp(entry->getLastOp());
       addr = builder.create<AllocaOp>({ new SizeAttr(4) });
+    }
 
-      auto bb = region->insertAfter(entry);
-      builder.setToBlockStart(bb);
-      auto init = builder.create<IntOp>({
-        new IntAttr(k->get<IntArrayAttr>()->vi[0])
+    auto bb = region->insertAfter(entry);
+    // We must make sure the whole entry block contains only alloca.
+    // That's why we inserted a new block here.
+    // This is also for further transformations that append allocas to the first block.
+    builder.setToBlockStart(bb);
+    Value init;
+    if (auto intArr = k->find<IntArrayAttr>()) {
+      init = builder.create<IntOp>({
+        new IntAttr(intArr->vi[0])
       });
-      builder.create<StoreOp>({ init, addr });
+    } else {
+      init = builder.create<FloatOp>({
+        new FloatAttr(k->get<FloatArrayAttr>()->vf[0])
+      });
+    }
+    builder.create<StoreOp>({ init, addr });
+
+    if (!beforeFlatten) {
+      // Remember to supply terminators for after FlattenCFG.
       entry->getLastOp()->moveToEnd(bb);
 
       builder.setToBlockEnd(entry);

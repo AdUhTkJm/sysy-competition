@@ -155,9 +155,10 @@ public:
     int *vi;
     float *vf;
   };
+  bool isFloat;
 
-  ConstArrayNode(int *vi): vi(vi) {}
-  ConstArrayNode(float *vf): vf(vf) {}
+  ConstArrayNode(int *vi): vi(vi), isFloat(false) {}
+  ConstArrayNode(float *vf): vf(vf), isFloat(true) {}
 };
 
 class LocalArrayNode : public ASTNodeImpl<LocalArrayNode, __LINE__> {

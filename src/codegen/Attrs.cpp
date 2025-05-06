@@ -31,6 +31,15 @@ IntArrayAttr::IntArrayAttr(int *vi, int size): vi(vi), size(size), allZero(true)
   }
 }
 
+FloatArrayAttr::FloatArrayAttr(float *vf, int size): vf(vf), size(size), allZero(true) {
+  for (int i = 0; i < size; i++) {
+    if (vf[i] != 0) {
+      allZero = false;
+      break;
+    }
+  }
+}
+
 std::string IntArrayAttr::toString() {
   if (allZero)
     return "<array = 0 x " + std::to_string(size) + ">";
@@ -41,6 +50,20 @@ std::string IntArrayAttr::toString() {
     ss << vi[0];
   for (int i = 1; i < size; i++)
     ss << ", " << vi[i];
+  ss << ">";
+  return ss.str();
+}
+
+std::string FloatArrayAttr::toString() {
+  if (allZero)
+    return "<array = 0.0f x " + std::to_string(size) + ">";
+  
+  std::stringstream ss;
+  ss << "<array = ";
+  if (size > 0)
+    ss << vf[0] << "f";
+  for (int i = 1; i < size; i++)
+    ss << ", " << vf[i] << "f";
   ss << ">";
   return ss.str();
 }

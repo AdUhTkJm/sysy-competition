@@ -68,6 +68,7 @@ void Globalize::runImpl(Region *region) {
       new NameAttr(gName),
       new SizeAttr(size),
       // Note that this only refers to, rather than copies, `data`.
+      // FIXME: check for floating point allocas. How?
       new IntArrayAttr(data, size / 4),
     });
 

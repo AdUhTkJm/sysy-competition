@@ -135,7 +135,7 @@ Value CodeGen::emitBinary(BinaryNode *node) {
 
   auto l = emitExpr(node->l);
   auto r = emitExpr(node->r);
-  if (isa<IntType>(node->type)) {
+  if (!isa<FloatType>(node->l->type) && !isa<FloatType>(node->r->type)) {
     switch (node->kind) {
     case BinaryNode::Add:
       return builder.create<AddIOp>({ l, r });
@@ -159,7 +159,6 @@ Value CodeGen::emitBinary(BinaryNode *node) {
       assert(false);
     }
   } else {
-    assert(isa<FloatType>(node->type));
     switch (node->kind) {
     case BinaryNode::Add:
       return builder.create<AddFOp>({ l, r });
@@ -367,22 +366,52 @@ void CodeGen::emit(ASTNode *node) {
         return;
       }
 
+      if (vardecl->init && isa<FloatNode>(vardecl->init)) {
+        float value = cast<FloatNode>(vardecl->init)->value;
+        // Treat the single integer as an array.
+        auto addr = builder.create<GlobalOp>({
+          new SizeAttr(getSize(vardecl->type)),
+          new FloatArrayAttr(new float(value), 1),
+          new NameAttr(vardecl->name),
+        });
+        globals[vardecl->name] = addr;
+        return;
+      }
+
       auto size = 1;
-      if (auto arrayTy = dyn_cast<ArrayType>(vardecl->type))
-        size = arrayTy->getSize();
-      int *value;
+      Type *base = vardecl->type;
+      if (auto arrTy = dyn_cast<ArrayType>(vardecl->type)) {
+        size = arrTy->getSize();
+        base = arrTy->base;
+      }
+
+      void *value;
       if (vardecl->init)
-        value = cast<ConstArrayNode>(vardecl->init)->vi;
+        value = isa<FloatType>(base)
+          ? (void*) cast<ConstArrayNode>(vardecl->init)->vf
+          : (void*) cast<ConstArrayNode>(vardecl->init)->vi;
       else {
-        value = new int[size];
+        value = isa<FloatType>(base)
+          ? (void*) new float[size]
+          : (void*) new int[size];
+        // sizeof(int) == sizeof(float).
         memset(value, 0, sizeof(int) * size);
       }
       
-      auto addr = builder.create<GlobalOp>({
-        new SizeAttr(getSize(vardecl->type)),
-        new IntArrayAttr(value, size),
-        new NameAttr(vardecl->name),
-      });
+      Value addr;
+      if (isa<FloatType>(base)) {
+        addr = builder.create<GlobalOp>({
+          new SizeAttr(getSize(vardecl->type)),
+          new FloatArrayAttr((float*) value, size),
+          new NameAttr(vardecl->name),
+        });
+      } else {
+        addr = builder.create<GlobalOp>({
+          new SizeAttr(getSize(vardecl->type)),
+          new IntArrayAttr((int*) value, size),
+          new NameAttr(vardecl->name),
+        });
+      }
       globals[vardecl->name] = addr;
       return;
     }
@@ -408,12 +437,15 @@ void CodeGen::emit(ASTNode *node) {
       // We manually load everything into the array.
       if (auto arr = dyn_cast<LocalArrayNode>(vardecl->init)) {
         auto arrTy = cast<ArrayType>(vardecl->type);
+        auto base = arrTy->base;
         auto arrSize = arrTy->getSize();
         auto baseSize = getSize(arrTy->base);
         for (int i = 0; i < arrSize; i++) {
           Value value = arr->va[i]
             ? emitExpr(arr->va[i])
-            : builder.create<IntOp>({ new IntAttr(0) });
+            : isa<FloatType>(base)
+              ? (Value) builder.create<FloatOp>({ new FloatAttr(0) })
+              : (Value) builder.create<IntOp>({ new IntAttr(0) });
 
           auto offset =  builder.create<IntOp>({ new IntAttr(baseSize * i) });
           auto place = builder.create<AddLOp>({ addr, offset });

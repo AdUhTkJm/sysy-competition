@@ -35,6 +35,7 @@ AR = "ar"
 CFLAGS = ["-c", "-std=c++17", "-g"]
 LDFLAGS = []
 CACHE_FILE = BUILD_DIR / ".build_cache.pkl"
+INCLUDE_CACHE_FILE = BUILD_DIR / ".include_cache.pkl"
 
 def hash_file(path):
   h = hashlib.sha256()
@@ -78,16 +79,52 @@ def needs_recompile(src_path, obj_path, cache, dependencies):
       return True
   return False
 
-def get_includes(src_path):
-  includes = []
-  with open(src_path, "r") as f:
-    for line in f:
-      line = line.strip()
-      if line.startswith("#include \""):
-        header = line.split("\"")[1]
-        include_path = src_path.parent / header
-        if include_path.exists():
-          includes.append(include_path.resolve())
+include_cache = {}
+include_hashes = {}
+
+def load_include_cache():
+  if INCLUDE_CACHE_FILE.exists():
+    with open(INCLUDE_CACHE_FILE, "rb") as f:
+      return pickle.load(f)
+  return {}
+
+def save_include_cache(cache):
+  BUILD_DIR.mkdir(parents=True, exist_ok=True)
+  with open(INCLUDE_CACHE_FILE, "wb") as f:
+    pickle.dump(cache, f)
+
+def get_all_includes(src_path, visited=None):
+  if visited is None:
+    visited = set()
+
+  resolved_path = src_path.resolve()
+  if resolved_path in visited:
+    return set()
+
+  visited.add(resolved_path)
+  file_hash = hash_file(resolved_path)
+
+  cached_entry = include_cache.get(resolved_path)
+  if cached_entry and include_hashes.get(resolved_path) == file_hash:
+    return cached_entry
+
+  includes = set()
+
+  try:
+    with open(resolved_path, "r") as f:
+      for line in f:
+        line = line.strip()
+        if line.startswith("#include \""):
+          header = line.split("\"")[1]
+          include_path = resolved_path.parent / header
+          if include_path.exists():
+            includes.add(include_path.resolve())
+            includes.update(get_all_includes(include_path, visited))
+  except (OSError, UnicodeDecodeError):
+    pass  # Skip problematic files
+
+  include_cache[resolved_path] = includes
+  include_hashes[resolved_path] = file_hash
   return includes
 
 def compile_cpp(src_path, obj_path):
@@ -106,6 +143,11 @@ def link_libraries(lib_files, output_binary):
   proc.check_call([COMPILER] + LDFLAGS + ["-o", str(output_binary)] + [str(lib) for lib in lib_files])
 
 def build():
+  global include_cache, include_hashes
+  include_cache_data = load_include_cache()
+  include_cache = include_cache_data.get("cache", {})
+  include_hashes = include_cache_data.get("hashes", {})
+
   cpp_files, _ = find_files()
   cache = load_cache()
 
@@ -117,7 +159,7 @@ def build():
     obj_dir = BUILD_DIR / rel_dir
     obj_path = obj_dir / (cpp.stem + ".o")
 
-    dependencies = get_includes(cpp)
+    dependencies = get_all_includes(cpp)
     if needs_recompile(cpp, obj_path, cache, dependencies):
       compile_cpp(cpp, obj_path)
       cache[str(cpp)] = {
@@ -146,6 +188,10 @@ def build():
   link_libraries(lib_files, FINAL_BINARY)
 
   save_cache(cache)
+  save_include_cache({
+    "cache": include_cache,
+    "hashes": include_hashes
+  })
 
 
 def run_asm(file: str):

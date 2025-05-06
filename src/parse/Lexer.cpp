@@ -1,5 +1,6 @@
 #include "Lexer.h"
 #include <cassert>
+#include <cctype>
 #include <cmath>
 #include <map>
 
@@ -44,67 +45,72 @@ Token Lexer::nextToken() {
     return Token(name);
   }
 
-  // Integer literals
-  if (std::isdigit(c)) {
-    int value = 0;
+  // Integer/FP literals
+  if (std::isdigit(c) || c == '.') {
+    int start = loc;
+    bool isFloat = false;
+
     if (c == '0') {
       if (input[loc + 1] == 'x' || input[loc + 1] == 'X') {
         // Hexadecimal, skip '0x'
         loc += 2;
-        while (std::isdigit(input[loc]) || ('a' <= tolower(input[loc]) && tolower(input[loc]) <= 'f')) {
-          value = value * 16 + (std::isdigit(input[loc]) ? input[loc] - '0' : tolower(input[loc]) - 'a' + 10);
+        while (std::isxdigit(input[loc]) || input[loc] == '.') {
+          if (input[loc] == '.') {
+            // Already seen a '.' before. Shouldn't continue.
+            if (isFloat)
+              break;
+            
+            isFloat = true;
+          }
           loc++;
         }
-        return value;
-      }
 
-      // Octal
-      while (std::isdigit(input[loc])) {
-        value = value * 8 + (input[loc] - '0');
-        loc++;
-      }
-      return value;
-    }
-
-    // Decimal, but might be floating point
-    while (std::isdigit(input[loc])) {
-      value = value * 10 + (input[loc] - '0');
-      loc++;
-    }
-    
-    if (input[loc] == '.') {
-      // Floating point, skip '.'
-      loc++;
-      float f = value;
-      float base = 1, decimal = 0;
-      while (std::isdigit(input[loc])) {
-        decimal += (input[loc] - '0') / (base *= 10);
-        loc++;
-      }
-
-      // Check for 1.23e(+|-)?8
-      if (input[loc] == 'e') {
-        // Skip 'e'
-        loc++;
-        int sign = 1;
-        if (input[loc] == '+')
+        // Try to read a 'p' for exponent.
+        if (input[loc] == 'p' || input[loc] == 'P') {
+          isFloat = true;
           loc++;
-        else if (input[loc] == '-')
-          loc++, sign = -1;
 
-        // Now an integer, just read it
-        int exponent = 0;
-        while (std::isdigit(input[loc])) {
-          exponent = exponent * 10 + (input[loc] - '0');
-          loc++;
+          if (input[loc] == '+' || input[loc] == '-')
+            loc++;
+          
+          while (std::isdigit(input[loc])) 
+            loc++;
         }
-        return powf(10, exponent) * (f + decimal);
+
+        std::string raw = input.substr(start, loc - start);
+        return isFloat ? Token(strtof(raw.c_str(), nullptr)) : std::stoi(raw, nullptr, /*base = autodetect*/0);
       }
 
-      return f + decimal;
+      // Octal. But let `std::stoi` to check for it.
+      // Fall through here.
     }
 
-    return value;
+    // Now this is a normal decimal integer or FP.
+    while (std::isdigit(input[loc]) || input[loc] == '.') {
+      if (input[loc] == '.') {
+        // Already seen a '.' before. Shouldn't continue.
+        if (isFloat)
+          break;
+        
+        isFloat = true;
+      }
+      loc++;
+    }
+
+    // Try to read an 'e' for exponent.
+    if (input[loc] == 'e' || input[loc] == 'E') {
+      isFloat = true;
+      loc++;
+
+      if (input[loc] == '+' || input[loc] == '-')
+        loc++;
+      
+      while (std::isdigit(input[loc])) 
+        loc++;
+    }
+
+    std::string raw = input.substr(start, loc - start);
+    return isFloat ? Token(strtof(raw.c_str(), nullptr)) : std::stoi(raw, nullptr, /*base = autodetect*/0);
   }
 
   // Check for multi-character operators like >=, <=, ==, !=, +=, etc.

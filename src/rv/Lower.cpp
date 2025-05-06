@@ -93,6 +93,9 @@ void Lower::run() {
   REPLACE(SubFOp, FsubOp);
   REPLACE(MulFOp, FmulOp);
   REPLACE(DivFOp, FdivOp);
+  REPLACE(LtFOp, FltOp);
+  REPLACE(EqFOp, FeqOp);
+  REPLACE(LeFOp, FleOp);
   REPLACE(F2IOp, FcvtwsRtzOp);
   REPLACE(I2FOp, FcvtswOp);
 
@@ -112,6 +115,16 @@ void Lower::run() {
     builder.setBeforeOp(op);
     auto zero = builder.create<LiOp>({ new IntAttr(0) });
     builder.replace<SubOp>(op, { zero, value }, op->getAttrs());
+    return true;
+  });
+
+  runRewriter([&](MinusFOp *op) {
+    auto value = op->getOperand();
+    
+    builder.setBeforeOp(op);
+    auto zero = builder.create<LiOp>({ new IntAttr(0) });
+    auto zerof = builder.create<FmvwxOp>({ zero });
+    builder.replace<FsubOp>(op, { zerof, value }, op->getAttrs());
     return true;
   });
 

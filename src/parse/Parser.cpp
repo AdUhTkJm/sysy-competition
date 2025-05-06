@@ -70,6 +70,20 @@ void ConstValue::release() {
   delete[] vi;
 }
 
+int ConstValue::getInt() {
+  assert((!dims.size() || (dims[0] == 1 && dims.size() == 1)));
+  if (isFloat)
+    return *vf;
+  return *vi;
+}
+
+float ConstValue::getFloat() {
+  assert((!dims.size() || (dims[0] == 1 && dims.size() == 1)));
+  if (isFloat)
+    return *vf;
+  return *vi;
+}
+
 Token Parser::last() {
   if (loc - 1 >= tokens.size())
     return Token::End;
@@ -103,8 +117,19 @@ Token Parser::expect(Token::Type t) {
 
 void Parser::printSurrounding() {
   std::cerr << "surrounding:\n";
-  for (size_t i = std::max(0ul, loc - 5); i < std::min(tokens.size(), loc + 6); i++)
-    std::cerr << tokens[i].type << (i == loc ? "(here)" : "") << "\n";
+  for (size_t i = std::max(0ul, loc - 5); i < std::min(tokens.size(), loc + 6); i++) {
+    std::cerr << tokens[i].type;
+    if (tokens[i].type == Token::LInt) {
+      std::cerr << " <int = " << tokens[i].vi << ">";
+    }
+    if (tokens[i].type == Token::LFloat) {
+      std::cerr << " <float = " << tokens[i].vf << "f>";
+    }
+    if (tokens[i].type == Token::Ident) {
+      std::cerr << " <name = " << tokens[i].vs << ">";
+    }
+    std::cerr << (i == loc ? " (here)" : "") << "\n";
+  }
 }
 
 Type *Parser::parseSimpleType() {
@@ -498,7 +523,7 @@ TransparentBlockNode *Parser::varDecl(bool global) {
     decls.push_back(decl);
 
     // Record in symbol table.
-    if ((!mut || global) && isa<IntType>(base)) {
+    if (!mut || global) {
       assert(init);
       symbols[name] = earlyFold(init);
     }
@@ -589,19 +614,51 @@ ConstValue Parser::earlyFold(ASTNode *node) {
   }
 
   if (auto binary = dyn_cast<BinaryNode>(node)) {
-    auto l = earlyFold(binary->l).getInt();
-    auto r = earlyFold(binary->r).getInt();
+    auto lv = earlyFold(binary->l);
+    auto rv = earlyFold(binary->r);
+    if (!lv.isFloat && !rv.isFloat) {
+      int l = lv.getInt(), r = rv.getInt();
+      switch (binary->kind) {
+      case BinaryNode::Add:
+        return ConstValue(new int(l + r), {});
+      case BinaryNode::Sub:
+        return ConstValue(new int(l - r), {});
+      case BinaryNode::Mul:
+        return ConstValue(new int(l * r), {});
+      case BinaryNode::Div:
+        return ConstValue(new int(l / r), {});
+      case BinaryNode::Mod:
+        return ConstValue(new int(l % r), {});
+      case BinaryNode::And:
+        return ConstValue(new int(l && r), {});
+      case BinaryNode::Or:
+        return ConstValue(new int(l || r), {});
+      case BinaryNode::Eq:
+        return ConstValue(new int(l == r), {});
+      case BinaryNode::Ne:
+        return ConstValue(new int(l != r), {});
+      case BinaryNode::Lt:
+        return ConstValue(new int(l < r), {});
+      case BinaryNode::Le:
+        return ConstValue(new int(l > r), {});
+      }
+    }
+    
+    // Implicitly raise to float.
+    float l = lv.isFloat ? lv.getFloat() : lv.getInt();
+    float r = rv.isFloat ? rv.getFloat() : rv.getInt();
     switch (binary->kind) {
     case BinaryNode::Add:
-      return ConstValue(new int(l + r), {});
+      return ConstValue(new float(l + r), {});
     case BinaryNode::Sub:
-      return ConstValue(new int(l - r), {});
+      return ConstValue(new float(l - r), {});
     case BinaryNode::Mul:
-      return ConstValue(new int(l * r), {});
+      return ConstValue(new float(l * r), {});
     case BinaryNode::Div:
-      return ConstValue(new int(l / r), {});
+      return ConstValue(new float(l / r), {});
     case BinaryNode::Mod:
-      return ConstValue(new int(l % r), {});
+      assert(false);
+    // Note these relation operations should return int.
     case BinaryNode::And:
       return ConstValue(new int(l && r), {});
     case BinaryNode::Or:
@@ -618,20 +675,34 @@ ConstValue Parser::earlyFold(ASTNode *node) {
   }
 
   if (auto unary = dyn_cast<UnaryNode>(node)) {
-    auto v = earlyFold(unary->node).getInt();
+    auto v = earlyFold(unary->node);
+    if (v.isFloat) {
+      switch (unary->kind) {
+      case UnaryNode::Minus:
+        return ConstValue(new float(-v.getFloat()), {});
+      // Note this should return int.
+      case UnaryNode::Not:
+        return ConstValue(new int(!v.getFloat()), {});
+      default:
+        assert(false);
+      }
+    }
+
     switch (unary->kind) {
     case UnaryNode::Minus:
-      return ConstValue(new int(-v), {});
+      return ConstValue(new int(-v.getInt()), {});
     case UnaryNode::Not:
-      return ConstValue(new int(!v), {});
+      return ConstValue(new int(!v.getInt()), {});
     default:
       assert(false);
     }
   }
 
-  if (auto lint = dyn_cast<IntNode>(node)) {
+  if (auto lint = dyn_cast<IntNode>(node))
     return ConstValue(new int(lint->value), {});
-  }
+
+  if (auto lfloat = dyn_cast<FloatNode>(node))
+    return ConstValue(new float(lfloat->value), {});
 
   if (auto access = dyn_cast<ArrayAccessNode>(node)) {
     if (!symbols.count(access->array)) {

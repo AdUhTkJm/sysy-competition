@@ -192,10 +192,18 @@ Type *Sema::infer(ASTNode *node) {
 
   if (auto branch = dyn_cast<IfNode>(node)) {
     auto condTy = infer(branch->cond);
-    if (!isa<IntType>(condTy)) {
-      std::cerr << "bad cond type\n";
-      assert(false);
+    if (isa<FloatType>(condTy)) {
+      // We should insert a check of whether it's zero.
+      // Truncation won't work; if (0.2) ... should be evaluated to true.
+      auto zero = new FloatNode(0);
+      zero->type = ctx.create<FloatType>();
+
+      auto ne = new BinaryNode(BinaryNode::Ne, branch->cond, zero);
+      ne->type = ctx.create<IntType>();
+
+      branch->cond = ne;
     }
+    
     infer(branch->ifso);
     if (branch->ifnot)
       infer(branch->ifnot);

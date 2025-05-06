@@ -96,6 +96,20 @@ public:
   IntArrayAttr *clone() { return new IntArrayAttr(vi, size); }
 };
 
+class FloatArrayAttr : public AttrImpl<FloatArrayAttr, __LINE__> {
+public:
+  float *vf;
+  // This is the number of elements in `vi`, rather than byte size,
+  // For example, if vi = { 2, 3 }, then `size` is 2, rather than sizeof(int) * 2.
+  int size;
+  bool allZero;
+
+  FloatArrayAttr(float *vf, int size);
+
+  std::string toString();
+  FloatArrayAttr *clone() { return new FloatArrayAttr(vf, size); }
+};
+
 class ImpureAttr : public AttrImpl<ImpureAttr, __LINE__> {
 public:
   std::string toString() { return "<impure>"; }

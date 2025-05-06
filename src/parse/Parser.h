@@ -21,13 +21,15 @@ class ConstValue {
   };
   std::vector<int> dims;
 public:
+  bool isFloat;
+
   ConstValue() {}
-  ConstValue(int *vi, const std::vector<int> &dims): vi(vi), dims(dims) {}
-  ConstValue(float *vf, const std::vector<int> &dims): vf(vf), dims(dims) {}
+  ConstValue(int *vi, const std::vector<int> &dims): vi(vi), dims(dims), isFloat(false) {}
+  ConstValue(float *vf, const std::vector<int> &dims): vf(vf), dims(dims), isFloat(true) {}
 
   ConstValue operator[](int i);
-  int getInt() { assert(!dims.size() || (dims[0] == 1 && dims.size() == 1)); return *vi; }
-  float getFloat() { assert(!dims.size() || (dims[0] == 1 && dims.size() == 1)); return *vf; }
+  int getInt();
+  float getFloat();
   const auto &getDims() { return dims; }
 
   int size();
