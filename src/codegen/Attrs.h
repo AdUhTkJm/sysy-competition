@@ -2,6 +2,7 @@
 #define ATTRS_H
 
 #include "OpBase.h"
+#include <cstdint>
 #include <map>
 
 namespace sys {
@@ -180,6 +181,21 @@ public:
   AliasAttr *clone() { return unknown ? new AliasAttr() : new AliasAttr(location); }
 };
 
+class RangeAttr : public AttrImpl<RangeAttr, __LINE__> {
+public:
+  // Semantics:
+  //    auto [low, high] = range;
+  // The integer operation to which this Attr attach is in range [low, high] (closed interval).
+  std::pair<int, int> range;
+
+  RangeAttr() {}
+  RangeAttr(int low, int high): range({ low, high }) {}
+  RangeAttr(std::pair<int, int> range): range(range) {}
+
+  std::string toString();
+  RangeAttr *clone() { return new RangeAttr(range); }
+};
+
 }
 
 #define V(op) (op)->get<IntAttr>()->value
@@ -190,5 +206,6 @@ public:
 #define ELSE(op) (op)->get<ElseAttr>()->bb
 #define CALLER(op) (op)->get<CallerAttr>()->callers
 #define ALIAS(op) (op)->get<AliasAttr>()
+#define RANGE(op) (op)->get<RangeAttr>()
 
 #endif

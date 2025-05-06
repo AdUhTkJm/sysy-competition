@@ -135,14 +135,33 @@ void DSE::runImpl(Region *region) {
     }
   }
 
-  // Eliminate unused stores.
+
   auto funcOp = region->getParent();
+
+  // Find allocas used by calls.
+  // Stores to them shouldn't be eliminated. (This is also a kind of escape analysis.)
+  auto calls = funcOp->findAll<CallOp>();
+  std::set<Op*> outref;
+  for (auto call : calls) {
+    for (auto operand : call->getOperands()) {
+      auto def = operand.defining;
+      if (auto attr = def->find<AliasAttr>()) {
+        for (auto &[base, offsets] : attr->location) {
+          if (isa<AllocaOp>(base))
+            outref.insert(base);
+        }
+      }
+    }
+  }
+
+  // Eliminate unused stores.
   auto allStores = funcOp->findAll<StoreOp>();
   for (auto *store : allStores) {
     if (used[store])
       continue;
 
-    auto alias = ALIAS(store->getOperand(1).defining);
+    auto addr = store->getOperand(1).defining;
+    auto alias = ALIAS(addr);
     // Never eliminate unknown things.
     bool canElim = !alias->unknown;
     for (auto [base, _] : alias->location) {
@@ -150,6 +169,11 @@ void DSE::runImpl(Region *region) {
       // If parent of `base` is a ModuleOp (i.e. global), or another function,
       // then it's not a candidate of removal.
       if (base->getParentOp() != funcOp) {
+        canElim = false;
+        break;
+      }
+      // Don't remove stores to escaped locals.
+      if (outref.count(base)) {
         canElim = false;
         break;
       }

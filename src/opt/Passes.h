@@ -311,6 +311,56 @@ public:
   void run();
 };
 
+// Integer range analysis.
+class Range : public Pass {
+  void runImpl(Region *region);
+public:
+  Range(ModuleOp *module): Pass(module) {}
+
+  std::string name() { return "range"; }
+  std::map<std::string, int> stats() { return {}; }
+  void run();
+};
+
+// Dead (actually, redundant) load elimination.
+class DLE : public Pass {
+  int elim = 0;
+
+  void runImpl(Region *region);
+public:
+  DLE(ModuleOp *module): Pass(module) {}
+
+  std::string name() { return "dle"; }
+  std::map<std::string, int> stats();
+  void run();
+};
+
+// Dead argument elimination.
+class DAE : public Pass {
+  int elim = 0;
+
+  void runImpl(Region *region);
+public:
+  DAE(ModuleOp *module): Pass(module) {}
+
+  std::string name() { return "dae"; }
+  std::map<std::string, int> stats();
+  void run();
+};
+
+// Folds after mem2reg.
+class LateConstFold : public Pass {
+  int foldedTotal = 0;
+
+  int foldImpl();
+public:
+  LateConstFold(ModuleOp *module): Pass(module) {}
+    
+  std::string name() { return "late-const-fold"; };
+  std::map<std::string, int> stats();
+  void run();
+};
+
 }
 
 #endif
