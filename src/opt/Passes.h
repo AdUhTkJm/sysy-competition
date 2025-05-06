@@ -205,7 +205,7 @@ public:
   EarlyConstFold(ModuleOp *module): Pass(module) {}
     
   std::string name() { return "early-const-fold"; };
-  std::map<std::string, int> stats() { return {}; }
+  std::map<std::string, int> stats();
   void run();
 };
 
@@ -344,6 +344,19 @@ public:
   DAE(ModuleOp *module): Pass(module) {}
 
   std::string name() { return "dae"; }
+  std::map<std::string, int> stats();
+  void run();
+};
+
+// Folds a wide range of expressions.
+class RegularFold : public Pass {
+  int foldedTotal = 0;
+
+  int foldImpl();
+public:
+  RegularFold(ModuleOp *module): Pass(module) {}
+    
+  std::string name() { return "regular-fold"; };
   std::map<std::string, int> stats();
   void run();
 };

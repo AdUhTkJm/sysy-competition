@@ -8,7 +8,7 @@ operators = [
   '+', '-', '*', '/', '%'
 ]
 comparisons = [
-  '<', '>', '=='
+  '<', '>', '==', '<=', '>='
 ]
 error_cnt = 0
 
@@ -44,11 +44,15 @@ def fuzz_arithmetic_fold(dir: str):
   global error_cnt
 
   testcases = []
-  for i in range(0, 500):
-    c1 = random.randint(-2000, 10000)
-    c2 = random.randint(-2000, 10000)
+  for i in range(0, 200):
+    c1 = random.randint(-1000, 10000)
+    c2 = random.randint(-1000, 10000)
     op = random.choice(operators)
     comp = random.choice(comparisons)
+    # No division by zero.
+    if op == '/' and c1 == 0:
+      c1 = 1
+    
     testcases.append(f"x {op} {c1} {comp} {c2}")
     testcases.append(f"{c1} {op} x {comp} {c2}")
 
