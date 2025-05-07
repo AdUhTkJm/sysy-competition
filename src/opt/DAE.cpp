@@ -4,7 +4,8 @@ using namespace sys;
 
 std::map<std::string, int> DAE::stats() {
   return {
-    { "removed-arguments", elim }
+    { "removed-arguments", elim },
+    { "removed-return-values", elimRet },
   };
 }
 
@@ -17,10 +18,15 @@ void DAE::run() {
   //   m[x] = y iff. all calls to `fn` gives `y` to the `x`th argument (counting from 0).
   std::map<FuncOp*, std::map<int, int>> value;
   std::map<FuncOp*, std::set<int>> forbidden;
+  // All functions whose return value has been used.
+  std::set<FuncOp*> resultUsed;
 
   for (auto call : calls) {
     FuncOp *fn = fnMap[NAME(call)];
     const auto &operands = call->getOperands();
+
+    if (call->getUses().size() > 0)
+      resultUsed.insert(fn);
 
     for (size_t i = 0; i < operands.size(); i++) {
       auto operand = operands[i];
@@ -126,5 +132,15 @@ void DAE::run() {
     }
 
     elim += toRemove.size();
+
+    // Now let's move return values.
+    // If the function's return value is never used, then no need to return.
+    // (We can't remove `return xx` in main even though it doesn't seem used.)
+    if (resultUsed.count(func) || NAME(func) == "main")
+      continue;
+
+    auto rets = func->findAll<ReturnOp>();
+    for (auto ret : rets)
+      ret->removeAllOperands();
   }
 }

@@ -31,6 +31,14 @@ int RegularFold::foldImpl() {
       return true;
     }
 
+    // (x + 0) becomes (x)
+    if (INT(y) && V(y) == 0) {
+      folded++;
+      op->replaceAllUsesWith(x);
+      op->erase();
+      return true;
+    }
+
     // ((a + B) + Y) becomes (a + (B + Y))
     if (isa<AddIOp>(x) && INT(y)) {
       auto a = x->getOperand(0).defining;
@@ -88,6 +96,14 @@ int RegularFold::foldImpl() {
       return true;
     }
 
+    // (x + 0) becomes (x)
+    if (INT(y) && V(y) == 0) {
+      folded++;
+      op->replaceAllUsesWith(x);
+      op->erase();
+      return true;
+    }
+    
     // ((a + B) + Y) becomes (a + (B + Y))
     if (isa<AddLOp>(x) && INT(y)) {
       auto a = x->getOperand(0).defining;
@@ -111,6 +127,21 @@ int RegularFold::foldImpl() {
     if (INT(x) && INT(y)) {
       folded++;
       builder.replace<IntOp>(op, { new IntAttr(V(x) - V(y)) });
+      return true;
+    }
+    
+    // (x - 0) becomes (x)
+    if (INT(y) && V(y) == 0) {
+      folded++;
+      op->replaceAllUsesWith(x);
+      op->erase();
+      return true;
+    }
+
+    // (x - x) becomes 0
+    if (x == y) {
+      folded++;
+      builder.replace<IntOp>(op, { new IntAttr(0) });
       return true;
     }
 

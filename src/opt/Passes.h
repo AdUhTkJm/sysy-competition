@@ -338,6 +338,7 @@ public:
 // Dead argument elimination.
 class DAE : public Pass {
   int elim = 0;
+  int elimRet = 0;
 
   void runImpl(Region *region);
 public:

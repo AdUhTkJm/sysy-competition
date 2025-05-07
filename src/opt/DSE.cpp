@@ -188,6 +188,8 @@ void DSE::runImpl(Region *region) {
 }
 
 void DSE::run() {
+  Alias(module).run();
+  
   auto funcs = collectFuncs();
 
   for (auto func : funcs)
