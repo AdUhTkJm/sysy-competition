@@ -25,16 +25,16 @@
   class Ty : public OpImpl<Ty, __LINE__ + 1048576> { \
   public: \
     Ty(Value::Type resultTy, const std::vector<Value> &values): OpImpl(resultTy, values) { \
-      setName("rv."#Ty); \
+      setName("arm."#Ty); \
     } \
     Ty(Value::Type resultTy): OpImpl(resultTy, {}) { \
-      setName("rv."#Ty); \
+      setName("arm."#Ty); \
     } \
     Ty(Value::Type resultTy, const std::vector<Attr*> &attrs): OpImpl(resultTy, {}, attrs) { \
-      setName("rv."#Ty); \
+      setName("arm."#Ty); \
     } \
     Ty(Value::Type resultTy, const std::vector<Value> &values, const std::vector<Attr*> &attrs): OpImpl(resultTy, values, attrs) { \
-      setName("rv."#Ty); \
+      setName("arm."#Ty); \
     } \
   }
 
@@ -48,42 +48,107 @@ namespace arm {
 
 // Note that ARM denotes length information on register names, rather than on instruction name.
 // We still denote it on instructions; when Dumping, we emit the same opcode but different registers.
-ARMOP(MovOp);
+// Similarly, the variants of the same instruction is also considered differently.
+
+// Look at here: https://courses.cs.washington.edu/courses/cse469/19wi/arm64.pdf
+
+ARMOP(MovIOp); // Allows a shift amount.
+ARMOP(MovkOp); // Keep the immediate and load 16 bytes. Allows a shift amount.
+ARMOP(MovnOp); // Load `not immediate`.
+ARMOP(MovROp); // To distinguish from loading immediates, an `R` is for moving between registers.
+
 ARMOPL(AdrOp); // The ADR instruction only allows 1 MB range. We use pseudo-instr `ldr x0, =label` when Dumping.
+
 ARMOP(AddWOp);
+ARMOP(AddWIOp); // Accept immediate
 ARMOPL(AddXOp);
+ARMOPL(AddXIOp); // Accept immediate
+
 ARMOP(SubWOp);
-ARMOPL(SubXOp);
+ARMOP(RsbWOp); // Reverse subtract
+ARMOP(SubWIOp); // Accept immediate
 ARMOP(SubSWOp); // Sub and set flag
+
 ARMOP(MulWOp);
 ARMOPL(MulXOp);
+
 ARMOP(SdivWOp);
 ARMOPL(SdivXOp);
 ARMOP(UdivWOp);
+
 ARMOP(MlaOp);
 ARMOP(NegOp);
+
 ARMOPL(SmulhOp);
 ARMOPL(UmulhOp);
+
 ARMOP(AndOp);
 ARMOP(OrOp);
 ARMOP(EorOp); // Xor
-ARMOP(LdrOp); // Load
-ARMOP(LslOp); // l-shift
+ARMOP(AndIOp); // Accept immediate
+ARMOP(OrIOp); // Accept immediate
+ARMOP(EorIOp); // Accept immediate
+
+// Memory family
+// ==== Take an immediate (can be 0) ====
+ARMOP(LdrWOp); // Load i32
+ARMOPL(LdrXOp); // Load i64
+ARMOPF(LdrFOp); // Load f32
+ARMOP(StrWOp); // Store i32
+ARMOP(StrXOp); // Store i64
+ARMOP(StrFOp); // Store f32
+
+// ==== Take another register, L-shifted by amount (can be 0) ====
+// If the l-shift amount is negative, then it means to SUBTRACT THE REGISTER instead.
+ARMOP(LdrWROp); // Load i32
+ARMOPL(LdrXROp); // Load i64
+ARMOPF(LdrFROp); // Load f32
+ARMOP(StrWROp); // Store i32
+ARMOP(StrXROp); // Store i64
+ARMOP(StrFROp); // Store f32
+
+ARMOP(LslOp); // L-shift
 ARMOP(LsrOp); // Logical r-shift
 ARMOP(AsrWOp); // Arithmetic r-shift
 ARMOPL(AsrXOp); // Arithmetic r-shift
-ARMOP(StrOp); // Store
-ARMOP(CselOp); // csel xd, xn, xm, cond; meaning: xd = cond ? xn : xm
-ARMOP(CmpOp);
-ARMOP(CsetOp); // set flags according to cmp
+
+ARMOP(LslIOp); // L-shift, accept immediate
+ARMOP(LsrIOp); // Logical r-shift, accept immediate
+ARMOP(AsrWIOp); // Arithmetic r-shift, accept immediate
+ARMOPL(AsrXIOp); // Arithmetic r-shift, accept immediate
+
+ARMOP(CselOp); // xd = cond ? xn : xm
+ARMOP(CmpOp); // We do think `cmp` has a result, which is "explicitly" stating the CPSR flags
+ARMOP(CmpIOp); // Accept immediate
+ARMOP(TstOp); // Same applies to `tst`
+
+// ====== CSET family ======
+// Read CPSR flags into a register. Each flag is a different op.
+// It takes the result of CmpOp.
+ARMOP(CsetNeOp);
+ARMOP(CsetEqOp);
+ARMOP(CsetLtOp);
+ARMOP(CsetLeOp);
+ARMOP(CsetGtOp);
+ARMOP(CsetGeOp);
+
+// ====== Branch family ======
+// Note all of them takes ONE argument. For B-series it's the CPSR flags given by CmpOp,
+// and for C-series it's the real argument.
 ARMOP(BgtOp);
 ARMOP(BleOp);
 ARMOP(BeqOp);
 ARMOP(BneOp);
 ARMOP(BltOp);
+ARMOP(BmiOp); // Branch if minus (< 0)
+ARMOP(BplOp); // Branch if plus (> 0)
+ARMOP(CbzOp); // Compact branch if zero
+ARMOP(CbnzOp); // Compact branch if non-zero
+
 ARMOP(BOp); // Jump
 ARMOP(RetOp);
 ARMOP(BrOp); // Branch-and-link (jal in RISC-V), so just a call
+
 ARMOPF(ScvtfOp); // i32 -> f32
 ARMOP(FcmpOp);
 ARMOP(FmovOp); // Note this is NOT moving between floats; it's fmv.w.x in RISC-V
@@ -93,9 +158,15 @@ ARMOPF(FsubOp);
 ARMOPF(FmulOp);
 ARMOPF(FdivOp);
 
+// ==== Pseudo Ops ====
+ARMOP(ReadRegOp);
+ARMOP(WriteRegOp);
+
 inline bool hasRd(Op *op) {
   return !(
-    isa<StrOp>(op) ||
+    isa<StrWOp>(op) ||
+    isa<StrXOp>(op) ||
+    isa<StrFOp>(op) ||
     isa<BOp>(op) ||
     isa<BrOp>(op) ||
     isa<BeqOp>(op) ||
@@ -103,7 +174,8 @@ inline bool hasRd(Op *op) {
     isa<BgtOp>(op) ||
     isa<BltOp>(op) ||
     isa<BleOp>(op) ||
-    isa<RetOp>(op)
+    isa<RetOp>(op) ||
+    isa<CmpOp>(op)
   );
 }
 

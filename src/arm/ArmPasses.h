@@ -2,8 +2,9 @@
 #define ARM_PASSES_H
 
 #include "../opt/Pass.h"
+#include "../codegen/Ops.h"
+#include "../codegen/Attrs.h"
 #include "ArmOps.h"
-#include "../codegen/CodeGen.h"
 
 namespace sys {
 

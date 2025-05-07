@@ -69,8 +69,6 @@ Expr *Rule::parse() {
   return new Atom(tok);
 }
 
-// This time just use `dynamic_cast`. 
-// For things this simple, there's no need to get a dyn_cast, isa and cast for them.
 bool Rule::matchExpr(Expr *expr, Op* op) {
   if (auto* atom = dyn_cast<Atom>(expr)) {
     std::string_view var = atom->value;
