@@ -36,7 +36,6 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::AtMostOnce>();
   pm.addPass<sys::Localize>(/*beforeFlattenCFG=*/ true);
   pm.addPass<sys::EarlyConstFold>();
-  pm.addPass<sys::StrengthReduct>();
   pm.addPass<sys::Pureness>();
   pm.addPass<sys::DCE>(/*elimBlocks=*/ false);
 
@@ -59,6 +58,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DSE>();
   pm.addPass<sys::DLE>();
   pm.addPass<sys::LateConstFold>();
+  pm.addPass<sys::StrengthReduct>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::GCM>();
