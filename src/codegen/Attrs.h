@@ -2,6 +2,7 @@
 #define ATTRS_H
 
 #include "OpBase.h"
+#include <climits>
 #include <cstdint>
 #include <map>
 
@@ -188,7 +189,7 @@ public:
   // The integer operation to which this Attr attach is in range [low, high] (closed interval).
   std::pair<int, int> range;
 
-  RangeAttr() {}
+  RangeAttr(): range({ INT_MIN, INT_MAX }) {}
   RangeAttr(int low, int high): range({ low, high }) {}
   RangeAttr(std::pair<int, int> range): range(range) {}
 
@@ -206,6 +207,6 @@ public:
 #define ELSE(op) (op)->get<ElseAttr>()->bb
 #define CALLER(op) (op)->get<CallerAttr>()->callers
 #define ALIAS(op) (op)->get<AliasAttr>()
-#define RANGE(op) (op)->get<RangeAttr>()
+#define RANGE(op) (op)->get<RangeAttr>()->range
 
 #endif

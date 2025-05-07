@@ -313,7 +313,11 @@ public:
 
 // Integer range analysis.
 class Range : public Pass {
-  void runImpl(Region *region);
+  // The set of all loop headers in a function.
+  // We should apply widening at these blocks, otherwise it would take forever to converge.
+  std::set<BasicBlock*> headers;
+
+  void runImpl(Region *region, const LoopForest &forest);
 public:
   Range(ModuleOp *module): Pass(module) {}
 

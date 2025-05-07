@@ -140,7 +140,7 @@ def archive_objects(obj_files, lib_path):
 
 def link_libraries(lib_files, output_binary):
   print(f"Linking {output_binary}")
-  proc.check_call([COMPILER] + LDFLAGS + ["-o", str(output_binary)] + [str(lib) for lib in lib_files])
+  proc.check_call([COMPILER] + LDFLAGS + ["-o", str(output_binary)] + ["-Wl,--start-group"] + [str(lib) for lib in lib_files] + ["-Wl,--end-group"])
 
 def build():
   global include_cache, include_hashes

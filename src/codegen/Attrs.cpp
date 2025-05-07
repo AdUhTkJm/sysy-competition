@@ -118,6 +118,27 @@ std::string AliasAttr::toString() {
   return str;
 }
 
+std::string RangeAttr::toString() {
+  auto [low, high] = range;
+  if (low == INT_MIN && high == INT_MAX)
+    return "<range = all>";
+
+  std::stringstream ss;
+  ss << "<range = ";
+  if (low == INT_MIN)
+    ss << "(-inf, ";
+  else
+    ss << "[" << low << ", ";
+
+  if (high == INT_MAX)
+    ss << "inf)";
+  else
+    ss << high << "]";
+
+  ss << '>';
+  return ss.str();
+}
+
 bool AliasAttr::add(Op *base, int offset) {
   if (unknown)
     return false;
