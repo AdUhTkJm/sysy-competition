@@ -163,6 +163,14 @@ bool Rule::matchExpr(Expr *expr, Op* op) {
            matchExpr(list->elements[2], op->getOperand(1).defining);
   }
 
+  if (opname == "not" && isa<NotOp>(op)) {
+    return matchExpr(list->elements[1], op->getOperand(0).defining);
+  }
+
+  if (opname == "snz" && isa<SetNotZeroOp>(op)) {
+    return matchExpr(list->elements[1], op->getOperand(0).defining);
+  }
+
   return false;
 }
 
@@ -250,6 +258,17 @@ int Rule::evalExpr(Expr *expr) {
     int a = evalExpr(list->elements[1]);
     int b = evalExpr(list->elements[2]);
     return a && b;
+  }
+  
+  if (opname == "!or") {
+    int a = evalExpr(list->elements[1]);
+    int b = evalExpr(list->elements[2]);
+    return a || b;
+  }
+
+  if (opname == "!not") {
+    int a = evalExpr(list->elements[1]);
+    return !a;
   }
 
   if (opname == "!only-if") {
@@ -368,6 +387,16 @@ Op *Rule::buildExpr(Expr *expr) {
   if (opname == "minus") {
     Value a = buildExpr(list->elements[1]);
     return builder.create<MinusOp>({ a });
+  }
+
+  if (opname == "not") {
+    Value a = buildExpr(list->elements[1]);
+    return builder.create<NotOp>({ a });
+  }
+
+  if (opname == "snz") {
+    Value a = buildExpr(list->elements[1]);
+    return builder.create<SetNotZeroOp>({ a });
   }
 
   std::cerr << "unknown opname: " << opname << "\n";

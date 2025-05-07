@@ -84,8 +84,6 @@ void Lower::run() {
   REPLACE(RShiftImmLOp, SraiOp);
   REPLACE(GotoOp, JOp);
   REPLACE(GetGlobalOp, LaOp);
-  REPLACE(NotOp, SeqzOp);
-  REPLACE(SetNotZeroOp, SnezOp);
   REPLACE(AndIOp, AndOp);
   REPLACE(OrIOp, OrOp);
   REPLACE(XorIOp, XorOp);
@@ -139,6 +137,33 @@ void Lower::run() {
     return true;
   });
 
+  runRewriter([&](SetNotZeroOp *op) {
+    if (op->getOperand().defining->getResultType() == Value::f32) {
+      builder.setBeforeOp(op);
+      auto zero = builder.create<LiOp>({ new IntAttr(0) });
+      auto zerof = builder.create<FmvwxOp>({ zero });
+      auto nonzero = builder.create<FeqOp>({ op->getOperand(), zerof });
+      builder.replace<SnezOp>(op, { nonzero });
+      return true;
+    }
+
+    builder.replace<SnezOp>(op, op->getOperands(), op->getAttrs());
+    return true;
+  });
+
+  runRewriter([&](NotOp *op) {
+    if (op->getOperand().defining->getResultType() == Value::f32) {
+      builder.setBeforeOp(op);
+      auto zero = builder.create<LiOp>({ new IntAttr(0) });
+      auto zerof = builder.create<FmvwxOp>({ zero });
+      builder.replace<FeqOp>(op, { op->getOperand(), zerof });
+      return true;
+    }
+
+    builder.replace<SeqzOp>(op, op->getOperands(), op->getAttrs());
+    return true;
+  });
+
   runRewriter([&](BranchOp *op) {
     auto cond = op->getOperand().defining;
 
@@ -187,6 +212,13 @@ void Lower::run() {
     // 'xor' is a keyword of C++.
     auto xorOp = builder.create<XorOp>(op->getOperands(), op->getAttrs());
     builder.replace<SnezOp>(op,{ xorOp });
+    return true;
+  });
+
+  runRewriter([&](NeFOp *op) {
+    builder.setBeforeOp(op);
+    auto feq = builder.create<FeqOp>(op->getOperands(), op->getAttrs());
+    builder.replace<SnezOp>(op, { feq });
     return true;
   });
 

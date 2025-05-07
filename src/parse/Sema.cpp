@@ -76,14 +76,12 @@ Type *Sema::infer(ASTNode *node) {
 
     if (isa<FloatType>(lty) && isa<IntType>(rty)) {
       binary->r = new UnaryNode(UnaryNode::Int2Float, binary->r);
-      binary->r->type = ctx.create<FloatType>();
-      return binary->type = ctx.create<FloatType>();
+      rty = binary->r->type = ctx.create<FloatType>();
     }
 
     if (isa<IntType>(lty) && isa<FloatType>(rty)) {
       binary->l = new UnaryNode(UnaryNode::Int2Float, binary->l);
-      binary->l->type = ctx.create<FloatType>();
-      return binary->type = ctx.create<FloatType>();
+      lty = binary->l->type = ctx.create<FloatType>();
     }
 
     std::set<decltype(binary->kind)> intops {

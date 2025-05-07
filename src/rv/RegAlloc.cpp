@@ -796,8 +796,13 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   for (auto phi : allPhis)
     phi->removeAllOperands();
 
-  for (auto phi : allPhis)
+  for (auto phi : allPhis) {
+    if (phi->getUses().size()) {
+      module->dump(std::cerr);
+      phi->dump(std::cerr);
+    }
     phi->erase();
+  }
 
   for (auto bb : region->getBlocks()) {
     for (auto op : bb->getOps()) {

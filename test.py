@@ -19,7 +19,7 @@ parser.add_argument("-r", "--dump-mid-ir", action="store_true")
 parser.add_argument("--arm", action="store_true")
 parser.add_argument("-n", "--no-execute", action="store_true")
 parser.add_argument("-d", "--directory", type=str)
-parser.add_argument("--timeout", type=float, default=0.5)
+parser.add_argument("--timeout", type=float, default=1)
 parser.add_argument("--asm", type=str)
 parser.add_argument("-t", "--test", type=str)
 parser.add_argument("-i", "--input", type=str) # Input to the executable
@@ -32,7 +32,7 @@ BUILD_DIR = Path("build")
 FINAL_BINARY = BUILD_DIR / "sysc"
 COMPILER = "clang++"
 AR = "ar"
-CFLAGS = ["-c", "-std=c++17", "-g"]
+CFLAGS = ["-c", "-std=c++17", "-O2", "-g"]
 LDFLAGS = []
 CACHE_FILE = BUILD_DIR / ".build_cache.pkl"
 INCLUDE_CACHE_FILE = BUILD_DIR / ".include_cache.pkl"

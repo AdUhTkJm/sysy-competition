@@ -52,6 +52,12 @@ const Rule rules[] = {
   "(change (mod 0 x) 0)",
   "(change (mod 'a 'b) (!mod 'a 'b))",
 
+  // Minus
+  "(change (minus 'a) (!sub 0 'a))",
+  "(change (minus (add x 'a)) (sub (!sub 0 'a) x))",
+  "(change (minus (sub x y)) (sub y x))",
+  "(change (minus (minus x)) x)",
+
   // Equality
   "(change (eq x x) 1)",
   "(change (eq 'a 'b) (!eq 'a 'b))",
@@ -80,6 +86,22 @@ const Rule rules[] = {
   "(change (lt 'b (sub x 'a)) (lt (!add 'b 'a) x))",
   "(change (lt 'b (mul x 'a)) (!only-if (!and (!gt 'a 0) (!gt 'b 0)) (lt (!div 'b 'a) x)))",
   "(change (lt 'b (div x 'a)) (!only-if (!and (!gt 'a 0) (!gt 'b 0)) (le (!mul 'a (!add 'b 1)) x)))",
+
+  // Not
+  "(change (not 'a) (!not 'a))",
+  "(change (not (eq x y)) (ne x y))",
+  "(change (not (lt x y)) (ge x y))",
+  "(change (not (le x y)) (gt x y))",
+  "(change (not (ne x y)) (eq x y))",
+  "(change (not (not x)) (snz x))",
+  "(change (not (or x y)) (and (not x) (not y)))",
+  "(change (not (and x y)) (or (not x) (not y)))",
+
+  // Not equal
+  "(change (ne 'a 'b) (!ne 'a 'b))",
+  "(change (ne 'a x) (ne x 'a))",
+  "(change (ne (add x 'a) 'b) (ne x (!sub 'b 'a)))",
+  "(change (ne (sub x 'a) 'b) (ne x (!add 'b 'a)))",
 };
 
 std::map<std::string, int> RegularFold::stats() {
@@ -99,8 +121,13 @@ void RegularFold::run() {
       for (auto bb : region->getBlocks()) {
         auto ops = bb->getOps();
         for (auto op : ops) {
-          for (auto rule : rules)
-            folded += rule.rewrite(op);
+          for (auto rule : rules) {
+            bool success = rule.rewrite(op);
+            if (success) {
+              folded++;
+              break;
+            }
+          }
         }
       }
     }
