@@ -116,6 +116,33 @@ std::map<std::string, int> RegularFold::stats() {
   };
 }
 
+void removePhiOperand(Op *phi, BasicBlock *from) {
+  auto ops = phi->getOperands();
+  std::vector<Attr*> attrs;
+  for (auto attr : phi->getAttrs())
+    attrs.push_back(attr->clone());
+
+  phi->removeAllOperands();
+  // This deletes attributes if their refcnt goes to zero.
+  // That's why we cloned above.
+  phi->removeAllAttributes();
+
+  for (size_t i = 0; i < ops.size(); i++) {
+    if (ops[i].defining->getParent() == from)
+      continue;
+
+    // Only preserve the operands that aren't from dead blocks.
+    phi->pushOperand(ops[i]);
+    phi->add<FromAttr>(FROM(attrs[i]));
+  }
+}
+
+void tidyPhi(BasicBlock *bb, BasicBlock *from) {
+  auto phis = bb->getPhis();
+  for (auto phi : phis)
+    removePhiOperand(phi, from);
+}
+
 void RegularFold::run() {
   auto funcs = collectFuncs();
   int folded;
@@ -148,12 +175,14 @@ void RegularFold::run() {
       
       if (V(cond) == 0) {
         folded++;
+        tidyPhi(TARGET(op), op->getParent());
         builder.replace<GotoOp>(op, { new TargetAttr(ELSE(op)) });
         return false;
       }
 
       // V(cond) != 0
       folded++;
+      tidyPhi(ELSE(op), op->getParent());
       builder.replace<GotoOp>(op, { new TargetAttr(TARGET(op)) });
       return false;
     });

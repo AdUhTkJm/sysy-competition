@@ -584,9 +584,8 @@ void Region::updateLiveness() {
     for (auto bb : bbs) {
       auto liveInOld = bb->liveIn;
 
-      // LiveOut(B) = \bigcup_{S\in succ(B)} (LiveIn(S) - PhiDefs(S)) \cup PhiUses(S)
-      // We don't need to include all PhiUses. 
-      // We only want to include uses with `from` blocks that are reachable from here.
+      // LiveOut(B) = \bigcup_{S\in succ(B)} (LiveIn(S) - PhiDefs(S)) \cup PhiUses(B)
+      // Here PhiUses(B) means the set of variables used in Phi nodes of S that come from B.
       std::set<Op*> liveOut;
       for (auto succ : bb->getSuccs()) {
         std::set_difference(
@@ -598,7 +597,7 @@ void Region::updateLiveness() {
           auto &ops = phi->getOperands();
           auto &attrs = phi->getAttrs();
           for (size_t i = 0; i < ops.size(); i++) {
-            if (bb->reachable(cast<FromAttr>(attrs[i])->bb))
+            if (FROM(attrs[i]) == bb)
               liveOut.insert(ops[i].defining);
           }
         }

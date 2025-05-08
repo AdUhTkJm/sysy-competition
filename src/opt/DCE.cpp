@@ -110,8 +110,9 @@ void DCE::run() {
       auto region = func->getRegion();
       region->updatePreds();
       std::set<BasicBlock*> toRemove;
+      auto entry = region->getFirstBlock();
       for (auto bb : region->getBlocks()) {
-        if (bb != region->getFirstBlock() && bb->getPreds().size() == 0)
+        if (!entry->reachable(bb))
           toRemove.insert(bb);
       }
 
@@ -152,7 +153,7 @@ void DCE::run() {
 
       // Do the real removal.
       for (auto bb : toRemove)
-        bb->erase();
+        bb->forceErase();
     }
   } while (changed);
 }
