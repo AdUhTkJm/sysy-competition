@@ -118,6 +118,39 @@ void DCE::run() {
       elimBB += toRemove.size();
       if (toRemove.size())
         changed = true;
+
+      // Remove all operands first, to avoid inter-dependency between blocks.
+      for (auto bb : toRemove) {
+        for (auto op : bb->getOps())
+          op->removeAllOperands();
+      }
+
+      // Remove phi nodes that take these dead blocks as input.
+      for (auto bb : toRemove) {
+        for (auto succ : bb->getSuccs()) {
+          auto phis = succ->getPhis();
+          for (auto phi : phis) {
+            auto ops = phi->getOperands();
+            std::vector<Attr*> attrs;
+            for (auto attr : phi->getAttrs())
+              attrs.push_back(attr->clone());
+
+            phi->removeAllOperands();
+            // This deletes attributes if their refcnt goes to zero.
+            phi->removeAllAttributes();
+
+            for (size_t i = 0; i < ops.size(); i++) {
+              if (FROM(attrs[i]) == bb)
+                continue;
+
+              phi->pushOperand(ops[i]);
+              phi->add<FromAttr>(FROM(attrs[i]));
+            }
+          }
+        }
+      }
+
+      // Do the real removal.
       for (auto bb : toRemove)
         bb->erase();
     }

@@ -106,48 +106,20 @@ inline bool isFP(Reg reg) {
   return (int) Reg::v0 <= (int) reg && (int) Reg::v31 >= (int) reg;
 }
 
-class RegAttr : public AttrImpl<RegAttr, ARMLINE> {
+class StackOffsetAttr : public AttrImpl<StackOffsetAttr, ARMLINE> {
 public:
-  Reg reg;
+  int offset;
 
-  RegAttr(Reg reg): reg(reg) {}
-
-  std::string toString() { return "<reg = " + showReg(reg) + ">"; }
-  RegAttr *clone() { return new RegAttr(reg); }
-};
-
-class RdAttr : public AttrImpl<RegAttr, ARMLINE> {
-public:
-  Reg reg;
-
-  RdAttr(Reg reg): reg(reg) {}
-
-  std::string toString() { return "<rd = " + showReg(reg) + ">"; }
-  RdAttr *clone() { return new RdAttr(reg); }
-};
-
-class RsAttr : public AttrImpl<RegAttr, ARMLINE> {
-public:
-  Reg reg;
-
-  RsAttr(Reg reg): reg(reg) {}
-
-  std::string toString() { return "<rs = " + showReg(reg) + ">"; }
-  RsAttr *clone() { return new RsAttr(reg); }
-};
-
-class Rs2Attr : public AttrImpl<RegAttr, ARMLINE> {
-public:
-  Reg reg;
-
-  Rs2Attr(Reg reg): reg(reg) {}
-
-  std::string toString() { return "<rs2 = " + showReg(reg) + ">"; }
-  Rs2Attr *clone() { return new Rs2Attr(reg); }
+  StackOffsetAttr(int offset): offset(offset) {}
+  
+  std::string toString() { return "<offset = " + std::to_string(offset) + ">"; }
+  StackOffsetAttr *clone() { return new StackOffsetAttr(offset); }
 };
 
 }
   
 }
+
+#define STACKOFF(op) (op)->get<StackOffsetAttr>()->offset
 
 #endif

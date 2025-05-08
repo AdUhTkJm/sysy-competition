@@ -55,7 +55,6 @@ public:
   Rule(const char *text);
   ~Rule();
   bool rewrite(Op *op);
-  // The caller should ensure the strings live long enough to cover the `extract`, if it will be called.
   bool match(Op *op, const Binding &external = {});
   Op *extract(const std::string &name);
 

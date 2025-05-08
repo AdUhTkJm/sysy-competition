@@ -104,6 +104,10 @@ Rule rules[] = {
   "(change (ne 'a x) (ne x 'a))",
   "(change (ne (add x 'a) 'b) (ne x (!sub 'b 'a)))",
   "(change (ne (sub x 'a) 'b) (ne x (!add 'b 'a)))",
+
+  // Set not zero
+  "(change (snz 0) 0)",
+  "(change (snz 'a) (!only-if (!ne 'a 0) 1))",
 };
 
 std::map<std::string, int> RegularFold::stats() {
@@ -133,6 +137,27 @@ void RegularFold::run() {
         }
       }
     }
+
+    // Also, run some extra folds.
+    Builder builder;
+
+    runRewriter([&](BranchOp *op) {
+      auto cond = op->getOperand().defining;
+      if (!isa<IntOp>(cond))
+        return false;
+      
+      if (V(cond) == 0) {
+        folded++;
+        builder.replace<GotoOp>(op, { new TargetAttr(ELSE(op)) });
+        return false;
+      }
+
+      // V(cond) != 0
+      folded++;
+      builder.replace<GotoOp>(op, { new TargetAttr(TARGET(op)) });
+      return false;
+    });
+
     foldedTotal += folded;
   } while (folded);
 }

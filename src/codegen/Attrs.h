@@ -208,5 +208,6 @@ public:
 #define CALLER(op) (op)->get<CallerAttr>()->callers
 #define ALIAS(op) (op)->get<AliasAttr>()
 #define RANGE(op) (op)->get<RangeAttr>()->range
+#define FROM(attr) cast<FromAttr>(attr)->bb
 
 #endif

@@ -3,8 +3,8 @@
 
 #include "../opt/Pass.h"
 #include "../codegen/Ops.h"
-#include "../codegen/Attrs.h"
 #include "ArmOps.h"
+#include "ArmAttrs.h"
 
 namespace sys {
 
@@ -42,6 +42,38 @@ public:
     
   std::string name() { return "arm-dce"; };
   std::map<std::string, int> stats();
+  void run();
+};
+
+class RegAlloc : public Pass {
+  int spilled = 0;
+  int convertedTotal = 0;
+
+  std::map<FuncOp*, std::set<Reg>> usedRegisters;
+  std::map<std::string, FuncOp*> fnMap;
+
+  void runImpl(Region *region, bool isLeaf);
+  // Create both prologue and epilogue of a function.
+  void proEpilogue(FuncOp *funcOp, bool isLeaf);
+  void tidyup(Region *region);
+public:
+  RegAlloc(ModuleOp *module): Pass(module) {}
+
+  std::string name() { return "arm-regalloc"; };
+  std::map<std::string, int> stats();
+  void run();
+};
+
+// Dumps the output.
+class Dump : public Pass {
+  std::string out;
+
+  void dump(std::ostream &os);
+public:
+  Dump(ModuleOp *module, const std::string &out): Pass(module), out(out) {}
+
+  std::string name() { return "arm-dump"; };
+  std::map<std::string, int> stats() { return {}; }
   void run();
 };
 

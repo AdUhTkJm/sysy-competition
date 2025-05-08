@@ -46,14 +46,20 @@ const ArmRule rules[] = {
     return false; \
   });
 
+#define REPLACE(BeforeTy, AfterTy) \
+  runRewriter([&](BeforeTy *op) { \
+    builder.replace<AfterTy>(op, op->getOperands(), op->getAttrs()); \
+    return true; \
+  });
+
+// We delay handling of calls etc. to RegAlloc.
 void Lower::run() {
   Builder builder;
 
   DESTRUCT_IMM(LShiftImmOp);
   DESTRUCT_IMM(RShiftImmOp);
   DESTRUCT_IMM(RShiftImmLOp);
-
-  // Calls must be handled on their own. So is ReturnOp.
+  REPLACE(ReturnOp, RetOp);
 
   auto funcs = collectFuncs();
   // No need to iterate to fixed point. All Ops are guaranteed to transform.

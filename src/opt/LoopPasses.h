@@ -101,6 +101,7 @@ public:
   void run();
 };
 
+// Buggy. Don't use it.
 class LoopRotate : public Pass {
   void runImpl(LoopInfo *info);
 public:
@@ -108,6 +109,18 @@ public:
 
   std::string name() { return "loop-rotate"; }
   std::map<std::string, int> stats() { return {}; }
+  void run();
+};
+
+class LoopUnroll : public Pass {
+  int unrolled = 0;
+
+  void runImpl(LoopInfo *info);
+public:
+  LoopUnroll(ModuleOp *module): Pass(module) {}
+
+  std::string name() { return "loop-unroll"; }
+  std::map<std::string, int> stats();
   void run();
 };
 
