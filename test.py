@@ -211,7 +211,7 @@ def run_asm(file: str):
 def run(full_file: str, no_exec: bool):
   basename = os.path.splitext(os.path.basename(full_file))[0]
 
-  command = [f"{BUILD_DIR}/sysc", f"test/{full_file}"]
+  command = [f"{BUILD_DIR}/sysc", full_file]
 
   if args.gdb:
     command = ["gdb", "--args", *command]

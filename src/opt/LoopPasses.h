@@ -39,6 +39,8 @@ public:
   const auto &getBlocks() const { return bbs; }
   auto getPreheader() const { return preheader; }
   auto getHeader() const { return header; }
+  auto getParent() const { return parent; }
+  auto getLatch() const { assert(latches.size() == 1); return *latches.begin(); }
 
   bool contains(BasicBlock *bb) const { return bbs.count(bb); }
 
@@ -92,6 +94,12 @@ public:
 };
 
 class LoopRotate : public Pass {
+  // This converts every loop to have a single latch.
+  void canonicalize(LoopInfo *info);
+
+  // Check whether all ops in the use-chain of `op` is able to get hoisted.
+  bool isCopyable(Op *op, BasicBlock *preheader);
+
   void runImpl(LoopInfo *info);
 public:
   LoopRotate(ModuleOp *module): Pass(module) {}

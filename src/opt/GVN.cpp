@@ -146,7 +146,6 @@ void GVN::dvnt(BasicBlock *bb, Domtree &domtree) {
 
   for (auto succ : domtree[bb])
     dvnt(succ, domtree);
-
 }
 
 // See https://www.cs.tufts.edu/~nr/cs257/archive/keith-cooper/value-numbering.pdf,
@@ -166,7 +165,6 @@ void GVN::runImpl(Region *region) {
 }
 
 void GVN::run() {
-  // module->dump(std::cerr);
   auto funcs = collectFuncs();
   for (auto func : funcs)
     runImpl(func->getRegion());

@@ -109,8 +109,12 @@ void CanonicalizeLoop::canonicalize(LoopInfo *loop) {
 
 void CanonicalizeLoop::runImpl(Region *region, LoopForest forest) {
   region->updateDoms();
-  for (auto loop : forest.getLoops())
-    canonicalize(loop);
+  // As `canonicalize` calls subloops recursively, 
+  // we only need to call it on all top-level loops.
+  for (auto loop : forest.getLoops()) {
+    if (!loop->getParent())
+      canonicalize(loop);
+  }
 }
 
 void CanonicalizeLoop::run() {

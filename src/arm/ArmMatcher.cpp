@@ -371,6 +371,8 @@ bool ArmRule::matchExpr(Expr *expr, Op* op) {
   MATCH_UNARY_IMM("ldrf", LdrFOp);
   MATCH_UNARY_IMM("ldrx", LdrXOp);
   MATCH_UNARY_IMM("lsli", LslIOp);
+  MATCH_UNARY_IMM("asrwi", AsrWIOp);
+  MATCH_UNARY_IMM("asrxi", AsrXIOp);
   MATCH_UNARY_IMM("cmpi", CmpIOp);
   MATCH_UNARY_IMM("andi", AndIOp);
   MATCH_UNARY_IMM("ori", OrIOp);

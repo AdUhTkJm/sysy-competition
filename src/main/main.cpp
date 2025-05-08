@@ -51,7 +51,6 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::Mem2Reg>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::CanonicalizeLoop>();
-  // Loop passes go here.
   pm.addPass<sys::GVN>();
   pm.addPass<sys::Alias>();
   pm.addPass<sys::DAE>();

@@ -14,10 +14,14 @@ const ArmRule rules[] = {
 
   "(change (mul x y) (mulw x y))",
   "(change (mull x y) (mulx x y))",
+
+  "(change (div x y) (sdivw x y))",
   
   "(change (and x y) (and x y))",
 
-  "(change (lshift x 'a) (lsli x 'a))",
+  "(change (shl x 'a) (lsli x 'a))",
+  "(change (shr x 'a) (asrwi x 'a))",
+  "(change (shrl x 'a) (asrxi x 'a))",
 
   "(change (j >bb) (b >bb))",
 
@@ -52,7 +56,7 @@ void Lower::run() {
   // Calls must be handled on their own. So is ReturnOp.
 
   auto funcs = collectFuncs();
-  // No need to iterate to fixed point. All Ops are guaranteed to transformm.
+  // No need to iterate to fixed point. All Ops are guaranteed to transform.
   for (auto func : funcs) {
     auto region = func->getRegion();
 
