@@ -1,4 +1,5 @@
 #include "LoopPasses.h"
+#include "../utils/Matcher.h"
 
 using namespace sys;
 
@@ -67,7 +68,9 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
       }
       preheader = pred;
     }
-    info->preheader = preheader;
+    // Preheader must also have a single edge to header.
+    if (preheader && preheader->getSuccs().size() == 1)
+      info->preheader = preheader;
     
     // Find exit and exiting blocks.
     for (auto loopbb : info->bbs) {
@@ -105,6 +108,62 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
         info->parent = parentInfo;
         parentInfo->subloops.push_back(info);
         break;
+      }
+    }
+  }
+
+  // Try to find the induction variable.
+  Rule addi("(add x 'a)");
+  Rule br("(br (lt x y))");
+  for (auto loop : forest.getLoops()) {
+    auto header = loop->getHeader();
+    auto phis = header->getPhis();
+    if (!phis.size() || loop->getLatches().size() != 1)
+      continue;
+
+    auto preheader = loop->getPreheader();
+    if (!preheader)
+      continue;
+
+    auto latch = loop->getLatch();
+    for (auto phi : phis) {
+      const auto &ops = phi->getOperands();
+      const auto &attrs = phi->getAttrs();
+      if (ops.size() != 2)
+        continue;
+
+      auto bb1 = cast<FromAttr>(attrs[0])->bb;
+      auto bb2 = cast<FromAttr>(attrs[1])->bb;
+      auto def1 = ops[0].defining;
+      auto def2 = ops[1].defining;
+
+      if (bb1 == latch && bb2 == preheader) {
+        std::swap(bb1, bb2);
+        std::swap(def1, def2);
+      }
+      if (bb1 == preheader && bb2 == latch) {
+        // Now this is a candidate of induction variable.
+        // See if `def2` is of form `%phi + 'a`.
+
+        // addi: (add x 'a)
+        if (addi.match(def2, { { "x", phi } })) {
+          auto step = addi.extract("'a");
+
+          // OK, now this is definitely an induction variable.
+          loop->induction = phi;
+          loop->start = def1;
+          loop->step = V(step);
+
+          // Try to identify the stop condition by looking at header.
+          auto term = header->getLastOp();
+
+          // br: (br (lt x y))
+          if (!br.match(term, { { "x", loop->induction } }))
+            break;
+
+          loop->stop = br.extract("y");
+          break;
+        }
       }
     }
   }

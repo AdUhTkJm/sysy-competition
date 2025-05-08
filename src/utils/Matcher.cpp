@@ -4,8 +4,31 @@
 
 using namespace sys;
 
+#define MATCH_BINARY(opcode, Ty) \
+  if (opname == opcode && isa<Ty>(op)) { \
+    return matchExpr(list->elements[1], op->getOperand(0).defining) && \
+          matchExpr(list->elements[2], op->getOperand(1).defining); \
+  }
+
+#define MATCH_UNARY(opcode, Ty) \
+  if (opname == opcode && isa<Ty>(op)) { \
+    return matchExpr(list->elements[1], op->getOperand(0).defining); \
+  }
+
 Rule::Rule(const char *text): text(text) {
   pattern = parse();
+}
+
+Rule::~Rule() {
+  release(pattern);
+}
+
+void Rule::release(Expr *expr) {
+  if (auto list = dyn_cast<List>(expr)) {
+    for (auto elem : list->elements)
+      release(elem);
+  }
+  delete expr;
 }
 
 void Rule::dump(std::ostream &os) {
@@ -112,62 +135,36 @@ bool Rule::matchExpr(Expr *expr, Op* op) {
 
   std::string_view opname = head->value;
 
-  if (opname == "eq" && isa<EqOp>(op)) {
-    return matchExpr(list->elements[1], op->getOperand(0).defining) &&
-           matchExpr(list->elements[2], op->getOperand(1).defining);
-  }
+  MATCH_BINARY("eq", EqOp);
+  MATCH_BINARY("ne", NeOp);
+  MATCH_BINARY("le", LeOp);
+  MATCH_BINARY("lt", LtOp);
+  MATCH_BINARY("eqf", EqFOp);
+  MATCH_BINARY("nef", NeFOp);
+  MATCH_BINARY("lef", LeFOp);
+  MATCH_BINARY("ltf", LtFOp);
+  MATCH_BINARY("add", AddIOp);
+  MATCH_BINARY("sub", SubIOp);
+  MATCH_BINARY("mul", MulIOp);
+  MATCH_BINARY("div", DivIOp);
+  MATCH_BINARY("mod", ModIOp);
+  MATCH_BINARY("and", AndIOp);
+  MATCH_BINARY("or", OrIOp);
+  MATCH_BINARY("xor", XorIOp);
+  MATCH_BINARY("shl", LShiftImmOp);
+  MATCH_BINARY("shr", RShiftImmOp);
+  MATCH_BINARY("shrl", RShiftImmLOp);
+  MATCH_BINARY("addl", AddLOp);
+  MATCH_BINARY("mull", MulLOp);
+  MATCH_BINARY("addf", AddFOp);
+  MATCH_BINARY("subf", SubFOp);
+  MATCH_BINARY("mulf", MulFOp);
+  MATCH_BINARY("divf", DivFOp);
 
-  if (opname == "ne" && isa<NeOp>(op)) {
-    return matchExpr(list->elements[1], op->getOperand(0).defining) &&
-           matchExpr(list->elements[2], op->getOperand(1).defining);
-  }
-
-  if (opname == "le" && isa<LeOp>(op)) {
-    return matchExpr(list->elements[1], op->getOperand(0).defining) &&
-           matchExpr(list->elements[2], op->getOperand(1).defining);
-  }
-
-  if (opname == "lt" && isa<LtOp>(op)) {
-    return matchExpr(list->elements[1], op->getOperand(0).defining) &&
-           matchExpr(list->elements[2], op->getOperand(1).defining);
-  }
-
-  if (opname == "minus" && isa<MinusOp>(op)) {
-    return matchExpr(list->elements[1], op->getOperand(0).defining);
-  }
-
-  if (opname == "add" && isa<AddIOp>(op)) {
-    return matchExpr(list->elements[1], op->getOperand(0).defining) &&
-           matchExpr(list->elements[2], op->getOperand(1).defining);
-  }
-
-  if (opname == "sub" && isa<SubIOp>(op)) {
-    return matchExpr(list->elements[1], op->getOperand(0).defining) &&
-           matchExpr(list->elements[2], op->getOperand(1).defining);
-  }
-
-  if (opname == "mul" && isa<MulIOp>(op)) {
-    return matchExpr(list->elements[1], op->getOperand(0).defining) &&
-           matchExpr(list->elements[2], op->getOperand(1).defining);
-  }
-
-  if (opname == "div" && isa<DivIOp>(op)) {
-    return matchExpr(list->elements[1], op->getOperand(0).defining) &&
-           matchExpr(list->elements[2], op->getOperand(1).defining);
-  }
-
-  if (opname == "mod" && isa<ModIOp>(op)) {
-    return matchExpr(list->elements[1], op->getOperand(0).defining) &&
-           matchExpr(list->elements[2], op->getOperand(1).defining);
-  }
-
-  if (opname == "not" && isa<NotOp>(op)) {
-    return matchExpr(list->elements[1], op->getOperand(0).defining);
-  }
-
-  if (opname == "snz" && isa<SetNotZeroOp>(op)) {
-    return matchExpr(list->elements[1], op->getOperand(0).defining);
-  }
+  MATCH_UNARY("not", NotOp);
+  MATCH_UNARY("snz", SetNotZeroOp);
+  MATCH_UNARY("minus", MinusOp);
+  MATCH_UNARY("br", BranchOp);
 
   return false;
 }
@@ -399,6 +396,29 @@ Op *Rule::buildExpr(Expr *expr) {
 
   std::cerr << "unknown opname: " << opname << "\n";
   assert(false);
+}
+
+bool Rule::match(Op *op, const std::map<std::string, Op*> &external) {
+  loc = 0;
+  failed = false;
+  binding.clear();
+  externalStrs.clear();
+  
+  for (auto [k, v] : external) {
+    externalStrs.push_back(k);
+    binding[externalStrs.back()] = v;
+  }
+
+  return matchExpr(pattern, op);
+}
+
+Op *Rule::extract(const std::string &name) {
+  if (!binding.count(name)) {
+    std::cerr << "querying unknown name: " << name << "\n";
+    dump(std::cerr);
+    assert(false);
+  }
+  return binding[name];
 }
 
 bool Rule::rewrite(Op *op) {

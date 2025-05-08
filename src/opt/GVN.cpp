@@ -110,6 +110,8 @@ void GVN::dvnt(BasicBlock *bb, Domtree &domtree) {
       if (!symbols.count(def)) {
         std::cerr << "cannot find def:\n  ";
         def->dump(std::cerr);
+        std::cerr << "demanding op:\n  ";
+        op->dump(std::cerr);
         std::cerr << "current map:\n";
         for (auto [k, v] : symbols) {
           std::cerr << v << " -> ";

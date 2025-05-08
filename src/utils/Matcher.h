@@ -32,6 +32,7 @@ struct List : Expr {
 class Rule {
   std::map<std::string_view, Op*> binding;
   std::string_view text;
+  std::vector<std::string> externalStrs;
   Expr *pattern;
   Builder builder;
   int loc = 0;
@@ -45,9 +46,18 @@ class Rule {
   Op *buildExpr(Expr *expr);
 
   void dump(Expr *expr, std::ostream &os);
+  void release(Expr *expr);
 public:
+  using Binding = std::map<std::string, Op*>;
+
+  Rule(const Rule &other) = delete;
+
   Rule(const char *text);
+  ~Rule();
   bool rewrite(Op *op);
+  // The caller should ensure the strings live long enough to cover the `extract`, if it will be called.
+  bool match(Op *op, const Binding &external = {});
+  Op *extract(const std::string &name);
 
   void dump(std::ostream &os);
 };

@@ -5,7 +5,7 @@ using namespace sys;
 
 #define INT(op) isa<IntOp>(op)
 
-const Rule rules[] = {
+Rule rules[] = {
   // Addition
   "(change (add x 0) x)",
   "(change (add 'a 'b) (!add 'a 'b))",
@@ -123,7 +123,7 @@ void RegularFold::run() {
       for (auto bb : region->getBlocks()) {
         auto ops = bb->getOps();
         for (auto op : ops) {
-          for (auto rule : rules) {
+          for (auto &rule : rules) {
             bool success = rule.rewrite(op);
             if (success) {
               folded++;
