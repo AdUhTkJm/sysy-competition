@@ -170,7 +170,16 @@ void Op::replaceOperand(Op *before, Value v) {
 }
 
 void Op::erase() {
-  assert(uses.size() == 0);
+  if (uses.size()) {
+    std::cerr << "removing op in use:\n  ";
+    dump(std::cerr);
+    std::cerr << "uses:\n";
+    for (auto use : uses) {
+      std::cerr << "  ";
+      use->dump(std::cerr);
+    }
+    assert(false);
+  }
   
   parent->remove(place);
   removeAllOperands();

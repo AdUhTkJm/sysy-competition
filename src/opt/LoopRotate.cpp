@@ -9,6 +9,12 @@ void postorder(LoopInfo *loop, std::vector<LoopInfo*> &loops) {
   loops.push_back(loop);
 }
 
+std::map<std::string, int> LoopRotate::stats() {
+  return {
+    { "rotated-loops", rotated }
+  };
+}
+
 void LoopRotate::runImpl(LoopInfo *info) {
   if (!info->getInduction())
     return;
@@ -42,6 +48,32 @@ void LoopRotate::runImpl(LoopInfo *info) {
   if (!isa<GotoOp>(preterm))
     return;
 
+  rotated++;
+
+  auto headerPhis = header->getPhis();
+  std::map<Op*, Op*> valueMap, initMap;
+  // Map each phi to the value from latch.
+  // When we update references outside the loop, we'll change phi to that value instead.
+  for (auto phi : headerPhis) {
+    const auto &ops = phi->getOperands();
+    const auto &attrs = phi->getAttrs();
+    
+    if (attrs.size() < 2)
+      continue;
+    
+    auto bb1 = cast<FromAttr>(attrs[0])->bb;
+    if (bb1 == latch) {
+      valueMap[phi] = ops[0].defining;
+      initMap[phi] = ops[1].defining;
+    }
+
+    auto bb2 = cast<FromAttr>(attrs[1])->bb;
+    if (bb2 == latch){
+      valueMap[phi] = ops[1].defining;
+      initMap[phi] = ops[0].defining;
+    }
+  }
+
   builder.setBeforeOp(preterm);
   auto upper = builder.create<IntOp>({ new IntAttr(V(br.extract("'a"))) });
   auto lt = builder.create<LtOp>({ (Value) info->getStart(), upper });
@@ -53,12 +85,10 @@ void LoopRotate::runImpl(LoopInfo *info) {
   builder.replace<GotoOp>(term, { new TargetAttr(target) });
 
   // Replace the latch's terminator with a branch.
-  // This time we should compare the increased induction variable with the upper bound.
-  // Don't worry, GVN will handle all these extra things.
+  // This time we should compare the increased induction variable with the upper bound,
+  // i.e. the value from latch.
   builder.setBeforeOp(latchterm);
-  auto step = builder.create<IntOp>({ new IntAttr(info->getStep()) });
-  auto add = builder.create<AddIOp>({ induction, step });
-  auto lt2 = builder.create<LtOp>({ add, upper });
+  auto lt2 = builder.create<LtOp>({ valueMap[induction], upper });
   builder.replace<BranchOp>(latchterm, { lt2 }, { new TargetAttr(header), new ElseAttr(exit) });
 
   // Fix phi nodes at exit.
@@ -68,8 +98,17 @@ void LoopRotate::runImpl(LoopInfo *info) {
     const auto &attrs = phi->getAttrs();
     for (size_t i = 0; i < ops.size(); i++) {
       auto &from = cast<FromAttr>(attrs[i])->bb;
-      if (from == header)
+      auto def = ops[i].defining;
+      if (from == header) {
         from = latch;
+        if (valueMap.count(def))
+          phi->setOperand(i, valueMap[def]);
+        if (initMap.count(def)) {
+          phi->pushOperand(initMap[def]);
+          phi->add<FromAttr>(preheader);
+        }
+        break;
+      }
     }
   }
 }
@@ -154,7 +193,7 @@ void LoopRotate::run() {
       postorder(toploop, loops);
 
       for (auto loop : loops)
-        runImpl(loop); 
+        runImpl(loop);
     }
   }
 }

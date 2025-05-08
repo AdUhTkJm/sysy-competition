@@ -101,14 +101,15 @@ public:
   void run();
 };
 
-// Buggy. Don't use it.
 class LoopRotate : public Pass {
+  int rotated = 0;
+
   void runImpl(LoopInfo *info);
 public:
   LoopRotate(ModuleOp *module): Pass(module) {}
 
   std::string name() { return "loop-rotate"; }
-  std::map<std::string, int> stats() { return {}; }
+  std::map<std::string, int> stats();
   void run();
 };
 

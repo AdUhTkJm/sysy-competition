@@ -147,6 +147,16 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
 
         // addi: (add x 'a)
         if (addi.match(def2, { { "x", phi } })) {
+          // If, after this `add` there's still something else (other than branch), 
+          // then this shouldn't be an induction variable.
+          auto next = def2->nextOp();
+          if (!isa<GotoOp>(next) && !isa<BranchOp>(next))
+            continue;
+
+          // Moreover, this should be in latch.
+          if (def2->getParent() != latch)
+            continue;
+
           auto step = addi.extract("'a");
 
           // OK, now this is definitely an induction variable.

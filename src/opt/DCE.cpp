@@ -109,10 +109,10 @@ void DCE::run() {
     for (auto func : funcs) {
       auto region = func->getRegion();
       region->updatePreds();
-      std::vector<BasicBlock*> toRemove;
+      std::set<BasicBlock*> toRemove;
       for (auto bb : region->getBlocks()) {
         if (bb != region->getFirstBlock() && bb->getPreds().size() == 0)
-          toRemove.push_back(bb);
+          toRemove.insert(bb);
       }
 
       elimBB += toRemove.size();
@@ -126,26 +126,26 @@ void DCE::run() {
       }
 
       // Remove phi nodes that take these dead blocks as input.
-      for (auto bb : toRemove) {
-        for (auto succ : bb->getSuccs()) {
-          auto phis = succ->getPhis();
-          for (auto phi : phis) {
-            auto ops = phi->getOperands();
-            std::vector<Attr*> attrs;
-            for (auto attr : phi->getAttrs())
-              attrs.push_back(attr->clone());
+      for (auto bb : region->getBlocks()) {
+        auto phis = bb->getPhis();
+        for (auto phi : phis) {
+          auto ops = phi->getOperands();
+          std::vector<Attr*> attrs;
+          for (auto attr : phi->getAttrs())
+            attrs.push_back(attr->clone());
 
-            phi->removeAllOperands();
-            // This deletes attributes if their refcnt goes to zero.
-            phi->removeAllAttributes();
+          phi->removeAllOperands();
+          // This deletes attributes if their refcnt goes to zero.
+          // That's why we cloned above.
+          phi->removeAllAttributes();
 
-            for (size_t i = 0; i < ops.size(); i++) {
-              if (FROM(attrs[i]) == bb)
-                continue;
+          for (size_t i = 0; i < ops.size(); i++) {
+            if (toRemove.count(ops[i].defining->getParent()))
+              continue;
 
-              phi->pushOperand(ops[i]);
-              phi->add<FromAttr>(FROM(attrs[i]));
-            }
+            // Only preserve the operands that aren't from dead blocks.
+            phi->pushOperand(ops[i]);
+            phi->add<FromAttr>(FROM(attrs[i]));
           }
         }
       }
