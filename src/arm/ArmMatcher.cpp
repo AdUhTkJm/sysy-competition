@@ -274,9 +274,6 @@ bool ArmRule::matchExprForLower(Expr *expr, Op* op) {
   MATCH_BINARY("and", AndIOp);
   MATCH_BINARY("or", OrIOp);
   MATCH_BINARY("xor", XorIOp);
-  MATCH_BINARY("shl", LShiftImmOp);
-  MATCH_BINARY("shr", RShiftImmOp);
-  MATCH_BINARY("shrl", RShiftImmLOp);
   MATCH_BINARY("addl", AddLOp);
   MATCH_BINARY("mull", MulLOp);
   MATCH_BINARY("addf", AddFOp);
@@ -287,6 +284,10 @@ bool ArmRule::matchExprForLower(Expr *expr, Op* op) {
   MATCH_UNARY("not", NotOp);
   MATCH_UNARY("snz", SetNotZeroOp);
   MATCH_UNARY("minus", MinusOp);
+  
+  MATCH_UNARY_IMM("shl", LShiftImmOp);
+  MATCH_UNARY_IMM("shr", RShiftImmOp);
+  MATCH_UNARY_IMM("shrl", RShiftImmLOp);
 
   MATCH_BRANCH("br", BranchOp);
 
@@ -366,6 +367,7 @@ bool ArmRule::matchExpr(Expr *expr, Op* op) {
   MATCH_BINARY("cmp", CmpOp);
 
   MATCH_UNARY_IMM("addwi", AddWIOp);
+  MATCH_UNARY_IMM("addxi", AddXIOp);
   MATCH_UNARY_IMM("subwi", SubWIOp);
   MATCH_UNARY_IMM("ldrw", LdrWOp);
   MATCH_UNARY_IMM("ldrf", LdrFOp);
@@ -517,6 +519,7 @@ Op *ArmRule::buildExpr(Expr *expr) {
   BUILD_BINARY("cmp", CmpOp);
 
   BUILD_UNARY_IMM("addwi", AddWIOp);
+  BUILD_UNARY_IMM("addxi", AddXIOp);
   BUILD_UNARY_IMM("subwi", SubWIOp);
   BUILD_UNARY_IMM("ldrw", LdrWOp);
   BUILD_UNARY_IMM("ldrf", LdrFOp);

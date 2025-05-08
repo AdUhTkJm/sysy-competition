@@ -5,7 +5,7 @@ using namespace sys;
 
 #define INT(op) isa<IntOp>(op)
 
-Rule rules[] = {
+static Rule rules[] = {
   // Addition
   "(change (add x 0) x)",
   "(change (add 'a 'b) (!add 'a 'b))",

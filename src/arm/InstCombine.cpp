@@ -10,8 +10,10 @@ std::map<std::string, int> InstCombine::stats() {
   };
 }
 
-ArmRule rules[] = {
-
+static ArmRule rules[] = {
+  "(change (addw x (mov #a)) (!only-if (!inbit 12 #a) (addwi x #a)))",
+  "(change (addx x (mov #a)) (!only-if (!inbit 12 #a) (addxi x #a)))",
+  "(change (cbz (csetlt x) >bb ?bb2) (blt x >bb ?bb2))",
 };
 
 void InstCombine::run() {
