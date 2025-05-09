@@ -63,6 +63,7 @@ int CodeGen::getSize(Type *ty) {
   
   return 8;
 }
+
 Value CodeGen::emitBinary(BinaryNode *node) {
   // TODO: for float, we need to test zero in a different way.
   if (node->kind == BinaryNode::And) {

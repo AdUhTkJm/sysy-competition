@@ -74,6 +74,29 @@ Type *Sema::infer(ASTNode *node) {
     auto lty = infer(binary->l);
     auto rty = infer(binary->r);
 
+    // Special: we need to convert float to comparison with zero.
+    if (binary->kind == BinaryNode::And || binary->kind == BinaryNode::Or) {
+      if (isa<FloatType>(lty)) {
+        auto zero = new FloatNode(0);
+        zero->type = ctx.create<FloatType>();
+
+        auto ne = new BinaryNode(BinaryNode::Ne, binary->l, zero);
+        ne->type = ctx.create<IntType>();
+
+        binary->l = ne;
+      }
+      if (isa<FloatType>(rty)) {
+        auto zero = new FloatNode(0);
+        zero->type = ctx.create<FloatType>();
+
+        auto ne = new BinaryNode(BinaryNode::Ne, binary->r, zero);
+        ne->type = ctx.create<IntType>();
+
+        binary->r = ne;
+      }
+      return node->type = ctx.create<IntType>();
+    }
+
     if (isa<FloatType>(lty) && isa<IntType>(rty)) {
       binary->r = new UnaryNode(UnaryNode::Int2Float, binary->r);
       rty = binary->r->type = ctx.create<FloatType>();

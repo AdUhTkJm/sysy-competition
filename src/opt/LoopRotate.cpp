@@ -60,6 +60,7 @@ void LoopRotate::runImpl(LoopInfo *info) {
     
     if (attrs.size() < 2)
       continue;
+    assert(attrs.size() == 2);
     
     auto bb1 = cast<FromAttr>(attrs[0])->bb;
     if (bb1 == latch) {
@@ -168,13 +169,18 @@ void LoopRotate::run() {
           // Remove all forwarded operands, and push a { newPhi, latch } pair.
           phi->removeAllOperands();
           phi->removeAllAttributes();
-          
-          for (auto [def, from] : preserved) {
-            phi->pushOperand(def);
-            phi->add<FromAttr>(from);
+
+          if (!preserved.size()) {
+            phi->replaceAllUsesWith(newPhi);
+            phi->erase();
+          } else {
+            for (auto [def, from] : preserved) {
+              phi->pushOperand(def);
+              phi->add<FromAttr>(from);
+            }
+            phi->pushOperand(newPhi);
+            phi->add<FromAttr>(latch);
           }
-          phi->pushOperand(newPhi);
-          phi->add<FromAttr>(latch);
         }
       }
 

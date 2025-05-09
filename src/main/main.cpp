@@ -52,7 +52,6 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::Mem2Reg>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::CanonicalizeLoop>();
-  // TODO: check it tomorrow. Look at 71_full_conn.sy
   // pm.addPass<sys::LoopRotate>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::Alias>();

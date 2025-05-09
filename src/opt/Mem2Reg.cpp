@@ -187,4 +187,15 @@ void Mem2Reg::run() {
   auto funcs = collectFuncs();
   for (auto func : funcs)
     runImpl(func);
+
+  // Discard trivial phis.
+  runRewriter([&](PhiOp *op) {
+    if (op->getOperands().size() == 1) {
+      auto def = op->getOperand().defining;
+      op->replaceAllUsesWith(def);
+      op->erase();
+      return true;
+    }
+    return false;
+  });
 }

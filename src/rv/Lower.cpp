@@ -216,7 +216,7 @@ void Lower::run() {
   runRewriter([&](NeFOp *op) {
     builder.setBeforeOp(op);
     auto feq = builder.create<FeqOp>(op->getOperands(), op->getAttrs());
-    builder.replace<SnezOp>(op, { feq });
+    builder.replace<SeqzOp>(op, { feq });
     return true;
   });
 
