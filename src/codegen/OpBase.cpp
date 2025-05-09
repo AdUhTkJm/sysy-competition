@@ -474,7 +474,7 @@ void Region::updateDoms() {
         std::set<BasicBlock*> temp;
         std::set_intersection(pred->doms.begin(), pred->doms.end(), result.begin(), result.end(),
           std::inserter(temp, temp.end()));
-        result = temp;
+        result = std::move(temp);
       }
 
       result.insert(x);
@@ -510,7 +510,7 @@ void Region::updateDoms() {
         break;
       }
     }
-    // Only blocks without preds can have no idom
+    // Only blocks without preds can have no idom.
     // We must remove those blocks before calling `updateDoms`.
     assert(bb->idom);
   }
@@ -531,6 +531,102 @@ void Region::updateDoms() {
       while (runner != bb->idom) {
         runner->domFront.insert(bb);
         runner = runner->idom;
+      }
+    }
+  }
+}
+
+// A dual of updateDoms().
+void Region::updatePDoms() {
+  updatePreds();
+  for (auto bb : bbs) {
+    bb->postdoms.clear();
+    bb->ipdom = nullptr;
+    bb->postdomFront.clear();
+  }
+
+  for (auto x : bbs)
+    std::copy(bbs.begin(), bbs.end(), std::inserter(x->postdoms, x->postdoms.end()));
+  
+  // We assume the last block is the exit block.
+  auto end = getLastBlock();
+  assert(isa<ReturnOp>(end->getLastOp()));
+  end->postdoms.clear();
+  end->postdoms.insert(end);
+
+  bool changed;
+  do {
+    changed = false;
+    for (auto x : bbs) {
+      if (x == end)
+        continue;
+
+      // Don't forget to set the identity to the full bbs.
+      std::set<BasicBlock*> result;
+      std::copy(bbs.begin(), bbs.end(), std::inserter(result, result.end()));
+
+      // Duality: changed to successors in this function.
+      for (auto succ : x->succs) {
+        std::set<BasicBlock*> temp;
+        std::set_intersection(succ->postdoms.begin(), succ->postdoms.end(), result.begin(), result.end(),
+          std::inserter(temp, temp.end()));
+        result = std::move(temp);
+      }
+
+      result.insert(x);
+      if (x->postdoms != result) {
+        changed = true;
+        x->postdoms = result;
+      }
+    }
+  } while (changed);
+
+  for (auto bb : bbs) {
+    // Start block has no idom
+    if (bb == end)
+      continue;
+    
+    const auto &postdoms = bb->postdoms;
+    for (auto candidate : postdoms) {
+      if (candidate == bb)
+        continue;
+
+      bool isIdom = true;
+      for (auto other : postdoms) {
+        if (other == bb || other == candidate)
+          continue;
+        if (other->postdoms.count(candidate)) { 
+          // `candidate` dominates another block, so not immediate
+          isIdom = false;
+          break;
+        }
+      }
+      if (isIdom) {
+        bb->ipdom = candidate;
+        break;
+      }
+    }
+    // Only blocks without successors can have no idom.
+    // We must remove those blocks before calling `updateDoms`.
+    assert(bb->ipdom);
+  }
+
+  // Update dominance frontier.
+  for (auto bb : bbs)
+    bb->postdomFront.clear();
+
+  // See https://en.wikipedia.org/wiki/Static_single-assignment_form#Computing_minimal_SSA_using_dominance_frontiers
+  // For each block, if it has at least 2 preds, then it must be at dominance frontier of all its `preds`,
+  // till its `idom`.
+  for (auto bb : bbs) {
+    if (bb->succs.size() < 2)
+      continue;
+
+    for (auto succ : bb->succs) {
+      auto runner = succ;
+      while (runner != bb->ipdom) {
+        runner->postdomFront.insert(bb);
+        runner = runner->ipdom;
       }
     }
   }

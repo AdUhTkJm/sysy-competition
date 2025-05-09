@@ -58,6 +58,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DAE>();
   pm.addPass<sys::DSE>();
   pm.addPass<sys::DLE>();
+  pm.addPass<sys::Range>();
   pm.addPass<sys::LateConstFold>();
   pm.addPass<sys::StrengthReduct>();
   pm.addPass<sys::DCE>();

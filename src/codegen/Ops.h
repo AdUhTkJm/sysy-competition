@@ -99,6 +99,7 @@ OP(MuluhOp);
 OP(SetNotZeroOp);
 OP(BreakOp);
 OP(ContinueOp);
+OP(IdOp); // Used for building extended SSA.
 
 }
 

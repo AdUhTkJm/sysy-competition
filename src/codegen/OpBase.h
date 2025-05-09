@@ -65,8 +65,10 @@ public:
 
   // Updates `preds` for every basic block inside this region. 
   void updatePreds();
-  // Updates `dominators` for every basic block inside this region.
+  // Updates dominators for every basic block inside this region.
   void updateDoms();
+  // Updates postdominators for every basic block inside this region.
+  void updatePDoms();
   // Updates `liveIn` and `liveOut` for every basic block inside this region.
   void updateLiveness();
 
@@ -91,6 +93,11 @@ class BasicBlock {
   // Dominance frontiers. `this` dominatES all blocks which are preds of the elements.
   std::set<BasicBlock*> domFront;
   BasicBlock *idom = nullptr;
+  // Similarly, post dominators.
+  std::set<BasicBlock*> postdoms;
+  std::set<BasicBlock*> postdomFront;
+  // Immediate post dominator.
+  BasicBlock *ipdom = nullptr;
   // Variable (results of the ops) alive at the beginning of this block.
   std::set<Op*> liveIn;
   // Variable (results of the ops) alive at the end of this block.
@@ -117,6 +124,8 @@ public:
   const auto &getSuccs() { return succs; }
   const auto &getDoms() { return doms; }
   const auto &getDominanceFrontier() { return domFront; }
+  const auto &getPDoms() { return postdoms; }
+  const auto &getPDomFrontier() { return postdomFront; }
   const auto &getLiveIn() { return liveIn; }
   const auto &getLiveOut() { return liveOut; }
   const auto &getReachables() { return reachables; }
@@ -124,11 +133,14 @@ public:
   std::vector<Op*> getPhis();
   
   BasicBlock *getIdom() { return idom; }
+  BasicBlock *getIPdom() { return ipdom; }
   BasicBlock *nextBlock();
 
   bool reachable(BasicBlock *bb) { return reachables.count(bb); }
   bool dominatedBy(BasicBlock *bb) { return doms.count(bb); }
   bool dominates(BasicBlock *bb) { return bb->doms.count(this); }
+  bool postDominatedBy(BasicBlock *bb) { return postdoms.count(bb); }
+  bool postDominates(BasicBlock *bb) { return bb->postdoms.count(this); }
 
   // Inserts before `at`.
   void insert(iterator at, Op *op);

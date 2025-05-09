@@ -122,19 +122,11 @@ std::string RangeAttr::toString() {
   auto [low, high] = range;
   if (low == INT_MIN && high == INT_MAX)
     return "<range = all>";
+  if (low == high)
+    return "<range = " + std::to_string(low) + ">";
 
   std::stringstream ss;
-  ss << "<range = ";
-  if (low == INT_MIN)
-    ss << "(-inf, ";
-  else
-    ss << "[" << low << ", ";
-
-  if (high == INT_MAX)
-    ss << "inf)";
-  else
-    ss << high << "]";
-
+  ss << "<range = " << "[" << low << ", " << high << "]";
   ss << '>';
   return ss.str();
 }
