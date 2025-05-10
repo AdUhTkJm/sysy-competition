@@ -68,7 +68,7 @@ static Rule rules[] = {
   "(change (eq (sub x 'a) 'b) (eq x (!add 'b 'a)))",
   "(change (eq (mul x 'a) 'b) (!only-if (!eq 0 (!mod 'b 'a)) (eq x (!div 'b 'a))))",
   "(change (eq (mul x 'a) 'b) (!only-if (!ne 0 (!mod 'b 'a)) 0))",
-  "(change (eq (div x 'a) 'b) (!only-if (!gt 'a 0) (and (lt x (!mul (!add 'b 1) 'a)) (gt x (!mul 'b 'a)))))",
+  "(change (eq (div x 'a) 'b) (!only-if (!gt 'a 0) (and (lt x (!mul (!add 'b 1) 'a)) (ge x (!mul 'b 'a)))))",
   "(change (eq (mod x 'a) 'b) (!only-if (!le 'a 'b) 0))",
 
   // Less than or equal
