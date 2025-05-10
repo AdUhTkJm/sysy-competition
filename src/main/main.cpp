@@ -60,6 +60,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::GVN>();
   pm.addPass<sys::RegularFold>();
   pm.addPass<sys::DCE>();
+  pm.addPass<sys::SimplifyCFG>();
   pm.addPass<sys::Alias>();
   pm.addPass<sys::DAE>();
   pm.addPass<sys::DSE>();

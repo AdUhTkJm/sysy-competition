@@ -81,6 +81,7 @@ public:
   Region(Op *parent): parent(parent) {}
 };
 
+class SimplifyCFG;
 class BasicBlock {
   std::list<Op*> ops;
   Region *parent;
@@ -105,6 +106,7 @@ class BasicBlock {
 
   friend class Region;
   friend class Op;
+  friend class SimplifyCFG;
 public:
   using iterator = decltype(ops)::iterator;
 

@@ -93,6 +93,17 @@ public:
   void run();
 };
 
+class SimplifyCFG : public Pass {
+  int inlined = 0;
+
+  void runImpl(Region *region);
+public:
+  SimplifyCFG(ModuleOp *module): Pass(module) {}
+
+  std::string name() { return "simplify-cfg"; };
+  std::map<std::string, int> stats();
+  void run();
+};
 
 }
 
