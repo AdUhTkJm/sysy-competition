@@ -18,26 +18,6 @@ public:
   void run();
 };
 
-// Moves all alloca to the beginning.
-class MoveAlloca : public Pass {
-public:
-  MoveAlloca(ModuleOp *module): Pass(module) {}
-    
-  std::string name() { return "move-alloca"; };
-  std::map<std::string, int> stats() { return {}; };
-  void run();
-};
-
-// Adds an implicit return if that's not present.
-class ImplicitReturn : public Pass {
-public:
-  ImplicitReturn(ModuleOp *module): Pass(module) {}
-    
-  std::string name() { return "implicit-return"; };
-  std::map<std::string, int> stats() { return {}; };
-  void run();
-};
-
 // Converts alloca's to SSA values.
 // This must run on flattened CFG, otherwise `break` and `continue` are hard to deal with.
 class Mem2Reg : public Pass {
@@ -66,44 +46,6 @@ public:
   Mem2Reg(ModuleOp *module): Pass(module) {}
     
   std::string name() { return "mem2reg"; };
-  std::map<std::string, int> stats();
-  void run();
-};
-
-// Analysis pass.
-// Detects whether a function is pure. If it isn't, give it an ImpureAttr.
-class Pureness : public Pass {
-  // Maps a function to all functions that it might call.
-  std::map<FuncOp*, std::set<FuncOp*>> callGraph;
-
-  void predetermineImpure(FuncOp *func);
-public:
-  Pureness(ModuleOp *module): Pass(module) {}
-    
-  std::string name() { return "pureness-analysis"; };
-  std::map<std::string, int> stats() { return {}; }
-  void run();
-};
-
-// Dead code elimination. Deals with functions, basic blocks and variables.
-class DCE : public Pass {
-  std::vector<Op*> removeable;
-  int elimOp = 0;
-  int elimFn = 0;
-  int elimBB = 0;
-  bool elimBlocks;
-
-  bool isImpure(Op *op);
-  bool markImpure(Region *region);
-  void runOnRegion(Region *region);
-
-  std::map<std::string, FuncOp*> fnMap;
-public:
-  // If DCE is called before flatten cfg, then it shouldn't eliminate blocks,
-  // since the blocks aren't actually well-formed.
-  DCE(ModuleOp *module, bool elimBlocks = true): Pass(module), elimBlocks(elimBlocks) {}
-    
-  std::string name() { return "dce"; };
   std::map<std::string, int> stats();
   void run();
 };
@@ -172,16 +114,6 @@ public:
   void runImpl(Region *region);
 };
 
-// Puts CallerAttr to each function.
-class CallGraph : public Pass {
-public:
-  CallGraph(ModuleOp *module): Pass(module) {}
-    
-  std::string name() { return "call-graph"; };
-  std::map<std::string, int> stats() { return {}; }
-  void run();
-};
-
 class Inline : public Pass {
   int inlined = 0;
 
@@ -209,39 +141,6 @@ public:
   void run();
 };
 
-// Rewrites WhileOp into ForOp, if possible.
-class RecognizeFor : public Pass {
-  void runImpl(Region *region);
-public:
-  RecognizeFor(ModuleOp *module): Pass(module) {}
-    
-  std::string name() { return "for-recognition"; };
-  std::map<std::string, int> stats() { return {}; }
-  void run();
-};
-
-// Mark functions that are called at most once.
-class AtMostOnce : public Pass {
-public:
-  AtMostOnce(ModuleOp *module): Pass(module) {}
-    
-  std::string name() { return "at-most-once"; };
-  std::map<std::string, int> stats() { return {}; }
-  void run();
-};
-
-// Gives an AliasAttr to values, if they are addresses.
-class Alias : public Pass {
-  std::map<std::string, GlobalOp*> gMap;
-  void runImpl(Region *region);
-public:
-  Alias(ModuleOp *module): Pass(module) {}
-
-  std::string name() { return "alias"; };
-  std::map<std::string, int> stats() { return {}; }
-  void run();
-};
-
 // Localizes global variables.
 class Localize : public Pass {
   bool beforeFlatten;
@@ -262,22 +161,6 @@ public:
     
   std::string name() { return "globalize"; };
   std::map<std::string, int> stats() { return {}; }
-  void run();
-};
-
-// Dead store elimination.
-class DSE : public Pass {
-  std::map<Op*, bool> used;
-
-  int elim = 0;
-
-  void dfs(BasicBlock *current, DomTree &dom, std::set<Op*> live);
-  void runImpl(Region *region);
-public:
-  DSE(ModuleOp *module): Pass(module) {}
-
-  std::string name() { return "dse"; };
-  std::map<std::string, int> stats();
   void run();
 };
 
@@ -308,48 +191,6 @@ public:
 
   std::string name() { return "gcm"; };
   std::map<std::string, int> stats() { return {}; }
-  void run();
-};
-
-// Integer range analysis.
-class Range : public Pass {
-  // The set of all loop headers in a function.
-  // We should apply widening at these blocks, otherwise it would take forever to converge.
-  std::set<BasicBlock*> headers;
-
-  void runImpl(Region *region, const LoopForest &forest);
-public:
-  Range(ModuleOp *module): Pass(module) {}
-
-  std::string name() { return "range"; }
-  std::map<std::string, int> stats() { return {}; }
-  void run();
-};
-
-// Dead (actually, redundant) load elimination.
-class DLE : public Pass {
-  int elim = 0;
-
-  void runImpl(Region *region);
-public:
-  DLE(ModuleOp *module): Pass(module) {}
-
-  std::string name() { return "dle"; }
-  std::map<std::string, int> stats();
-  void run();
-};
-
-// Dead argument elimination.
-class DAE : public Pass {
-  int elim = 0;
-  int elimRet = 0;
-
-  void runImpl(Region *region);
-public:
-  DAE(ModuleOp *module): Pass(module) {}
-
-  std::string name() { return "dae"; }
-  std::map<std::string, int> stats();
   void run();
 };
 

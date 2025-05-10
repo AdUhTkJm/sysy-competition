@@ -8,6 +8,7 @@ std::map<std::string, int> LoopUnroll::stats() {
   };
 }
 
+// TODO: Still buggy. Try unroll = 3.
 void LoopUnroll::runImpl(LoopInfo *loop) {
   if (!loop->getInduction())
     return;
@@ -48,14 +49,19 @@ void LoopUnroll::runImpl(LoopInfo *loop) {
     loopsize += bb->getOps().size();
   int unroll = 2; //loopsize > 500 ? 2 : loopsize > 200 ? 4 : 8;
 
+  // Whether the loop is flattened completely, into serial execution.
+  bool complete = false;
+
   auto lower = loop->getStart();
   auto upper = loop->getStop();
   // Fully unroll constant-bounded loops if it's small enough.
   if (lower && upper && isa<IntOp>(lower) && isa<IntOp>(upper)) {
     int low = V(lower);
     int high = V(upper);
-    if (high - low <= 32)
+    if (high - low <= 32) {
       unroll = high - low;
+      complete = true;
+    }
   }
   
   // Replicate every block.
@@ -75,7 +81,7 @@ void LoopUnroll::runImpl(LoopInfo *loop) {
     }
   }
 
-  std::map<Op*, Op*> cloneMap, revcloneMap;
+  std::map<Op*, Op*> cloneMap, revcloneMap, prevLatch;
   std::map<BasicBlock*, BasicBlock*> rewireMap;
   Builder builder;
   BasicBlock *lastLatch = latch;
@@ -149,15 +155,25 @@ void LoopUnroll::runImpl(LoopInfo *loop) {
     // Replace phis at header.
     // All phis come from either the preheader or the latch.
     // Now the "preheader" is the previous latch. 
-    // The value wouldn't come from the latch because it's no longer jumpable to here.
+    // The value wouldn't come from the latch because it's no longer a predecessor.
     auto phis = rewireMap[header]->getPhis();
     for (auto copiedphi : phis) {
       auto origphi = revcloneMap[copiedphi];
       // We should use the updated version of the variable.
-      // That is, the non-cloned version of the value from latch.
-      // origphi->dump(std::cerr);
-      assert(cloneMap.count(phiMap[origphi]));
-      copiedphi->replaceAllUsesWith(phiMap[origphi]);
+      // This means the operand from latch in the original phi (phiMap[origphi]).
+      auto latchvalue = phiMap[origphi];
+
+      // For the block succeeding the original loop body, `prevLatch` is empty.
+      // Just use the latch value.
+      if (!prevLatch.count(latchvalue)) {
+        copiedphi->replaceAllUsesWith(latchvalue);
+        copiedphi->erase();
+        continue;
+      }
+
+      // Otherwise, use `prevLatch` (which is actually the cloneMap of the previous iteration)
+      // to find the inherited value.
+      copiedphi->replaceAllUsesWith(prevLatch[latchvalue]);
       copiedphi->erase();
     }
 
@@ -179,20 +195,36 @@ void LoopUnroll::runImpl(LoopInfo *loop) {
       k->pushOperand(operand);
       k->add<FromAttr>(curLatch);
     }
+
+    prevLatch = cloneMap;
   }
 
   // Rewire the old latch now. It should go to `latchRewire`.
   auto term = latch->getLastOp();
   if (TARGET(term) == header)
-    TARGET(term) = rewireMap[header];
+    TARGET(term) = latchRewire;
   if (ELSE(term) == header)
-    ELSE(term) = rewireMap[header];
+    ELSE(term) = latchRewire;
 
   // Phis at the header should also now point to the new latch.
   phis = header->getPhis();
   for (auto phi : phis) {
     const auto &ops = phi->getOperands();
     const auto &attrs = phi->getAttrs();
+
+    if (complete) {
+      // If this is a complete flattening, then the phi would only come from preheader.
+      for (int i = 0; i < ops.size(); i++) {
+        if (FROM(attrs[i]) != preheader)
+          continue;
+
+        phi->replaceAllUsesWith(ops[i].defining);
+        phi->erase();
+        break;
+      }
+      continue;
+    }
+
     for (int i = 0; i < ops.size(); i++) {
       if (FROM(attrs[i]) != latch)
         continue;

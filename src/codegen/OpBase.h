@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <iterator>
 #include <list>
-#include <ostream>
+#include <iostream>
 #include <set>
 #include <string>
 #include <vector>
@@ -239,7 +239,7 @@ public:
   void erase();
   void replaceAllUsesWith(Op *other);
 
-  void dump(std::ostream&, int depth = 0);
+  void dump(std::ostream& = std::cerr, int depth = 0);
   
   void moveBefore(Op *op);
   void moveAfter(Op *op);
@@ -312,6 +312,10 @@ public:
   }
 };
 
+inline std::ostream &operator<<(std::ostream &os, Op *op) {
+  op->dump(os);
+  return os;
+}
 
 template<class T, int OpID>
 class OpImpl : public Op {

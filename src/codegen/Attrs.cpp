@@ -83,7 +83,7 @@ std::string CallerAttr::toString() {
 }
 
 // Implemented in OpBase.cpp.
-std::ostream &operator<<(std::ostream&, Value);
+std::string getValueNumber(Value value);
 
 std::string AliasAttr::toString() {
   std::stringstream ss;
@@ -99,7 +99,7 @@ std::string AliasAttr::toString() {
     if (isa<GlobalOp>(base))
       ss << "global " << NAME(base);
     else
-      ss << "alloca " << base->getResult();
+      ss << "alloca " << getValueNumber(base->getResult());
     
     assert(offset.size() > 0);
     ss << ": " << offset[0];

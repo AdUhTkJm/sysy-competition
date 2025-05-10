@@ -415,7 +415,7 @@ bool Rule::match(Op *op, const std::map<std::string, Op*> &external) {
 Op *Rule::extract(const std::string &name) {
   if (!binding.count(name)) {
     std::cerr << "querying unknown name: " << name << "\n";
-    dump(std::cerr);
+    dump();
     assert(false);
   }
   return binding[name];

@@ -1,4 +1,4 @@
-#include "Passes.h"
+#include "CleanupPasses.h"
 
 using namespace sys;
 
@@ -31,7 +31,7 @@ void DLE::runImpl(Region *region) {
       }
       
       // This call might invalidate all living stores.
-      // We can have more granularity but I don't wanat to do it now.
+      // We can have more granularity but I don't want to do it now.
       if (isa<CallOp>(op) && op->has<ImpureAttr>()) {
         liveStore.clear();
         continue;

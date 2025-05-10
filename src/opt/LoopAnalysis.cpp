@@ -115,6 +115,7 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
   // Try to find the induction variable.
   Rule addi("(add x 'a)");
   Rule br("(br (lt x y))");
+  Rule brRotated("(br (lt (add x 'a) y))");
   for (auto loop : forest.getLoops()) {
     auto header = loop->getHeader();
     auto phis = header->getPhis();
@@ -163,7 +164,7 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
               if (def == def2) {
                 builder.setBeforeOp(op);
                 auto a = builder.create<IntOp>({ new IntAttr(V(step)) });
-                auto addi = builder.create<AddIOp>({ a, phi });
+                auto addi = builder.create<AddIOp>({ phi, a });
                 op->setOperand(i, addi);
               }
             }
@@ -178,6 +179,16 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
 
           // Try to identify the stop condition by looking at header.
           auto term = header->getLastOp();
+          if (isa<GotoOp>(term)) {
+            // Already rotated. Check latch instead.
+            // brRotated: (br (lt (add x 'a) y))
+            term = latch->getLastOp();
+            if (!brRotated.match(term,  { { "x", loop->induction } }))
+              break;
+
+            loop->stop = brRotated.extract("y");
+            break;
+          }
 
           // br: (br (lt x y))
           if (!br.match(term, { { "x", loop->induction } }))

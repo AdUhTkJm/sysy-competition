@@ -90,17 +90,17 @@ std::map<std::string, int> RegAlloc::stats() {
 #define RS2(op) (op)->get<Rs2Attr>()->reg
 #define IMM(op) (op)->get<IntAttr>()->value
 
-// In OpBase.cpp
-std::ostream &operator<<(std::ostream &os, Value value);
+// Implemented in OpBase.cpp.
+std::string getValueNumber(Value value);
 
 // For debug purposes
 void dumpInterf(Region *region, const std::map<Op*, std::set<Op*>> &interf) {
   region->dump(std::cerr, /*depth=*/1);
   std::cerr << "\n\n===== interference graph =====\n\n";
   for (auto [k, v] : interf) {
-    std::cerr << k->getResult() << ": ";
+    std::cerr << getValueNumber(k->getResult()) << ": ";
     for (auto op : v)
-      std::cerr << op->getResult() << " ";
+      std::cerr << getValueNumber(op->getResult()) << " ";
     std::cerr << "\n";
   }
 }
@@ -109,7 +109,7 @@ void dumpAssignment(Region *region, const std::map<Op*, Reg> &assignment) {
   region->dump(std::cerr, /*depth=*/1);
   std::cerr << "\n\n===== assignment =====\n\n";
   for (auto [k, v] : assignment) {
-    std::cerr << k->getResult() << " = " << showReg(v) << "\n";
+    std::cerr << getValueNumber(k->getResult()) << " = " << showReg(v) << "\n";
   }
 }
 

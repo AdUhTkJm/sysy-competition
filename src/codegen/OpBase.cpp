@@ -228,19 +228,19 @@ void Op::replaceAllUsesWith(Op *other) {
 static std::map<Op*, int> valueName = {};
 static int id = 0;
 
-std::ostream &operator<<(std::ostream &os, Value value) {
+std::string getValueNumber(Value value) {
   if (!valueName.count(value.defining))
     valueName[value.defining] = id++;
-  return os << "%" << valueName[value.defining];
+  return "%" + std::to_string(valueName[value.defining]);
 }
 
 void Op::dump(std::ostream &os, int depth) {
   indent(os, depth * 2);
-  os << getResult() << " = " << opname;
+  os << getValueNumber(getResult()) << " = " << opname;
   if (resultTy == Value::f32)
     os << ".f";
   for (auto &operand : operands)
-    os << " " << operand;
+    os << " " << getValueNumber(operand);
   for (auto attr : attrs)
     os << " " << attr->toString();
   if (regions.size() > 0) {

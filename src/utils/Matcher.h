@@ -58,7 +58,7 @@ public:
   bool match(Op *op, const Binding &external = {});
   Op *extract(const std::string &name);
 
-  void dump(std::ostream &os);
+  void dump(std::ostream &os = std::cerr);
 };
 
 }

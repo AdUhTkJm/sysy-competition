@@ -3,6 +3,8 @@
 #include "../codegen/CodeGen.h"
 #include "../opt/Passes.h"
 #include "../opt/LoopPasses.h"
+#include "../opt/CleanupPasses.h"
+#include "../opt/Analysis.h"
 #include "../arm/ArmPasses.h"
 #include "../rv/RvPasses.h"
 #include "Options.h"
@@ -56,6 +58,8 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::CanonicalizeLoop>(/*lcssa=*/ false);
   pm.addPass<sys::LoopUnroll>();
   pm.addPass<sys::GVN>();
+  pm.addPass<sys::RegularFold>();
+  pm.addPass<sys::DCE>();
   pm.addPass<sys::Alias>();
   pm.addPass<sys::DAE>();
   pm.addPass<sys::DSE>();

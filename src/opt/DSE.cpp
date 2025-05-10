@@ -1,4 +1,5 @@
-#include "Passes.h"
+#include "CleanupPasses.h"
+#include "Analysis.h"
 #include <deque>
 
 using namespace sys;

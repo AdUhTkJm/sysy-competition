@@ -1,5 +1,4 @@
-#include "Passes.h"
-#include "../codegen/Attrs.h"
+#include "Analysis.h"
 
 using namespace sys;
 
