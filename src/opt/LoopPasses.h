@@ -93,8 +93,10 @@ public:
 class CanonicalizeLoop : public Pass {
   void canonicalize(LoopInfo *loop);
   void runImpl(Region *region, LoopForest forest);
+
+  bool lcssa;
 public:
-  CanonicalizeLoop(ModuleOp *module): Pass(module) {}
+  CanonicalizeLoop(ModuleOp *module, bool lcssa): Pass(module), lcssa(lcssa) {}
 
   std::string name() { return "canonicalize-loop"; }
   std::map<std::string, int> stats() { return {}; }

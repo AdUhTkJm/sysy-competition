@@ -171,10 +171,11 @@ void Range::runImpl(Region *region, const LoopForest &forest) {
   // Now we can calculate the post-domination tree.
   region->updatePDoms();
 
-  // Begin converting to extended SSA.
-  // E-SSA is first describe here: https://dl.acm.org/doi/pdf/10.1145/358438.349342
+  // Convert to extended SSA.
+  // E-SSA is first described here: https://dl.acm.org/doi/pdf/10.1145/358438.349342
   // Also refer to the SSA book, Chapter 13.
-  // 
+  //
+  // First we need to find out the variables used for condition.
   
 }
 

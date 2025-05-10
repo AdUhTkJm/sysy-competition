@@ -199,6 +199,9 @@ void CanonicalizeLoop::run() {
     }
   }
 
+  if (!lcssa)
+    return;
+
   loop.run();
   info = loop.getResult();
   // Do LCSSA on each function.

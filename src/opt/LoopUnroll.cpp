@@ -12,11 +12,20 @@ void LoopUnroll::runImpl(LoopInfo *loop) {
   if (!loop->getInduction())
     return;
 
+  if (loop->getExits().size() > 1)
+    return;
+
   auto header = loop->getHeader();
   auto preheader = loop->getPreheader();
   auto latch = loop->getLatch();
+  // The loop is not rotated. Don't unroll it.
+  if (!isa<BranchOp>(latch->getLastOp()))
+    return;
+
   auto phis = header->getPhis();
   // Ensure that every phi at header is either from preheader or from the latch.
+  // Also, finds the value of each phi from latch.
+  std::map<Op*, Op*> phiMap;
   for (auto phi : phis) {
     const auto &ops = phi->getOperands();
     const auto &attrs = phi->getAttrs();
@@ -27,28 +36,172 @@ void LoopUnroll::runImpl(LoopInfo *loop) {
     if (!(bb1 == latch && bb2 == preheader
        || bb2 == latch && bb1 == preheader))
       return;
+
+    if (bb1 == latch)
+      phiMap[phi] = ops[0].defining;
+    if (bb2 == latch)
+      phiMap[phi] = ops[1].defining;
   }
 
-  // If the loop has fixed lower and upper bound,
-  // and it isn't too large (<= 32),
-  // then fully unroll it.
+  int loopsize = 0;
+  for (auto bb : loop->getBlocks())
+    loopsize += bb->getOps().size();
+  int unroll = 2; //loopsize > 500 ? 2 : loopsize > 200 ? 4 : 8;
+
   auto lower = loop->getStart();
   auto upper = loop->getStop();
-  if (!upper)
-    return;
-
-  if (isa<IntOp>(lower) && isa<IntOp>(upper)) {
+  // Fully unroll constant-bounded loops if it's small enough.
+  if (lower && upper && isa<IntOp>(lower) && isa<IntOp>(upper)) {
     int low = V(lower);
     int high = V(upper);
-    if (high - low > 32)
-      return;
-    // Replicate every block.
-    auto bb = loop->getPreheader();
-    auto region = bb->getParent();
+    if (high - low <= 32)
+      unroll = high - low;
+  }
+  
+  // Replicate every block.
+  auto bb = loop->getLatch();
+  auto region = bb->getParent();
+
+  // Record the phi values at the beginning of `exit` that are taken from the latch.
+  auto exit = *loop->getExits().begin();
+  std::map<Op*, Op*> exitlatch;
+  auto exitphis = exit->getPhis();
+  for (auto phi : exitphis) {
+    const auto &ops = phi->getOperands();
+    const auto &attrs = phi->getAttrs();
+    for (int i = 0; i < ops.size(); i++) {
+      if (FROM(attrs[i]) == latch)
+        exitlatch[phi] = ops[i].defining;
+    }
+  }
+
+  std::map<Op*, Op*> cloneMap, revcloneMap;
+  std::map<BasicBlock*, BasicBlock*> rewireMap;
+  Builder builder;
+  BasicBlock *lastLatch = latch;
+  BasicBlock *latchRewire = nullptr;
+
+  // We have already got one copy. So only replicate `unroll - 1` times.
+  while (--unroll) {
+    cloneMap.clear();
+    revcloneMap.clear();
+    rewireMap.clear();
+
+    // First shallow copy everything.
+    std::vector<Op*> created;
+    created.reserve(loopsize);
 
     for (auto block : loop->getBlocks()) {
       bb = region->insertAfter(bb);
+      builder.setToBlockStart(bb);
+      for (auto op : block->getOps()) {
+        auto copied = builder.copy(op);
+        cloneMap[op] = copied;
+        created.push_back(copied);
+        if (isa<PhiOp>(op))
+          revcloneMap[copied] = op;
+      }
+      rewireMap[block] = bb;
+    }
 
+    // Rewire operands.
+    for (auto op : created) {
+      auto operands = op->getOperands();
+      op->removeAllOperands();
+      for (auto operand : operands) {
+        auto def = operand.defining;
+        op->pushOperand(cloneMap.count(def) ? cloneMap[def] : def);
+      }
+    }
+
+    // Rewire blocks.
+    for (auto [k, v] : rewireMap) {
+      auto term = v->getLastOp();
+      if (auto attr = term->find<TargetAttr>(); attr && rewireMap.count(attr->bb))
+        attr->bb = rewireMap[attr->bb];
+      if (auto attr = term->find<ElseAttr>(); attr && rewireMap.count(attr->bb))
+        attr->bb = rewireMap[attr->bb];
+    }
+
+    // The current (unappended) latch of the loop should connect to the new region instead.
+    // We shouldn't change the original latch; otherwise all future copies will break.
+    auto term = lastLatch->getLastOp();
+    auto rewired = rewireMap[header];
+    if (lastLatch != latch) {
+      if (TARGET(term) == header)
+        TARGET(term) = rewired;
+      if (ELSE(term) == header)
+        ELSE(term) = rewired;
+    } else latchRewire = rewired;
+
+    // The new latch now branches to either the rewire header or exit.
+    // Redirect it to the real header.
+    auto curLatch = rewireMap[latch];
+    term = curLatch->getLastOp();
+    if (TARGET(term) == rewired)
+      TARGET(term) = header;
+    if (ELSE(term) == rewired)
+      ELSE(term) = header;
+
+    // Update the current latch.
+    lastLatch = curLatch;
+
+    // Replace phis at header.
+    // All phis come from either the preheader or the latch.
+    // Now the "preheader" is the previous latch. 
+    // The value wouldn't come from the latch because it's no longer jumpable to here.
+    auto phis = rewireMap[header]->getPhis();
+    for (auto copiedphi : phis) {
+      auto origphi = revcloneMap[copiedphi];
+      // We should use the updated version of the variable.
+      // That is, the non-cloned version of the value from latch.
+      // origphi->dump(std::cerr);
+      assert(cloneMap.count(phiMap[origphi]));
+      copiedphi->replaceAllUsesWith(phiMap[origphi]);
+      copiedphi->erase();
+    }
+
+    // All remaining phis should have their blocks renamed.
+    // Note that `revcloneMap` contains all phis.
+    std::set<Op*> erased(phis.begin(), phis.end());
+    for (auto [k, _] : revcloneMap) {
+      if (erased.count(k))
+        continue;
+
+      for (auto attr : k->getAttrs())
+        FROM(attr) = rewireMap[FROM(attr)];
+    }
+
+    // Fix exit phis.
+    // A new predecessor is added to exit, so we need to add another operand.
+    for (auto [k, v] : exitlatch) {
+      auto operand = cloneMap[v];
+      k->pushOperand(operand);
+      k->add<FromAttr>(curLatch);
+    }
+  }
+
+  // Rewire the old latch now. It should go to `latchRewire`.
+  auto term = latch->getLastOp();
+  if (TARGET(term) == header)
+    TARGET(term) = rewireMap[header];
+  if (ELSE(term) == header)
+    ELSE(term) = rewireMap[header];
+
+  // Phis at the header should also now point to the new latch.
+  phis = header->getPhis();
+  for (auto phi : phis) {
+    const auto &ops = phi->getOperands();
+    const auto &attrs = phi->getAttrs();
+    for (int i = 0; i < ops.size(); i++) {
+      if (FROM(attrs[i]) != latch)
+        continue;
+
+      FROM(attrs[i]) = lastLatch;
+      // phiMap[phi] is the latch-value in the original phi.
+      // cloneMap[phiMap[phi]] is the latch-value in the last-copied block.
+      phi->setOperand(i, cloneMap[phiMap[phi]]);
+      break;
     }
   }
 }

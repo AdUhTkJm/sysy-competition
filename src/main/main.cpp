@@ -51,8 +51,10 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::Globalize>();
   pm.addPass<sys::Mem2Reg>();
   pm.addPass<sys::DCE>();
-  pm.addPass<sys::CanonicalizeLoop>();
-  pm.addPass<sys::LoopRotate>();
+  pm.addPass<sys::CanonicalizeLoop>(/*lcssa=*/ true);
+  pm.addPass<sys::LoopRotate>(); // Destroys preheader.
+  pm.addPass<sys::CanonicalizeLoop>(/*lcssa=*/ false);
+  pm.addPass<sys::LoopUnroll>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::Alias>();
   pm.addPass<sys::DAE>();
@@ -64,6 +66,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::GCM>();
+  pm.addPass<sys::Verify>();
   // Note that Mem2Reg can only be executed once. 
   // That's why we need a late inline here.
 

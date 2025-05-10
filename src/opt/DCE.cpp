@@ -141,12 +141,13 @@ void DCE::run() {
           phi->removeAllAttributes();
 
           for (size_t i = 0; i < ops.size(); i++) {
-            if (toRemove.count(ops[i].defining->getParent()))
+            auto from = FROM(attrs[i]);
+            if (toRemove.count(ops[i].defining->getParent()) || toRemove.count(from))
               continue;
 
             // Only preserve the operands that aren't from dead blocks.
             phi->pushOperand(ops[i]);
-            phi->add<FromAttr>(FROM(attrs[i]));
+            phi->add<FromAttr>(from);
           }
         }
       }
