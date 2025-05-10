@@ -100,6 +100,10 @@ void CanonicalizeLoop::canonicalize(LoopInfo *loop) {
         if (loop->contains(parent) || produced.count(use))
           continue;
 
+        // std::cerr << "replacing:\n  ";
+        // op->dump(std::cerr);
+        // std::cerr << "use in bb" << bbmap[parent] << "\n  ";
+        // use->dump(std::cerr);
         auto replace = getValueFor(parent, loop, phiMap);
         use->replaceOperand(op, replace);
       }
@@ -163,10 +167,16 @@ void CanonicalizeLoop::run() {
           // These form a new phi at the preheader.
           if (forwarded.size()) {
             builder.setToBlockEnd(preheader);
-            Op *newPhi = builder.create<PhiOp>();
-            for (auto [def, from] : forwarded) {
-              newPhi->pushOperand(def);
-              newPhi->add<FromAttr>(from);
+            Op *newPhi;
+            if (forwarded.size() > 1) {
+              newPhi = builder.create<PhiOp>();
+              for (auto [def, from] : forwarded) {
+                newPhi->pushOperand(def);
+                newPhi->add<FromAttr>(from);
+              }
+            } else {
+              auto [def, from] = forwarded[0];
+              newPhi = def;
             }
 
             // Remove all forwarded operands, and push a { newPhi, preheader } pair.
