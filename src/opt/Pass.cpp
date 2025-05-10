@@ -1,4 +1,5 @@
 #include "Pass.h"
+#include "Passes.h"
 #include "../codegen/Attrs.h"
 
 #include <iostream>
@@ -99,9 +100,16 @@ void PassManager::setPrintAfter(const std::string &printAfter) {
   this->printAfter = printAfter;
 }
 
+void PassManager::setVerify(bool verify) {
+  this->verify = verify;
+}
+
 void PassManager::run() {
   for (auto pass : passes) {
     pass->run();
+
+    if (verify)
+      Verify(module).run();
 
     if (verbose || pass->name() == printAfter) {
       std::cerr << "===== After " << pass->name() << " =====\n\n";

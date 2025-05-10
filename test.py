@@ -14,6 +14,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-g", "--gdb", action="store_true")
 parser.add_argument("-V", "--valgrind", action="store_true")
 parser.add_argument("-v", "--verbose", action="store_true")
+parser.add_argument("--verify", action="store_true")
 parser.add_argument("-s", "--stats", action="store_true")
 parser.add_argument("-r", "--dump-mid-ir", action="store_true")
 parser.add_argument("--arm", action="store_true")
@@ -232,6 +233,9 @@ def run(full_file: str, no_exec: bool):
   
   if args.stats:
     command.append("--stats")
+
+  if args.verify:
+    command.append("--verify")
 
   if args.print_after:
     command.extend(["--print-after", args.print_after])

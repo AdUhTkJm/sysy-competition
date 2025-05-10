@@ -128,12 +128,13 @@ void removePhiOperand(Op *phi, BasicBlock *from) {
   phi->removeAllAttributes();
 
   for (size_t i = 0; i < ops.size(); i++) {
-    if (ops[i].defining->getParent() == from)
+    auto pred = FROM(attrs[i]);
+    if (from == pred)
       continue;
 
     // Only preserve the operands that aren't from dead blocks.
     phi->pushOperand(ops[i]);
-    phi->add<FromAttr>(FROM(attrs[i]));
+    phi->add<FromAttr>(pred);
   }
 }
 

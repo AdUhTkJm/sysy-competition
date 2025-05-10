@@ -99,9 +99,8 @@ void Mem2Reg::fillPhi(BasicBlock *bb, BasicBlock *last) {
     // So this PhiOp should have that value as operand as well.
     auto value = symbols[alloca];
     // Found the same op. Alright to skip it.
-    if (value.defining == op) {
+    if (value.defining == op)
       continue;
-    }
 
     op->pushOperand(value);
     assert(last);
@@ -188,13 +187,25 @@ void Mem2Reg::run() {
   for (auto func : funcs)
     runImpl(func);
 
-  // Discard trivial phis.
   runRewriter([&](PhiOp *op) {
+    // Discard trivial phis.
     if (op->getOperands().size() == 1) {
       auto def = op->getOperand().defining;
       op->replaceAllUsesWith(def);
       op->erase();
       return true;
+    }
+
+    // In case a phi references itself, we remove that operand.
+    // (Why would this even happen?)
+    const auto &ops = op->getOperands();
+    const auto &attrs = op->getAttrs();
+    for (size_t i = 0; i < ops.size(); i++) {
+      if (ops[i].defining == op) {
+        op->removeOperand(i);
+        op->removeAttribute(i);
+        return true;
+      }
     }
     return false;
   });

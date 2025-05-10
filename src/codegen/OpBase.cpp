@@ -140,6 +140,13 @@ void Op::removeAllAttributes() {
   attrs.clear();
 }
 
+void Op::removeAttribute(int i) {
+  auto attr = attrs[i];
+  if (!--attr->refcnt)
+    delete attr;
+  attrs.erase(attrs.begin() + i);  
+}
+
 void Op::removeRegion(Region *region) {
   for (auto it = regions.begin(); it != regions.end(); it++) {
     if (*it == region) {
@@ -154,6 +161,12 @@ void Op::setOperand(int i, Value v) {
   operands[i] = v;
   def->uses.erase(this);
   v.defining->uses.insert(this);
+}
+
+void Op::removeOperand(int i) {
+  auto def = operands[i].defining;
+  def->uses.erase(this);
+  operands.erase(operands.begin() + i);
 }
 
 void Op::replaceOperand(Op *before, Value v) {

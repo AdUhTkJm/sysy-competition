@@ -17,6 +17,7 @@ struct Options {
     option rv : 1;
     option verbose : 1;
     option stats : 1;
+    option verify : 1;
   };
 
   std::string inputFile;

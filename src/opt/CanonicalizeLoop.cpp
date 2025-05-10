@@ -131,7 +131,7 @@ void CanonicalizeLoop::run() {
 
     for (auto loop : forest.getLoops()) {
       auto header = loop->getHeader();
-      if (!loop->getPreheader()) {
+      if (true || !loop->getPreheader()) {
         const auto &preds = header->getPreds();
         auto region = header->getParent();
         auto preheader = region->insert(header);

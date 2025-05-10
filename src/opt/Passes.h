@@ -379,6 +379,15 @@ public:
   void run();
 };
 
+class Verify : public Pass {
+public:
+  Verify(ModuleOp *module): Pass(module) {}
+    
+  std::string name() { return "verify"; };
+  std::map<std::string, int> stats() { return {}; }
+  void run();
+};
+
 }
 
 #endif

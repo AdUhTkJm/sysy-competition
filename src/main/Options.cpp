@@ -19,6 +19,7 @@ Options::Options() {
   rv = false;
   verbose = false;
   stats = false;
+  verify = false;
 }
 
 Options sys::parseArgs(int argc, char **argv) {
@@ -45,6 +46,7 @@ Options sys::parseArgs(int argc, char **argv) {
     PARSEOPT("-S", noLink);
     PARSEOPT("-v", verbose);
     PARSEOPT("--stats", stats);
+    PARSEOPT("--verify", verify);
 
     if (opts.inputFile != "") {
       std::cerr << "error: multiple inputs\n";

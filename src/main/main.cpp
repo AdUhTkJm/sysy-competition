@@ -52,13 +52,13 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::Mem2Reg>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::CanonicalizeLoop>();
-  // pm.addPass<sys::LoopRotate>();
+  pm.addPass<sys::LoopRotate>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::Alias>();
   pm.addPass<sys::DAE>();
   pm.addPass<sys::DSE>();
   pm.addPass<sys::DLE>();
-  pm.addPass<sys::Range>();
+  // pm.addPass<sys::Range>();
   pm.addPass<sys::LateConstFold>();
   pm.addPass<sys::StrengthReduct>();
   pm.addPass<sys::DCE>();
@@ -103,6 +103,7 @@ int main(int argc, char **argv) {
   pm.setVerbose(opts.verbose);
   pm.setPrintStats(opts.stats);
   pm.setPrintAfter(opts.printAfter);
+  pm.setVerify(opts.verify);
   
   initPipeline(pm);
   pm.run();
