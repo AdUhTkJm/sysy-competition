@@ -170,4 +170,27 @@ void GVN::run() {
   auto funcs = collectFuncs();
   for (auto func : funcs)
     runImpl(func->getRegion());
+
+  // Tidy up remaining phis after gvn.
+  runRewriter([&](PhiOp *op) {
+    // Discard trivial phis.
+    if (op->getOperands().size() == 1) {
+      auto def = op->getOperand().defining;
+      op->replaceAllUsesWith(def);
+      op->erase();
+      return true;
+    }
+
+    // In case a phi references itself, we remove that operand.
+    const auto &ops = op->getOperands();
+    const auto &attrs = op->getAttrs();
+    for (size_t i = 0; i < ops.size(); i++) {
+      if (ops[i].defining == op) {
+        op->removeOperand(i);
+        op->removeAttribute(i);
+        return true;
+      }
+    }
+    return false;
+  });
 }

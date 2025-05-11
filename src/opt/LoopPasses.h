@@ -75,13 +75,14 @@ public:
 class LoopAnalysis : public Pass {
   std::map<FuncOp*, LoopForest> info;
 
-  LoopForest runImpl(Region *region);
 public:
   LoopAnalysis(ModuleOp *module): Pass(module) {}
 
   std::string name() { return "loop-analysis"; }
   std::map<std::string, int> stats() { return {}; }
+  LoopForest runImpl(Region *region);
   void run();
+  void reset() { info = {}; }
 
   auto getResult() { return info; }
 };
@@ -118,7 +119,8 @@ public:
 class LoopUnroll : public Pass {
   int unrolled = 0;
 
-  void runImpl(LoopInfo *info);
+  // Returns true if changed.
+  bool runImpl(LoopInfo *info);
 public:
   LoopUnroll(ModuleOp *module): Pass(module) {}
 

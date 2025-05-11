@@ -9,19 +9,19 @@ std::map<std::string, int> LoopUnroll::stats() {
 }
 
 // TODO: Still buggy. Try unroll = 3.
-void LoopUnroll::runImpl(LoopInfo *loop) {
+bool LoopUnroll::runImpl(LoopInfo *loop) {
   if (!loop->getInduction())
-    return;
+    return false;
 
   if (loop->getExits().size() > 1)
-    return;
+    return false;
 
   auto header = loop->getHeader();
   auto preheader = loop->getPreheader();
   auto latch = loop->getLatch();
   // The loop is not rotated. Don't unroll it.
   if (!isa<BranchOp>(latch->getLastOp()))
-    return;
+    return false;
 
   auto phis = header->getPhis();
   // Ensure that every phi at header is either from preheader or from the latch.
@@ -31,12 +31,12 @@ void LoopUnroll::runImpl(LoopInfo *loop) {
     const auto &ops = phi->getOperands();
     const auto &attrs = phi->getAttrs();
     if (ops.size() != 2)
-      return;
+      return false;
     auto bb1 = cast<FromAttr>(attrs[0])->bb;
     auto bb2 = cast<FromAttr>(attrs[1])->bb;
     if (!(bb1 == latch && bb2 == preheader
        || bb2 == latch && bb1 == preheader))
-      return;
+      return false;
 
     if (bb1 == latch)
       phiMap[phi] = ops[0].defining;
@@ -236,16 +236,29 @@ void LoopUnroll::runImpl(LoopInfo *loop) {
       break;
     }
   }
+
+  unrolled++;
+  return true;
 }
 
 void LoopUnroll::run() {
   LoopAnalysis analysis(module);
-  analysis.run();
-  const auto &forests = analysis.getResult();
 
   auto funcs = collectFuncs();
   for (auto func : funcs) {
-    for (auto loop : forests.at(func).getLoops())
-      runImpl(loop);
+    auto region = func->getRegion();
+    auto forest = analysis.runImpl(region);
+
+    bool changed;
+    do {
+      changed = false;
+      for (auto loop : forest.getLoops()) {
+        if (runImpl(loop)) {
+          forest = analysis.runImpl(region);
+          changed = true;
+          break;
+        }
+      }
+    } while (changed);
   }
 }

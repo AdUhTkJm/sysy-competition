@@ -37,6 +37,10 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
       while (!worklist.empty()) {
         auto back = worklist.back();
         worklist.pop_back();
+        // Don't traverse beyond the header.
+        if (back == header)
+          continue;
+        
         for (auto pred : back->getPreds()) {
           if (!info->bbs.count(pred)) {
             info->bbs.insert(pred);

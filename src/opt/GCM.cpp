@@ -96,7 +96,7 @@ void GCM::updateDepth(BasicBlock *bb, int dep) {
   for (auto child : tree[bb])
     updateDepth(child, dep + 1);
 }
-
+// 30 33 37 40 44 47 15 52 2 4 0
 void GCM::updateLoopDepth(LoopInfo *info, int dep) {
   for (auto bb : info->getBlocks())
     loopDepth[bb] = dep;
