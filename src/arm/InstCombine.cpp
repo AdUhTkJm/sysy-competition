@@ -11,9 +11,17 @@ std::map<std::string, int> InstCombine::stats() {
 }
 
 static ArmRule rules[] = {
+  // Add
   "(change (addw x (mov #a)) (!only-if (!inbit 12 #a) (addwi x #a)))",
   "(change (addx x (mov #a)) (!only-if (!inbit 12 #a) (addxi x #a)))",
-  "(change (cbz (csetlt x) >bb ?bb2) (blt x >bb ?bb2))",
+
+  // CBZ
+  "(change (cbz (csetlt x) >ifso >ifnot) (blt x >ifso >ifnot))",
+  "(change (cbz (csetne x) >ifso >ifnot) (bne x >ifso >ifnot))",
+  "(change (cbz (cseteq x) >ifso >ifnot) (beq x >ifso >ifnot))",
+
+  // Meaning: jump to `ifso` if x == 0.
+  "(change (beq (tst x x) >ifso >ifnot) (cbz x >ifso >ifnot))",
 };
 
 void InstCombine::run() {

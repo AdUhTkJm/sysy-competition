@@ -67,7 +67,7 @@ ARMOPL(AddXIOp); // Accept immediate
 ARMOP(SubWOp);
 ARMOP(RsbWOp); // Reverse subtract
 ARMOP(SubWIOp); // Accept immediate
-ARMOP(SubSWOp); // Sub and set flag
+ARMOP(SubSWOp); // Sub and set flag; Note that only S-suffixed ops will set flag.
 
 ARMOP(MulWOp);
 ARMOPL(MulXOp);
@@ -125,8 +125,8 @@ ARMOP(TstOp); // Same applies to `tst`
 // ====== CSET family ======
 // Read CPSR flags into a register. Each flag is a different op.
 // It takes the result of CmpOp.
-ARMOP(CsetNeOp);
-ARMOP(CsetEqOp);
+ARMOP(CsetNeOp); // Z == 0
+ARMOP(CsetEqOp); // Z == 1
 ARMOP(CsetLtOp);
 ARMOP(CsetLeOp);
 ARMOP(CsetGtOp);
@@ -140,6 +140,7 @@ ARMOP(BleOp);
 ARMOP(BeqOp);
 ARMOP(BneOp);
 ARMOP(BltOp);
+ARMOP(BgeOp);
 ARMOP(BmiOp); // Branch if minus (< 0)
 ARMOP(BplOp); // Branch if plus (> 0)
 ARMOP(CbzOp); // Compact branch if zero

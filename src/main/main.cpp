@@ -18,6 +18,7 @@ void initArmPipeline(sys::PassManager &pm) {
 
   pm.addPass<Lower>();
   pm.addPass<InstCombine>();
+  pm.addPass<ArmDCE>();
 }
 
 void initRvPipeline(sys::PassManager &pm) {
@@ -66,7 +67,6 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DAE>();
   pm.addPass<sys::DSE>();
   pm.addPass<sys::DLE>();
-  // pm.addPass<sys::Range>();
   pm.addPass<sys::LateConstFold>();
   pm.addPass<sys::StrengthReduct>();
   pm.addPass<sys::DCE>();
@@ -75,6 +75,50 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::Verify>();
   // Note that Mem2Reg can only be executed once. 
   // That's why we need a late inline here.
+
+  if (opts.arm)
+    initArmPipeline(pm);
+
+  if (opts.rv)
+    initRvPipeline(pm);
+}
+
+void initLessOptPipeline(sys::PassManager &pm) {
+  pm.addPass<sys::MoveAlloca>();
+  pm.addPass<sys::ImplicitReturn>();
+
+  // ===== Structured control flow =====
+
+  pm.addPass<sys::AtMostOnce>();
+  pm.addPass<sys::Localize>(/*beforeFlattenCFG=*/ true);
+  pm.addPass<sys::EarlyConstFold>();
+  pm.addPass<sys::Pureness>();
+  pm.addPass<sys::DCE>(/*elimBlocks=*/ false);
+
+  // ===== Flattened CFG =====
+
+  pm.addPass<sys::FlattenCFG>();
+  pm.addPass<sys::GVN>();
+  pm.addPass<sys::DCE>();
+  pm.addPass<sys::Inline>(/*inlineThreshold=*/ 200);
+  pm.addPass<sys::DCE>();
+  pm.addPass<sys::Localize>(/*beforeFlattenCFG=*/ false);
+  pm.addPass<sys::Globalize>();
+  pm.addPass<sys::Mem2Reg>();
+  pm.addPass<sys::RegularFold>();
+  pm.addPass<sys::DCE>();
+  pm.addPass<sys::GVN>();
+  pm.addPass<sys::SimplifyCFG>();
+  pm.addPass<sys::Alias>();
+  pm.addPass<sys::DAE>();
+  pm.addPass<sys::DSE>();
+  pm.addPass<sys::DLE>();
+  pm.addPass<sys::LateConstFold>();
+  pm.addPass<sys::StrengthReduct>();
+  pm.addPass<sys::DCE>();
+  pm.addPass<sys::GVN>();
+  pm.addPass<sys::GCM>();
+  pm.addPass<sys::Verify>();
 
   if (opts.arm)
     initArmPipeline(pm);

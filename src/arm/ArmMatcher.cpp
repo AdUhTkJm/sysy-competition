@@ -53,7 +53,7 @@ using namespace sys::arm;
     blockBinding[var] = target; \
     auto ifnot = ELSE(op); \
     var = cast<Atom>(list->elements[3])->value; \
-    assert(var[0] == '?'); \
+    assert(var[0] == '>'); \
     if (blockBinding.count(var)) \
       return blockBinding[var] == ifnot; \
     blockBinding[var] = ifnot; \
@@ -186,24 +186,6 @@ bool ArmRule::matchExprForLower(Expr *expr, Op* op) {
   if (auto* atom = dyn_cast<Atom>(expr)) {
     std::string_view var = atom->value;
 
-    if (var[0] == '>') {
-      // This denotes the target.
-      if (blockBinding.count(var))
-        return blockBinding[var] == TARGET(op);
-
-      blockBinding[var] = TARGET(op);
-      return true;
-    }
-
-    if (var[0] == '?') {
-      // This denotes the "else" branch.
-      if (blockBinding.count(var))
-        return blockBinding[var] == ELSE(op);
-
-      blockBinding[var] = ELSE(op);
-      return true;
-    }
-
     if (var[0] == '*') {
       // This denotes a floating point constant.
       if (std::isdigit(var[0]) || var[0] == '-') {
@@ -311,32 +293,12 @@ bool ArmRule::matchExpr(Expr *expr, Op* op) {
   if (auto* atom = dyn_cast<Atom>(expr)) {
     std::string_view var = atom->value;
 
-    if (var[0] == '>') {
-      // This denotes the target.
-      if (blockBinding.count(var))
-        return blockBinding[var] == TARGET(op);
-
-      blockBinding[var] = TARGET(op);
-      return true;
-    }
-
-    if (var[0] == '?') {
-      // This denotes the "else" branch.
-      if (blockBinding.count(var))
-        return blockBinding[var] == ELSE(op);
-
-      blockBinding[var] = ELSE(op);
-      return true;
-    }
-
     // A normal binding.
-    if (var[0] != '\'' && !(std::isdigit(var[0]) || var[0] == '-')) {
-      if (binding.count(var))
-        return binding[var] == op;
+    if (binding.count(var))
+      return binding[var] == op;
 
-      binding[var] = op;
-      return true;
-    }
+    binding[var] = op;
+    return true;
   }
 
   List *list = dyn_cast<List>(expr);
@@ -525,6 +487,8 @@ Op *ArmRule::buildExpr(Expr *expr) {
   BUILD_UNARY_IMM("ldrf", LdrFOp);
   BUILD_UNARY_IMM("ldrx", LdrXOp);
   BUILD_UNARY_IMM("lsli", LslIOp);
+  BUILD_UNARY_IMM("asrwi", AsrWIOp);
+  BUILD_UNARY_IMM("asrxi", AsrXIOp);
   BUILD_UNARY_IMM("cmpi", CmpIOp);
   BUILD_UNARY_IMM("andi", AndIOp);
   BUILD_UNARY_IMM("ori", OrIOp);

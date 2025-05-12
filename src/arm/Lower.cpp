@@ -30,7 +30,9 @@ static ArmRule rules[] = {
   "(change (le x y) (csetle (cmp x y)))",
   "(change (eq x y) (cseteq (cmp x y)))",
 
-  "(change (br x >bb ?bb2) (cbz x >bb ?bb2))",
+  "(change (not x) (cseteq (tst x x)))",
+
+  "(change (br x >ifso >ifnot) (cbz x >ifso >ifnot))",
 
   "(change 'a (mov 'a))",
 };
