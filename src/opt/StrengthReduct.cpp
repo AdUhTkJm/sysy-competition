@@ -159,7 +159,7 @@ int StrengthReduct::runImpl() {
       return true;
     }
 
-    if (i < 0)
+    if (i <= 0)
       return false;
 
     auto bits = __builtin_popcount(i);
@@ -228,7 +228,7 @@ int StrengthReduct::runImpl() {
 
     int i = V(y.defining);
 
-    if (i < 0)
+    if (i <= 0)
       return false;
 
     //   x % (1 << n)

@@ -47,6 +47,7 @@ static Rule rules[] = {
   "(change (div x -1) (minus x))",
   "(change (div x x) 1)",
   "(change (div 'a 'b) (!div 'a 'b))",
+  "(change (div (mul x 'a) 'b) (!only-if (!eq (!mod 'a 'b) 0) (mul x (!div 'a 'b))))",
 
   // Modulus
   "(change (mod x 1) 0)",

@@ -263,6 +263,10 @@ void LoopUnroll::run() {
     bool changed;
     do {
       changed = false;
+      // Don't unroll too much.
+      if (region->getBlocks().size() > 2500)
+        break;
+
       // We want to unroll small loops first.
       const auto &loops = forest.getLoops();
       std::vector<LoopInfo*> order;

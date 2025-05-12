@@ -134,6 +134,17 @@ void Lower::run() {
     builder.replace<SubOp>(op, { denom, mul });
     return true;
   });
+  
+  runRewriter([&](ModFOp *op) {
+    auto denom = op->getOperand(0);
+    auto nom = op->getOperand(1);
+
+    builder.setBeforeOp(op);
+    auto quot = builder.create<FdivOp>(op->getOperands(), op->getAttrs());
+    auto mul = builder.create<FmulOp>({ quot, nom });
+    builder.replace<FsubOp>(op, { denom, mul });
+    return true;
+  });
 
   runRewriter([&](SetNotZeroOp *op) {
     if (op->getOperand().defining->getResultType() == Value::f32) {

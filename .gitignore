@@ -2,6 +2,7 @@ build
 bin
 test/official
 test/temp
+test/fuzz
 temp
 final_performance
 functional
