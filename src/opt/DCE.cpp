@@ -107,13 +107,28 @@ void DCE::run() {
   
   do {
     changed = false;
+    
     for (auto func : funcs) {
       auto region = func->getRegion();
       region->updatePreds();
       std::set<BasicBlock*> toRemove;
       auto entry = region->getFirstBlock();
+
+      std::set<BasicBlock*> reachable;
+      std::vector<BasicBlock*> queue { entry };
+      while (!queue.empty()) {
+        auto bb = queue.back();
+        queue.pop_back();
+        
+        if (reachable.count(bb))
+          continue;
+        reachable.insert(bb);
+        for (auto succ : bb->getSuccs())
+          queue.push_back(succ);
+      }
+
       for (auto bb : region->getBlocks()) {
-        if (!entry->reachable(bb))
+        if (!reachable.count(bb))
           toRemove.insert(bb);
       }
 

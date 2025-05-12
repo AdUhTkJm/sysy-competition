@@ -105,7 +105,7 @@ void GCM::updateLoopDepth(LoopInfo *info, int dep) {
     updateLoopDepth(subloop, dep + 1);
 }
 
-void postorder(BasicBlock *current, DomTree &tree, std::vector<BasicBlock*> order) {
+static void postorder(BasicBlock *current, DomTree &tree, std::vector<BasicBlock*> order) {
   for (auto child : tree[current])
     postorder(child, tree, order);
   order.push_back(current);

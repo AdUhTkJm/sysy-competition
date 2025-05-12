@@ -63,13 +63,19 @@ public:
   void insertAfter(iterator at, BasicBlock *bb);
   void remove(iterator at);
 
-  // Updates `preds` for every basic block inside this region. 
+  // Updates `preds` and `succs`. 
   void updatePreds();
-  // Updates dominators for every basic block inside this region.
+
+  // Updates dominators. Will also update preds.
   void updateDoms();
-  // Updates postdominators for every basic block inside this region.
+
+  // Updates dominance frontier. Will also update doms.
+  void updateDomFront();
+
+  // Updates postdominators.
   void updatePDoms();
-  // Updates `liveIn` and `liveOut` for every basic block inside this region.
+
+  // Updates `liveIn` and `liveOut`.
   void updateLiveness();
 
   // Moves all blocks in `from` after `insertionPoint`.
@@ -88,7 +94,6 @@ class BasicBlock {
   Region::iterator place;
   std::set<BasicBlock*> preds;
   std::set<BasicBlock*> succs;
-  std::set<BasicBlock*> reachables;
   // Note these are dominatORs, which mean `this` is dominatED by the elements.
   std::set<BasicBlock*> doms;
   // Dominance frontiers. `this` dominatES all blocks which are preds of the elements.
@@ -124,13 +129,11 @@ public:
 
   const auto &getPreds() { return preds; }
   const auto &getSuccs() { return succs; }
-  const auto &getDoms() { return doms; }
   const auto &getDominanceFrontier() { return domFront; }
   const auto &getPDoms() { return postdoms; }
   const auto &getPDomFrontier() { return postdomFront; }
   const auto &getLiveIn() { return liveIn; }
   const auto &getLiveOut() { return liveOut; }
-  const auto &getReachables() { return reachables; }
 
   std::vector<Op*> getPhis();
   
@@ -138,9 +141,8 @@ public:
   BasicBlock *getIPdom() { return ipdom; }
   BasicBlock *nextBlock();
 
-  bool reachable(BasicBlock *bb) { return reachables.count(bb); }
-  bool dominatedBy(BasicBlock *bb) { return doms.count(bb); }
-  bool dominates(BasicBlock *bb) { return bb->doms.count(this); }
+  bool dominatedBy(BasicBlock *bb);
+  bool dominates(BasicBlock *bb) { return bb->dominatedBy(this); }
   bool postDominatedBy(BasicBlock *bb) { return postdoms.count(bb); }
   bool postDominates(BasicBlock *bb) { return bb->postdoms.count(this); }
 

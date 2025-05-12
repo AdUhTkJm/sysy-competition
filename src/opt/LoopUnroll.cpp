@@ -8,7 +8,6 @@ std::map<std::string, int> LoopUnroll::stats() {
   };
 }
 
-// TODO: Still buggy. Try unroll = 3.
 bool LoopUnroll::runImpl(LoopInfo *loop) {
   if (!loop->getInduction())
     return false;
@@ -47,6 +46,12 @@ bool LoopUnroll::runImpl(LoopInfo *loop) {
   int loopsize = 0;
   for (auto bb : loop->getBlocks())
     loopsize += bb->getOps().size();
+
+  // Not every loop can be unrolled, even not all constant-bounded loops.
+  // See 65_color.sy, where we are attempting to unroll a nested loop with a total of 18^5*7 = 13226976 iterations.
+  if (loopsize > 1000)
+    return false;
+
   int unroll = 2; //loopsize > 500 ? 2 : loopsize > 200 ? 4 : 8;
 
   // Whether the loop is flattened completely, into serial execution.
@@ -241,6 +246,12 @@ bool LoopUnroll::runImpl(LoopInfo *loop) {
   return true;
 }
 
+static void postorder(LoopInfo *loop, std::vector<LoopInfo*> &order) {
+  for (auto subloop : loop->getSubloops())
+    order.push_back(subloop);
+  order.push_back(loop);
+}
+
 void LoopUnroll::run() {
   LoopAnalysis analysis(module);
 
@@ -252,8 +263,18 @@ void LoopUnroll::run() {
     bool changed;
     do {
       changed = false;
+      // We want to unroll small loops first.
+      const auto &loops = forest.getLoops();
+      std::vector<LoopInfo*> order;
       for (auto loop : forest.getLoops()) {
+        if (!loop->getParent())
+          postorder(loop, order);
+      }
+
+      for (auto loop : order) {
         if (runImpl(loop)) {
+          // No worries of repeated unrolling;
+          // We require a single exit, and unrolled loops don't have that.
           forest = analysis.runImpl(region);
           changed = true;
           break;

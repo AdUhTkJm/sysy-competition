@@ -14,7 +14,7 @@ std::map<std::string, int> Mem2Reg::stats() {
 
 // See explanation at https://longfangsong.github.io/en/mem2reg-made-simple/
 void Mem2Reg::runImpl(FuncOp *func) {
-  func->getRegion()->updateDoms();
+  func->getRegion()->updateDomFront();
   converted.clear();
   visited.clear();
   symbols.clear();

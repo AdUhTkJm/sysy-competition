@@ -2,13 +2,8 @@
 #include "Attrs.h"
 #include "Ops.h"
 
-#include <algorithm>
-#include <cassert>
 #include <deque>
-#include <iterator>
-#include <map>
-#include <iostream>
-#include <string>
+#include <unordered_map>
 
 using namespace sys;
 
@@ -330,6 +325,14 @@ std::vector<Op*> BasicBlock::getPhis() {
   return phis;
 }
 
+bool BasicBlock::dominatedBy(BasicBlock *bb) {
+  for (auto p = this; p; p = p->idom) {
+    if (p == bb)
+      return true;
+  }
+  return false;
+}
+
 BasicBlock *Region::insert(BasicBlock *at) {
   assert(at->parent == this);
 
@@ -416,7 +419,6 @@ void Region::updatePreds() {
   for (auto bb : bbs) {
     bb->preds.clear();
     bb->succs.clear();
-    bb->reachables.clear();
   }
 
   for (auto bb : bbs) {
@@ -436,102 +438,138 @@ void Region::updatePreds() {
   for (auto bb : bbs) {
     for (auto pred : bb->getPreds())
       pred->succs.insert(bb);
-    bb->reachables.insert(bb);
   }
-
-  bool changed;
-  do {
-    changed = false;
-    for (auto bb : bbs) {
-      auto old = bb->reachables;
-      for (auto x : bb->reachables) {
-        for (auto succ : x->succs) {
-          auto [it, absent] = bb->reachables.insert(succ);
-          changed |= absent;
-        }
-      }
-    }
-  } while (changed);
 }
 
-// Use the simple data-flow approach, rather than the Tarjan one.
-// See https://en.wikipedia.org/wiki/Dominator_(graph_theory)
+namespace {
+
+// DFN is the number of each node in DFS order.
+using DFN = std::unordered_map<BasicBlock*, int>;
+using BBMap = std::unordered_map<BasicBlock*, BasicBlock*>;
+
+using Vertex = std::vector<BasicBlock*>;
+
+// Semidominator of `u` is the node `v` with the smallest DFN,
+// such that `v` dominates `u` on every path not going through its parent in the DFS tree.
+using SDom = BBMap;
+using Parent = BBMap;
+using UnionFind = BBMap;
+// Best ancestor found so far.
+using Best = BBMap;
+
+int num = 0;
+
+DFN dfn;
+SDom sdom;
+Vertex vertex;
+Parent parents;
+UnionFind uf;
+Best best;
+
+void updateDFN(BasicBlock *current) {
+  dfn[current] = num++;
+  vertex.push_back(current);
+  for (auto v : current->getSuccs()) {
+    if (!dfn.count(v)) {
+      parents[v] = current;
+      updateDFN(v);
+    }
+  }
+}
+
+BasicBlock* find(BasicBlock *v) {
+  if (uf[v] != v) {
+    BasicBlock* u = find(uf[v]);
+    if (dfn[sdom[best[uf[v]]]] < dfn[sdom[best[v]]])
+      best[v] = best[uf[v]];
+    uf[v] = u;
+  }
+  return uf[v];
+}
+
+// Links `w` to `v` (setting the father of `w` to `v`).
+void link(BasicBlock *v, BasicBlock *w) {
+  uf[w] = v;
+}
+
+}
+
+// Use the Langauer-Tarjan approach.
+// https://www.cs.princeton.edu/courses/archive/fall03/cs528/handouts/a%20fast%20algorithm%20for%20finding.pdf
+// Loop unrolling might update dominators very frequently, and it's quite time consuming.
 void Region::updateDoms() {
   updatePreds();
   // Clear existing data.
   for (auto bb : bbs) {
     bb->doms.clear();
     bb->idom = nullptr;
-    bb->domFront.clear();
   }
 
-  for (auto x : bbs)
-    std::copy(bbs.begin(), bbs.end(), std::inserter(x->doms, x->doms.end()));
-  
-  auto start = getFirstBlock();
-  start->doms.clear();
-  start->doms.insert(start);
+  // Clear global data as well.
+  dfn.clear();
+  vertex.clear();
+  parents.clear();
+  sdom.clear();
+  uf.clear();
+  best.clear();
 
-  bool changed;
-  do {
-    changed = false;
-    for (auto x : bbs) {
-      if (x == start)
-        continue;
+  // For each `u` as key, it contains all blocks that it semi-dominates.
+  // 'b' for bucket.
+  std::map<BasicBlock*, std::vector<BasicBlock*>> bsdom;
 
-      // Don't forget to set the identity to the full bbs.
-      std::set<BasicBlock*> result;
-      std::copy(bbs.begin(), bbs.end(), std::inserter(result, result.end()));
+  num = 1;
 
-      for (auto pred : x->preds) {
-        std::set<BasicBlock*> temp;
-        std::set_intersection(pred->doms.begin(), pred->doms.end(), result.begin(), result.end(),
-          std::inserter(temp, temp.end()));
-        result = std::move(temp);
-      }
-
-      result.insert(x);
-      if (x->doms != result) {
-        changed = true;
-        x->doms = result;
-      }
-    }
-  } while (changed);
+  auto entry = getFirstBlock();
+  updateDFN(entry);
 
   for (auto bb : bbs) {
-    // Start block has no idom
-    if (bb == start)
-      continue;
-    
-    const auto &doms = bb->doms;
-    for (auto candidate : doms) {
-      if (candidate == bb)
-        continue;
-
-      bool isIdom = true;
-      for (auto other : doms) {
-        if (other == bb || other == candidate)
-          continue;
-        if (other->doms.count(candidate)) { 
-          // `candidate` dominates another block, so not immediate
-          isIdom = false;
-          break;
-        }
-      }
-      if (isIdom) {
-        bb->idom = candidate;
-        break;
-      }
-    }
-    // Only blocks without preds can have no idom.
-    // We must remove those blocks before calling `updateDoms`.
-    assert(bb->idom);
+    sdom[bb] = bb;
+    uf[bb] = bb;
+    best[bb] = bb;
   }
 
-  // Update dominance frontier.
+  // Deal with every block in reverse dfn order.
+  for (auto it = vertex.rbegin(); it != vertex.rend(); it++) {
+    auto bb = *it;
+    for (auto v : bb->preds) {
+      // Unreachable. Skip it.
+      if (!dfn.count(v))
+        continue;
+      BasicBlock *u;
+      if (dfn[v] < dfn[bb])
+        u = v;
+      else {
+        find(v);
+        u = best[v];
+      }
+      if (dfn[sdom[u]] < dfn[sdom[bb]])
+        sdom[bb] = sdom[u];
+    }
+
+    bsdom[sdom[bb]].push_back(bb);
+    link(parents[bb], bb);
+
+    for (auto v : bsdom[parents[bb]]) {
+      find(v);
+      v->idom = sdom[best[v]] == sdom[v] ? parents[bb] : best[v];
+    }
+  }
+
+  // Find idom, but ignore the entry block (which has no idom).
+  for (int i = 1; i < vertex.size(); ++i) {
+    auto bb = vertex[i];
+    assert(bb->idom);
+    if (bb->idom != sdom[bb])
+      bb->idom = bb->idom->idom;
+  }
+}
+
+void Region::updateDomFront() {
+  updateDoms();
   for (auto bb : bbs)
     bb->domFront.clear();
 
+  // Update dominance frontier.
   // See https://en.wikipedia.org/wiki/Static_single-assignment_form#Computing_minimal_SSA_using_dominance_frontiers
   // For each block, if it has at least 2 preds, then it must be at dominance frontier of all its `preds`,
   // till its `idom`.

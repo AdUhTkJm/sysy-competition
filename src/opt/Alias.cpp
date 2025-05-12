@@ -2,7 +2,7 @@
 
 using namespace sys;
 
-void postorder(BasicBlock *current, DomTree &tree, std::vector<BasicBlock*> &order) {
+static void postorder(BasicBlock *current, DomTree &tree, std::vector<BasicBlock*> &order) {
   for (auto bb : tree[current])
     postorder(bb, tree, order);
   order.push_back(current);

@@ -3,7 +3,7 @@
 
 using namespace sys;
 
-void postorder(LoopInfo *loop, std::vector<LoopInfo*> &loops) {
+static void postorder(LoopInfo *loop, std::vector<LoopInfo*> &loops) {
   for (auto subloop : loop->getSubloops())
     loops.push_back(subloop);
   loops.push_back(loop);

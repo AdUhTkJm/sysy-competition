@@ -75,4 +75,36 @@ void SimplifyCFG::run() {
   auto funcs = collectFuncs();
   for (auto func : funcs)
     runImpl(func->getRegion());
+
+  // Simplify the following construction:
+  //   if (x) ...; if (!x) ...
+  // becomes a single if-else.
+  //
+  // In IR, it should be like
+  //
+  // bb1:
+  //   br %1, <bb2>, <exit>
+  // bb2:
+  //   goto <exit>
+  // exit:
+  //   br (not %1), <bb3>, <exit2>
+  // bb3:
+  //   goto <exit2>
+  // exit2:
+  //   ...
+  //
+  // As multiple linear goto's have been combined, there's less risk of missed optimization.
+  // To fold it:
+  //
+  // bb1:
+  //   br %1, <bb2>, <bb3>
+  // bb2:
+  //   goto <exit2>
+  // exit (now dead):
+  //   br (not %1), <bb3>, <exit2>
+  // bb3:
+  //   goto <exit2>
+  // exit2:
+  //   ...
+  // Note that `exit` must only contain a NotOp and a branch.
 }
