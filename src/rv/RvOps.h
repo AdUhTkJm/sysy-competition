@@ -89,7 +89,7 @@ RVOP(RetOp);
 RVOPE(LoadOp);
 RVOP(StoreOp);
 RVOP(SubSpOp); // Allocate stack space: sub sp, sp, <IntAttr>
-RVOP(ReadRegOp); // Read from real register
+RVOPE(ReadRegOp); // Read from real register
 RVOP(WriteRegOp); // Write to real register; the SSA value is used and pre-colored in RegAlloc.
 RVOP(CallOp);
 RVOP(PlaceHolderOp); // See regalloc; holds a place to denote a register isn't available.
@@ -103,6 +103,7 @@ RVOPF(FaddOp);
 RVOPF(FsubOp);
 RVOPF(FmulOp);
 RVOPF(FdivOp);
+RVOPF(FmvOp);
 
 inline bool hasRd(Op *op) {
   return 
@@ -147,7 +148,8 @@ inline bool hasRd(Op *op) {
     isa<FmvwxOp>(op) ||
     isa<FeqOp>(op) ||
     isa<FltOp>(op) ||
-    isa<FleOp>(op);
+    isa<FleOp>(op) ||
+    isa<FmvOp>(op);
 }
 
 }

@@ -36,7 +36,7 @@ void rewriteAlloca(FuncOp *func) {
   for (auto op : allocas) {
     // Translate itself into `sp + offset`.
     builder.setBeforeOp(op);
-    auto spValue = builder.create<ReadRegOp>({
+    auto spValue = builder.create<ReadRegOp>(Value::i32, {
       new RegAttr(Reg::sp)
     });
 
@@ -140,8 +140,8 @@ void Lower::run() {
       builder.setBeforeOp(op);
       auto zero = builder.create<LiOp>({ new IntAttr(0) });
       auto zerof = builder.create<FmvwxOp>({ zero });
-      auto nonzero = builder.create<FeqOp>({ op->getOperand(), zerof });
-      builder.replace<SnezOp>(op, { nonzero });
+      auto iszero = builder.create<FeqOp>({ op->getOperand(), zerof });
+      builder.replace<SeqzOp>(op, { iszero });
       return true;
     }
 
@@ -189,7 +189,7 @@ void Lower::run() {
     }
 
     builder.setBeforeOp(op);
-    auto zero = builder.create<ReadRegOp>({ new RegAttr(Reg::zero) });
+    auto zero = builder.create<ReadRegOp>(Value::i32, { new RegAttr(Reg::zero) });
     builder.replace<BneOp>(op, { cond, zero }, op->getAttrs());
     return true;
   });
@@ -298,7 +298,7 @@ void Lower::run() {
       builder.create<SubSpOp>({ new IntAttr(stackOffset) });
     
     for (int i = 0; i < spilled.size(); i++) {
-      auto sp = builder.create<ReadRegOp>({ new RegAttr(Reg::sp) });
+      auto sp = builder.create<ReadRegOp>(Value::i32, { new RegAttr(Reg::sp) });
       builder.create<StoreOp>({ spilled[i], sp }, { new SizeAttr(8), new IntAttr(i * 8) });
     }
 
@@ -312,7 +312,10 @@ void Lower::run() {
       builder.create<SubSpOp>({ new IntAttr(-stackOffset) });
 
     // Read result from a0.
-    builder.replace<ReadRegOp>(op, { new RegAttr(op->getResultType() != Value::f32 ? Reg::a0 : Reg::fa0) });
+    if (op->getResultType() == Value::f32)
+      builder.replace<ReadRegOp>(op, Value::f32, { new RegAttr(Reg::fa0) });
+    else
+      builder.replace<ReadRegOp>(op, Value::i32, { new RegAttr(Reg::a0) });
     return true;
   });
 

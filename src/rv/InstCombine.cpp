@@ -179,9 +179,9 @@ void InstCombine::run() {
   // Only run this after all int-related fold completes.
   // Rewrite `li a0, 0` into reading from `zero`.
   runRewriter([&](LiOp *op) {
-    if (V(op) == 0) {
-      builder.replace<ReadRegOp>(op, { new RegAttr(Reg::zero)} );
-    }
+    if (V(op) == 0)
+      builder.replace<ReadRegOp>(op, Value::i32, { new RegAttr(Reg::zero)} );
+    
     return false;
   });
 }

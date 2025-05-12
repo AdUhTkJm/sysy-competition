@@ -280,14 +280,14 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     if (ty == Value::f32 && fcnt < 8) {
       builder.setBeforeOp(op);
       builder.create<PlaceHolderOp>({ fargHolders[fcnt] });
-      builder.replace<ReadRegOp>(op, { new RegAttr(fargRegs[fcnt]) });
+      builder.replace<ReadRegOp>(op, Value::f32, { new RegAttr(fargRegs[fcnt]) });
       fcnt++;
       continue;
     }
     if (ty != Value::f32 && cnt < 8) {
       builder.setBeforeOp(op);
       builder.create<PlaceHolderOp>({ argHolders[cnt] });
-      builder.replace<ReadRegOp>(op, { new RegAttr(argRegs[cnt]) });
+      builder.replace<ReadRegOp>(op, Value::i32, { new RegAttr(argRegs[cnt]) });
       cnt++;
       continue;
     }
@@ -596,7 +596,10 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   runRewriter(funcOp, [&](WriteRegOp *op) {
     auto rd = new RdAttr(op->get<RegAttr>()->reg);
     auto rs = new RsAttr(getReg(op->getOperand(0).defining));
-    builder.replace<MvOp>(op, { rd, rs });
+    if (isFP(rd->reg))
+      builder.replace<FmvOp>(op, { rd, rs });
+    else
+      builder.replace<MvOp>(op, { rd, rs });
     return true;
   });
 
@@ -608,7 +611,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     auto rs = new RsAttr(op->get<RegAttr>()->reg);
     // Now a new MvOp is constructed. Update it in assignment[].
     auto rd = getReg(op);
-    auto mv = builder.replace<MvOp>(op, { rs });
+    auto mv = !isFP(rd)
+      ? (Op*) builder.replace<MvOp>(op, { rs })
+      : (Op*) builder.replace<FmvOp>(op, { rs });
     assignment[mv] = rd;
     return true;
   });
@@ -1052,6 +1057,15 @@ int RegAlloc::latePeephole(Op *funcOp) {
 
   // Eliminate useless MvOp.
   runRewriter(funcOp, [&](MvOp *op) {
+    if (RD(op) == RS(op)) {
+      converted++;
+      op->erase();
+      return true;
+    }
+    return false;
+  });
+
+  runRewriter(funcOp, [&](FmvOp *op) {
     if (RD(op) == RS(op)) {
       converted++;
       op->erase();

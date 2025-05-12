@@ -160,6 +160,7 @@ ARMOPF(FdivOp);
 
 // ==== Pseudo Ops ====
 ARMOP(ReadRegOp);
+ARMOPF(ReadFRegOp);
 ARMOP(WriteRegOp);
 
 inline bool hasRd(Op *op) {

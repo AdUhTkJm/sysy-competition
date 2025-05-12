@@ -115,6 +115,10 @@ static Rule rules[] = {
   "(change (snz 0) 0)",
   "(change (snz 'a) (!only-if (!ne 'a 0) 1))",
   "(change (snz (mod x 2)) (mod x 2))",
+  "(change (snz (eq x y)) (eq x y))",
+  "(change (snz (le x y)) (le x y))",
+  "(change (snz (lt x y)) (lt x y))",
+  "(change (snz (ne x y)) (ne x y))",
 };
 
 std::map<std::string, int> RegularFold::stats() {

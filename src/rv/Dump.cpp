@@ -38,6 +38,7 @@ void dumpOp(Op *op, std::ostream &os) {
     { "feq", "feq.s" },
     { "fcvtsw", "fcvt.s.w" },
     { "fmvwx", "fmv.w.x" },
+    { "fmv", "fmv.s" },
   };
 
   // Skip the initial "rv."

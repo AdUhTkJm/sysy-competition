@@ -353,6 +353,12 @@ Op *Rule::buildExpr(Expr *expr) {
     Value a = buildExpr(list->elements[1]);
     Value b = buildExpr(list->elements[2]);
     return builder.create<EqOp>({ a, b });
+  } 
+  
+  if (opname == "ne") {
+    Value a = buildExpr(list->elements[1]);
+    Value b = buildExpr(list->elements[2]);
+    return builder.create<NeOp>({ a, b });
   }
 
   if (opname == "lt") {
