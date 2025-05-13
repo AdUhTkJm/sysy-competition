@@ -32,7 +32,7 @@ bool ArmDCE::isImpure(Op *op) {
     IMPURE(CbzOp)
     IMPURE(CbnzOp)
     IMPURE(BOp)
-    IMPURE(CopyToOp)
+    IMPURE(WriteRegOp)
   ;
 }
 

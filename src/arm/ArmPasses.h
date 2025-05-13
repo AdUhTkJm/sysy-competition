@@ -44,8 +44,6 @@ public:
   void run();
 };
 
-// Note that this is now an analysis pass rather than a conversion pass;
-// We no longer have attributes attached to ops.
 class RegAlloc : public Pass {
   std::map<FuncOp*, std::set<Reg>> usedRegisters;
   std::map<std::string, FuncOp*> fnMap;
@@ -62,6 +60,20 @@ public:
   RegAlloc(ModuleOp *module): Pass(module) {}
 
   std::string name() { return "arm-regalloc"; };
+  std::map<std::string, int> stats() { return {}; }
+  void run();
+};
+
+class Destruct : public Pass {
+  std::map<Op*, Reg> assignment;
+  std::unordered_map<Op*, int> spillOffset;
+
+  void runImpl(Region *region);
+  bool spilled(Op *op);
+public:
+  Destruct(ModuleOp *module): Pass(module) {}
+
+  std::string name() { return "arm-destruct"; };
   std::map<std::string, int> stats() { return {}; }
   void run();
 };

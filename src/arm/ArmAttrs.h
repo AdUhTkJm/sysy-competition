@@ -100,6 +100,10 @@ inline std::string showReg(Reg reg) {
   return "<unknown = " + std::to_string((int) reg) + ">";
 }
 
+inline std::ostream &operator<<(std::ostream &os, Reg reg) {
+  return os << showReg(reg);
+}
+
 #undef REGS
 
 inline bool isFP(Reg reg) {
@@ -116,21 +120,44 @@ public:
   StackOffsetAttr *clone() { return new StackOffsetAttr(offset); }
 };
 
-class PrecolorAttr : public AttrImpl<PrecolorAttr, ARMLINE> {
-public:
-  Reg color;
+#define RATTR(Ty) \
+  class Ty : public AttrImpl<Ty, ARMLINE> { \
+  public: \
+    Reg reg; \
+    Ty(Reg reg): reg(reg) {} \
+    std::string toString() { return "<" + showReg(reg) + ">"; } \
+    Ty *clone() { return new Ty(reg); } \
+  };
 
-  PrecolorAttr(Reg color): color(color) {}
-  
-  std::string toString() { return "<" + showReg(color) + ">"; }
-  PrecolorAttr *clone() { return new PrecolorAttr(color); }
-};
+#define RPOLYATTR(Ty) \
+  class Ty : public AttrImpl<Ty, ARMLINE> { \
+  public: \
+    int offset; \
+    Value::Type ty; \
+    Ty(int offset, Value::Type ty): offset(offset), ty(ty) {} \
+    std::string toString() { return "<" + std::to_string(offset) + ">"; } \
+    Ty *clone() { return new Ty(offset, ty); } \
+  };
+
+RATTR(RegAttr);
+RPOLYATTR(RdAttr);
+RPOLYATTR(RsAttr);
+RPOLYATTR(Rs2Attr);
+RPOLYATTR(Rs3Attr);
 
 }
   
 }
 
 #define STACKOFF(op) (op)->get<StackOffsetAttr>()->offset
-#define PRECOLOR(op) (op)->get<PrecolorAttr>()->color
+#define REG(op) (op)->get<RegAttr>()->reg
+#define RDOFF(op) (op)->get<RdAttr>()->offset
+#define RSOFF(op) (op)->get<RsAttr>()->offset
+#define RS2OFF(op) (op)->get<Rs2Attr>()->offset
+#define RS3OFF(op) (op)->get<Rs3Attr>()->offset
+#define RD(op) ((Reg) RDOFF(op))
+#define RS(op) ((Reg) RSOFF(op))
+#define RS2(op) ((Reg) RS2OFF(op))
+#define RS3(op) ((Reg) RS3OFF(op))
 
 #endif

@@ -1,14 +1,13 @@
-#include "ArmAttrs.h"
 #include "ArmPasses.h"
 
 using namespace sys;
 using namespace sys::arm;
 
-static const Reg fregs[] = {
+static const Reg fargRegs[] = {
   Reg::v0, Reg::v1, Reg::v2, Reg::v3,
   Reg::v4, Reg::v5, Reg::v6, Reg::v7,
 };
-static const Reg argregs[] = {
+static const Reg argRegs[] = {
   Reg::x0, Reg::x1, Reg::x2, Reg::x3,
   Reg::x4, Reg::x5, Reg::x6, Reg::x7,
 };
@@ -116,7 +115,67 @@ void RegAlloc::allocate(Region *region, bool isLeaf) {
 
   Builder builder;
 
+
   auto funcOp = region->getParent();
+
+  // First of all, add 35 precolored placeholders before each call.
+  // This denotes that a CallOp clobbers those registers.
+  runRewriter(funcOp, [&](CallOp *op) {
+    builder.setBeforeOp(op);
+    for (auto reg : callerSaved) {
+      auto placeholder = builder.create<PlaceHolderOp>();
+      assignment[placeholder] = reg;
+    }
+    return false;
+  });
+
+  // Similarly, add placeholders around each GetArg.
+  // First create placeholders for a0-a7.
+  builder.setToRegionStart(region);
+  std::vector<Value> argHolders, fargHolders;
+  auto argcnt = funcOp->get<ArgCountAttr>()->count;
+  for (int i = 0; i < std::min(argcnt, 8); i++) {
+    auto placeholder = builder.create<PlaceHolderOp>();
+    assignment[placeholder] = argRegs[i];
+    argHolders.push_back(placeholder);
+
+    auto fplaceholder = builder.create<PlaceHolderOp>();
+    assignment[fplaceholder] = fargRegs[i];
+    fargHolders.push_back(fplaceholder);
+  }
+
+  auto rawGets = funcOp->findAll<GetArgOp>();
+  // We might find some getArgs missing by DCE, so it's not necessarily consecutive.
+  std::vector<Op*> getArgs;
+  getArgs.resize(argcnt);
+  for (auto x : rawGets)
+    getArgs[V(x)] = x;
+
+  int fcnt = 0, cnt = 0;
+  for (size_t i = 0; i < getArgs.size(); i++) {
+    // A missing argument.
+    if (!getArgs[i])
+      continue;
+
+    Op *op = getArgs[i];
+    auto ty = op->getResultType();
+
+    if (ty == Value::f32 && fcnt < 8) {
+      builder.setBeforeOp(op);
+      builder.create<PlaceHolderOp>({ fargHolders[fcnt] });
+      builder.replace<ReadFRegOp>(op, { new RegAttr(fargRegs[fcnt]) });
+      fcnt++;
+      continue;
+    }
+    if (ty != Value::f32 && cnt < 8) {
+      builder.setBeforeOp(op);
+      builder.create<PlaceHolderOp>({ argHolders[cnt] });
+      builder.replace<ReadXRegOp>(op, { new RegAttr(argRegs[cnt]) });
+      cnt++;
+      continue;
+    }
+    // Spilled to stack; don't do anything.
+  }
 
   // If a phi has an operand of float type, then itself must also be of float type.
   runRewriter(funcOp, [&](PhiOp *op) {
@@ -126,8 +185,14 @@ void RegAlloc::allocate(Region *region, bool isLeaf) {
         return false;
       }
     }
+    // Do it only once.
     return false;
   });
+
+  region->updateLiveness();
+
+  // Interference graph.
+  std::map<Op*, std::set<Op*>> interf;
 
   // Values of readreg, or operands of writereg, or phis (mvs), are prioritzed.
   std::map<Op*, int> priority;
@@ -153,12 +218,13 @@ void RegAlloc::allocate(Region *region, bool isLeaf) {
         lastUsed[op] = i + 1;
 
       // Precolor.
-      if (isa<CopyToOp>(op)) {
-        assignment[op] = PRECOLOR(op);
+      if (isa<WriteRegOp>(op)) {
+        assignment[op] = REG(op);
         priority[op] = 1;
       }
-      if (isa<CopyFromOp>(op))
+      if (isa<ReadRegOp>(op) || isa<ReadXRegOp>(op) || isa<ReadFRegOp>(op)) {
         priority[op] = 1;
+      }
 
       if (isa<PhiOp>(op)) {
         priority[op] = 2;
@@ -174,6 +240,7 @@ void RegAlloc::allocate(Region *region, bool isLeaf) {
     for (auto op : bb->getLiveOut())
       lastUsed[op] = ops.size();
 
+    // We use event-driven approach to optimize it into O(n log n + E).
     std::vector<Event> events;
     for (auto [op, v] : lastUsed) {
       // Don't push empty live range. It's not handled properly.
@@ -192,9 +259,11 @@ void RegAlloc::allocate(Region *region, bool isLeaf) {
 
     std::set<Op*> active;
     for (const auto& event : events) {
-      if (event.start) {
-        auto op = event.op;
+      auto op = event.op;
+      if (!hasRd(op))
+        continue;
 
+      if (event.start) {
         for (Op* activeOp : active) {
           // FP and int are using different registers.
           if (activeOp->getResultType() == Value::f32 ^ op->getResultType() == Value::f32)
@@ -202,24 +271,10 @@ void RegAlloc::allocate(Region *region, bool isLeaf) {
 
           interf[op].insert(activeOp);
           interf[activeOp].insert(op);
-
-          // For special instructions, we also mark some registers as forbidden.
-          if (isa<CallOp>(op)) {
-            auto &bad = forbidden[op];
-            std::copy(callerSaved.begin(), callerSaved.end(), std::inserter(bad, bad.begin()));
-          }
-
-          if (isa<GetArgOp>(op)) {
-            auto &bad = forbidden[op];
-            auto index = V(op);
-            if (index < 8)
-              bad.insert(argregs[index]);
-          }
         }
-
         active.insert(op);
       } else
-        active.erase(event.op);
+        active.erase(op);
     }
   }
 
@@ -238,15 +293,18 @@ void RegAlloc::allocate(Region *region, bool isLeaf) {
     return pa == pb ? interf[a].size() > interf[b].size() : pa > pb;
   });
 
+  std::unordered_map<Op*, int> spillOffset;
+  int currentOffset = STACKOFF(funcOp);
   int highest = 0;
-  
+
   for (auto op : ops) {
     // Do not allocate colored instructions.
-    if (assignment.count(op))
+    if (assignment.count(op) || !hasRd(op))
       continue;
 
-    std::set<Reg> bad = forbidden[op];
+    std::set<Reg> bad;
     for (auto v : interf[op]) {
+      // In the whole function, `sp` and `zero` are read-only.
       if (assignment.count(v))
         bad.insert(assignment[v]);
     }
@@ -263,16 +321,16 @@ void RegAlloc::allocate(Region *region, bool isLeaf) {
     // See if there's any preferred registers.
     int preferred = -1;
     for (auto use : op->getUses()) {
-      if (isa<CopyToOp>(use)) {
-        auto reg = PRECOLOR(op);
+      if (isa<WriteRegOp>(use)) {
+        auto reg = REG(use);
         if (!bad.count(reg)) {
           preferred = (int) reg;
           break;
         }
       }
     }
-    if (isa<CopyFromOp>(op)) {
-      auto reg = PRECOLOR(op);
+    if (isa<ReadRegOp>(op)) {
+      auto reg = REG(op);
       if (!bad.count(reg))
         preferred = (int) reg;
     }
@@ -294,9 +352,9 @@ void RegAlloc::allocate(Region *region, bool isLeaf) {
 
     if (assignment.count(op))
       continue;
-  
+
     // Spilled. Try to see all spill offsets of conflicting ops.
-    int desired = 0;
+    int desired = currentOffset;
     std::set<int> conflict;
     for (auto v : interf[op]) {
       if (!spillOffset.count(v))
@@ -306,12 +364,9 @@ void RegAlloc::allocate(Region *region, bool isLeaf) {
     }
 
     // Try find a space.
-    for (auto offset : conflict) {
-      if (desired == offset)
-        desired += 8;
-    }
+    while (conflict.count(desired))
+      desired += 8;
 
-    // Record the offset.
     spillOffset[op] = desired;
 
     // Update `highest`, which will indicate the size allocated.
@@ -319,7 +374,14 @@ void RegAlloc::allocate(Region *region, bool isLeaf) {
       highest = desired;
   }
 
-  STACKOFF(funcOp) += highest;
+  // Allocate more stack space for it.
+  if (spillOffset.size())
+    STACKOFF(funcOp) = highest + 8;
+
+  const auto getReg = [&](Op *op) {
+    return assignment.count(op) ? assignment[op] :
+      op->getResultType() == Value::f32 ? vorder[0] : order[0];
+  };
 }
 
 void RegAlloc::run() {
@@ -327,6 +389,8 @@ void RegAlloc::run() {
 
   for (auto func : funcs) {
     auto calls = func->findAll<BrOp>();
-    allocate(func->getRegion(), calls.size() == 0);
+    auto region = func->getRegion();
+
+    allocate(region, calls.size() == 0);
   }
 }

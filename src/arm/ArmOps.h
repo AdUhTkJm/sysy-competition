@@ -158,9 +158,18 @@ ARMOPF(FmulOp);
 ARMOPF(FdivOp);
 
 // ==== Pseudo Ops ====
-ARMOP(CopyToOp);
-ARMOPF(CopyToFOp);
-ARMOP(CopyFromOp);
+ARMOP(ReadRegOp);
+ARMOPF(ReadFRegOp);
+ARMOPL(ReadXRegOp);
+ARMOP(WriteRegOp);
+ARMOP(PlaceHolderOp);
+ARMOP(ReloadOp);
+ARMOPF(ReloadFOp);
+ARMOPL(ReloadLOp);
+ARMOP(SpillOp);
+ARMOP(SpillFOp);
+ARMOP(SpillLOp);
+ARMOP(SubSpOp);
 
 inline bool hasRd(Op *op) {
   return !(
@@ -176,8 +185,11 @@ inline bool hasRd(Op *op) {
     isa<BleOp>(op) ||
     isa<RetOp>(op) ||
     isa<CmpOp>(op) ||
-    isa<CopyToOp>(op) ||
-    isa<CopyFromOp>(op)
+    isa<WriteRegOp>(op) ||
+    isa<SpillOp>(op) ||
+    isa<SpillFOp>(op) ||
+    isa<SpillLOp>(op) ||
+    isa<SubSpOp>(op)
   );
 }
 

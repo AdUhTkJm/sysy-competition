@@ -506,7 +506,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
     spilled++;
     // Spilled. Try to see all spill offsets of conflicting ops.
-    int desired = 0;
+    int desired = currentOffset;
     std::set<int> conflict;
     for (auto v : interf[op]) {
       if (!spillOffset.count(v))
@@ -519,7 +519,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     while (conflict.count(desired))
       desired += 8;
 
-    spillOffset[op] = currentOffset + desired;
+    spillOffset[op] = desired;
 
     // Update `highest`, which will indicate the size allocated.
     if (desired > highest)
@@ -528,7 +528,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
   // Allocate more stack space for it.
   if (spillOffset.size())
-    STACKOFF(funcOp) += highest + 8;
+    STACKOFF(funcOp) = highest + 8;
 
   const auto getReg = [&](Op *op) {
     return assignment.count(op) ? assignment[op] :
@@ -624,6 +624,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     if (spillOffset.count(op)) {
       mv->remove<RdAttr>();
       mv->add<SpilledRdAttr> GET_SPILLED_ARGS(op);
+      spillOffset[mv] = spillOffset[op];
     }
 
     // We can't directly erase it because it might get used by phi's later.
@@ -1109,21 +1110,22 @@ void save(Builder builder, const std::vector<Reg> &regs, int offset) {
         /*size=*/new SizeAttr(8)
       });
     } else {
-      // li s11, offset
-      // addi s11, s11, sp
-      // sd reg, 0(s11)
+      // li t6, offset
+      // addi t6, t6, sp
+      // sd reg, 0(t6)
+      // (Because reg might be `s11`)
       builder.create<LiOp>({
-        new RdAttr(spillReg),
+        new RdAttr(spillReg2),
         new IntAttr(offset)
       });
       builder.create<AddOp>({
-        new RdAttr(spillReg),
-        new RsAttr(spillReg),
+        new RdAttr(spillReg2),
+        new RsAttr(spillReg2),
         new Rs2Attr(Reg::sp)
       });
       builder.create<sys::rv::StoreOp>({
         new RsAttr(reg),
-        new Rs2Attr(spillReg),
+        new Rs2Attr(spillReg2),
         new IntAttr(0),
         new SizeAttr(8)
       });

@@ -51,19 +51,35 @@ static void rewriteAlloca(FuncOp *func) {
   auto region = func->getRegion();
   auto block = region->getFirstBlock();
 
-  size_t total = 0;
+  // All alloca's are in the first block.
+  size_t offset = 0; // Offset from sp.
+  size_t total = 0; // Total stack frame size
   std::vector<AllocaOp*> allocas;
   for (auto op : block->getOps()) {
     if (!isa<AllocaOp>(op))
       continue;
 
     size_t size = SIZE(op);
-    op->add<StackOffsetAttr>(total);
     total += size;
+    allocas.push_back(cast<AllocaOp>(op));
+  }
+
+  for (auto op : allocas) {
+    // Translate itself into `sp + offset`.
+    builder.setBeforeOp(op);
+    auto spValue = builder.create<ReadXRegOp>({ new RegAttr(Reg::x30) });
+    auto offsetValue = builder.create<MovIOp>({ new IntAttr(offset) });
+    auto add = builder.create<AddXOp>({ spValue, offsetValue });
+    op->replaceAllUsesWith(add);
+
+    size_t size = SIZE(op);
+    offset += size;
+    op->erase();
   }
 
   func->add<StackOffsetAttr>(total);
 }
+
 
 // We delay handling of calls etc. to RegAlloc.
 void Lower::run() {
@@ -101,6 +117,68 @@ void Lower::run() {
 
     builder.replace<LdrWOp>(op, op->getOperands());
     return false;
+  });
+
+  static const Reg fargRegs[] = {
+    Reg::v0, Reg::v1, Reg::v2, Reg::v3,
+    Reg::v4, Reg::v5, Reg::v6, Reg::v7,
+  };
+  static const Reg argRegs[] = {
+    Reg::x0, Reg::x1, Reg::x2, Reg::x3,
+    Reg::x4, Reg::x5, Reg::x6, Reg::x7,
+  };
+
+  runRewriter([&](sys::CallOp *op) {
+    builder.setBeforeOp(op);
+    const auto &args = op->getOperands();
+
+    std::vector<Value> argsNew;
+    std::vector<Value> fargsNew;
+    std::vector<Value> spilled;
+    for (size_t i = 0; i < args.size(); i++) {
+      Value arg = args[i];
+      int fcnt = fargsNew.size();
+      int cnt = argsNew.size();
+
+      if (arg.ty == Value::f32 && fcnt < 8) {
+        fargsNew.push_back(builder.create<WriteRegOp>({ arg }, { new RegAttr(fargRegs[fcnt]) }));
+        continue;
+      }
+      if (arg.ty != Value::f32 && cnt < 8) {
+        argsNew.push_back(builder.create<WriteRegOp>({ arg }, { new RegAttr(argRegs[cnt]) }));
+        continue;
+      }
+      spilled.push_back(arg);
+    }
+
+    // More registers must get spilled to stack.
+    int stackOffset = spilled.size() * 8;
+    // Align to 16 bytes.
+    if (stackOffset % 16 != 0)
+      stackOffset = stackOffset / 16 * 16 + 16;
+    if (stackOffset > 0)
+      builder.create<SubSpOp>({ new IntAttr(stackOffset) });
+    
+    for (int i = 0; i < spilled.size(); i++) {
+      auto sp = builder.create<ReadXRegOp>({ new RegAttr(Reg::x30) });
+      builder.create<StoreOp>({ spilled[i], sp }, { new SizeAttr(8), new IntAttr(i * 8) });
+    }
+
+    builder.create<BrOp>(argsNew, { 
+      op->get<NameAttr>(),
+      new ArgCountAttr(args.size())
+    });
+
+    // Restore stack pointer.
+    if (stackOffset > 0)
+      builder.create<SubSpOp>({ new IntAttr(-stackOffset) });
+
+    // Read result from a0.
+    if (op->getResultType() == Value::f32)
+      builder.replace<ReadFRegOp>(op, { new RegAttr(Reg::v0) });
+    else
+      builder.replace<ReadRegOp>(op, { new RegAttr(Reg::x0) });
+    return true;
   });
 
   auto funcs = collectFuncs();
