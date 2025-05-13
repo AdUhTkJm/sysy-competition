@@ -9,16 +9,11 @@ using namespace sys;
 
 // Combines all alloca's into a SubSpOp.
 // Also rewrites load/stores with sp-offset.
-void rewriteAlloca(FuncOp *func) {
+static void rewriteAlloca(FuncOp *func) {
   Builder builder;
 
   auto region = func->getRegion();
   auto block = region->getFirstBlock();
-
-  // If the first Op isn't alloca, then the whole function doesn't contain alloca.
-  // This is guaranteed by MoveAlloca pass.
-  if (!isa<AllocaOp>(block->getFirstOp()))
-    return;
 
   // All alloca's are in the first block.
   size_t offset = 0; // Offset from sp.
@@ -36,13 +31,8 @@ void rewriteAlloca(FuncOp *func) {
   for (auto op : allocas) {
     // Translate itself into `sp + offset`.
     builder.setBeforeOp(op);
-    auto spValue = builder.create<ReadRegOp>(Value::i32, {
-      new RegAttr(Reg::sp)
-    });
-
-    auto offsetValue = builder.create<LiOp>({
-      new IntAttr(offset)
-    });
+    auto spValue = builder.create<ReadRegOp>(Value::i32, { new RegAttr(Reg::sp) });
+    auto offsetValue = builder.create<LiOp>({ new IntAttr(offset) });
     auto add = builder.create<AddOp>({ spValue, offsetValue });
     op->replaceAllUsesWith(add);
 
@@ -51,11 +41,7 @@ void rewriteAlloca(FuncOp *func) {
     op->erase();
   }
 
-  // Allocate space equal to all allocas.
-  builder.setToBlockStart(block);
-  builder.create<SubSpOp>({
-    new IntAttr(total)
-  });
+  func->add<StackOffsetAttr>(total);
 }
 
 #define REPLACE(BeforeTy, AfterTy) \
@@ -330,7 +316,7 @@ void Lower::run() {
     return true;
   });
 
-  auto funcs = module->findAll<FuncOp>();
+  auto funcs = collectFuncs();
   for (auto func : funcs)
     rewriteAlloca(func);
 }

@@ -406,6 +406,7 @@ void CodeGen::emit(ASTNode *node) {
           new FloatArrayAttr((float*) value, size),
           new NameAttr(vardecl->name),
         });
+        addr.defining->add<FPAttr>();
       } else {
         addr = builder.create<GlobalOp>({
           new SizeAttr(getSize(vardecl->type)),
@@ -418,8 +419,8 @@ void CodeGen::emit(ASTNode *node) {
     }
     
     auto addr = builder.create<AllocaOp>({
-        new SizeAttr(getSize(vardecl->type))
-      });
+      new SizeAttr(getSize(vardecl->type))
+    });
     
     symbols[vardecl->name] = addr;
     // An uninitialized local array.
@@ -430,6 +431,11 @@ void CodeGen::emit(ASTNode *node) {
       });
       builder.create<StoreOp>({ addr, arrayPtr }, { new SizeAttr(8) });
       symbols[vardecl->name] = arrayPtr;
+      // Also check whether this is a floating point array.
+      // If it is, give the original alloca a FPAttr.
+      auto arrTy = cast<ArrayType>(vardecl->type);
+      if (isa<FloatType>(arrTy->base))
+        addr->add<FPAttr>();
       return;
     }
 
@@ -459,6 +465,9 @@ void CodeGen::emit(ASTNode *node) {
         });
         builder.create<StoreOp>({ addr, arrayPtr }, { new SizeAttr(8) });
         symbols[vardecl->name] = arrayPtr;
+        // Give a FPAttr if the array is float*.
+        if (isa<FloatType>(arrTy->base))
+          addr->add<FPAttr>();
         return;
       }
 

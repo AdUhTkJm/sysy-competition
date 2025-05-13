@@ -19,6 +19,8 @@ void initArmPipeline(sys::PassManager &pm) {
   pm.addPass<Lower>();
   pm.addPass<InstCombine>();
   pm.addPass<ArmDCE>();
+  pm.addPass<RegAlloc>();
+  pm.addPass<Dump>(opts.outputFile);
 }
 
 void initRvPipeline(sys::PassManager &pm) {

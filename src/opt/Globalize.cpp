@@ -55,12 +55,13 @@ void Globalize::runImpl(Region *region) {
 
   for (auto alloca : allocas) {
     auto size = SIZE(alloca);
+    bool isFP = alloca->has<FPAttr>();
     if (size <= 32)
       continue;
 
     builder.setToRegionStart(module->getRegion());
 
-    int *data = new int[size / 4];
+    void *data = isFP ? (void*) new float[size / 4] : new int[size / 4];
     memset(data, 0, size);
     // name like __main_1
     std::string gName = "__" + fnName + "_" + std::to_string(allocaCnt++);
@@ -68,8 +69,9 @@ void Globalize::runImpl(Region *region) {
       new NameAttr(gName),
       new SizeAttr(size),
       // Note that this only refers to, rather than copies, `data`.
-      // FIXME: check for floating point allocas. How?
-      new IntArrayAttr(data, size / 4),
+      isFP
+        ? (Attr*) new FloatArrayAttr((float*) data, size / 4)
+        : (Attr*) new IntArrayAttr((int*) data, size / 4),
     });
 
     builder.setToBlockStart(alloca->getParent()->nextBlock());
@@ -93,30 +95,42 @@ void Globalize::runImpl(Region *region) {
           // Don't forget that `offset` is byte offset.
           auto [success, offset] = isAddrOf(addr, gName);
 
-          if (!isa<IntOp>(value)) {
-            if (success && offset >= 0) {
-              unknownOffsets[offset] = value;
+          // Storing to an unknown place. Continue.
+          if (success && offset < 0) {
+            shouldBreak = true;
+            break;
+          }
+          // This isn't storing to the address we're processing.
+          if (!success)
+            continue;
+
+          // Floating point case.
+          if (isFP) {
+            if (!isa<FloatOp>(value)) {
+              if (offset >= 0)
+                unknownOffsets[offset] = value;
               continue;
             }
-            if (success && offset < 0) {
-              shouldBreak = true;
-              break;
-            }
+
+            float v = F(value);
+
+            ((float*) data)[offset / 4] = v;
+            op->erase();
+            continue;
+          }
+
+          // Integer case.
+          if (!isa<IntOp>(value)) {
+            if (offset >= 0)
+              unknownOffsets[offset] = value;
             continue;
           }
 
           int v = V(value);
 
-          // We're storing to an unknown place. Break.
-          if (success && offset < 0) {
-            shouldBreak = true;
-            break;
-          }
-          if (success) {
-            data[offset / 4] = v;
-            op->erase();
-            continue;
-          }
+          ((int*) data)[offset / 4] = v;
+          op->erase();
+          continue;
         }
 
         if (isa<LoadOp>(op)) {
@@ -136,8 +150,10 @@ void Globalize::runImpl(Region *region) {
             Op *value = nullptr;
             if (unknownOffsets.count(offset))
               value = unknownOffsets[offset];
+            else if (isFP)
+              value = builder.create<FloatOp>({ new FloatAttr(((float*) data)[offset / 4]) });
             else
-              value = builder.create<IntOp>({ new IntAttr(data[offset / 4]) });
+              value = builder.create<IntOp>({ new IntAttr(((int*) data)[offset / 4]) });
             op->replaceAllUsesWith(value);
             op->erase();
             continue;
@@ -159,11 +175,21 @@ void Globalize::runImpl(Region *region) {
     }
 
     // We need to update `allZero` of `data`.
-    auto attr = global->get<IntArrayAttr>();
-    for (int i = 0; i < attr->size; i++) {
-      if (attr->vi[i] != 0) {
-        attr->allZero = false;
-        break;
+    if (isFP) {
+      auto attr = global->get<FloatArrayAttr>();
+      for (int i = 0; i < attr->size; i++) {
+        if (attr->vf[i] != 0) {
+          attr->allZero = false;
+          break;
+        }
+      }
+    } else {
+      auto attr = global->get<IntArrayAttr>();
+      for (int i = 0; i < attr->size; i++) {
+        if (attr->vi[i] != 0) {
+          attr->allZero = false;
+          break;
+        }
       }
     }
   }

@@ -20,7 +20,7 @@ class Value {
 public:
   Op *defining;
   enum Type {
-    unit, i32, i64, f32
+    unit, i32, i64, f32, i128, f128
   } ty;
 
   Value() {} // uninitialized, for std::map
@@ -215,6 +215,8 @@ public:
   const auto &getRegions() const { return regions; }
   const auto &getOperands() const { return operands; }
   const auto &getAttrs() const { return attrs; }
+
+  int getOperandCount() const { return operands.size(); }
 
   Region *getRegion(int i = 0) { return regions[i]; }
   Value getOperand(int i = 0) { return operands[i]; }

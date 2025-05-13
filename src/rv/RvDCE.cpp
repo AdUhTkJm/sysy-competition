@@ -33,7 +33,6 @@ void RvDCE::markImpure(Region *region) {
 }
 
 void RvDCE::runOnRegion(Region *region) {
-  markImpure(region);
   for (auto bb : region->getBlocks()) {
     for (auto op : bb->getOps()) {
       if (!op->has<ImpureAttr>() && op->getUses().size() == 0)
@@ -46,6 +45,9 @@ void RvDCE::runOnRegion(Region *region) {
 
 void RvDCE::run() {
   auto funcs = collectFuncs();
+
+  for (auto func : funcs)
+    markImpure(func->getRegion());
 
   do {
     removeable.clear();

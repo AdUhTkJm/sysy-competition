@@ -3,12 +3,11 @@
 
 #include "../opt/Pass.h"
 #include "../codegen/Ops.h"
+#include "../codegen/CodeGen.h"
 #include "ArmOps.h"
 #include "ArmAttrs.h"
 
-namespace sys {
-
-namespace arm {
+namespace sys::arm {
 
 class Lower : public Pass {
 public:
@@ -45,22 +44,25 @@ public:
   void run();
 };
 
+// Note that this is now an analysis pass rather than a conversion pass;
+// We no longer have attributes attached to ops.
 class RegAlloc : public Pass {
-  int spilled = 0;
-  int convertedTotal = 0;
-
   std::map<FuncOp*, std::set<Reg>> usedRegisters;
   std::map<std::string, FuncOp*> fnMap;
 
-  void runImpl(Region *region, bool isLeaf);
-  // Create both prologue and epilogue of a function.
-  void proEpilogue(FuncOp *funcOp, bool isLeaf);
-  void tidyup(Region *region);
+  std::map<Op*, std::set<Op*>> interf;
+  std::map<Op*, std::set<Reg>> forbidden;
+
+  // Fill in the internal data structures.
+  void allocate(Region *region, bool isLeaf);
 public:
+  std::map<Op*, Reg> assignment;
+  std::unordered_map<Op*, int> spillOffset;
+
   RegAlloc(ModuleOp *module): Pass(module) {}
 
   std::string name() { return "arm-regalloc"; };
-  std::map<std::string, int> stats();
+  std::map<std::string, int> stats() { return {}; }
   void run();
 };
 
@@ -69,6 +71,7 @@ class Dump : public Pass {
   std::string out;
 
   void dump(std::ostream &os);
+  void dumpBody(Region *region, std::ostream &os);
 public:
   Dump(ModuleOp *module, const std::string &out): Pass(module), out(out) {}
 
@@ -78,7 +81,5 @@ public:
 };
 
 };
-
-}
 
 #endif

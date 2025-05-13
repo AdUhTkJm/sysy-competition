@@ -106,50 +106,17 @@ RVOPF(FdivOp);
 RVOPF(FmvOp);
 
 inline bool hasRd(Op *op) {
-  return 
-    isa<AddOp>(op) ||
-    isa<AddiwOp>(op) ||
-    isa<AddwOp>(op) ||
-    isa<AddiOp>(op) ||
-    isa<SubOp>(op) ||
-    isa<SubwOp>(op) ||
-    isa<MulwOp>(op) ||
-    isa<MulOp>(op) ||
-    isa<DivwOp>(op) ||
-    isa<DivOp>(op) ||
-    isa<sys::rv::LoadOp>(op) ||
-    isa<LiOp>(op) ||
-    isa<MvOp>(op) ||
-    isa<ReadRegOp>(op) ||
-    isa<SlliwOp>(op) ||
-    isa<SrliwOp>(op) ||
-    isa<SraiwOp>(op) ||
-    isa<SraiOp>(op) ||
-    isa<SeqzOp>(op) ||
-    isa<SnezOp>(op) ||
-    isa<SltOp>(op) ||
-    isa<SltiOp>(op) ||
-    isa<MulhOp>(op) ||
-    isa<MulhuOp>(op) ||
-    isa<LaOp>(op) ||
-    isa<AndOp>(op) ||
-    isa<OrOp>(op) ||
-    isa<XorOp>(op) ||
-    isa<AndiOp>(op) ||
-    isa<OriOp>(op) ||
-    isa<XoriOp>(op) ||
-    isa<GetArgOp>(op) ||
-    isa<FaddOp>(op) ||
-    isa<FsubOp>(op) ||
-    isa<FmulOp>(op) ||
-    isa<FdivOp>(op) ||
-    isa<FcvtswOp>(op) ||
-    isa<FcvtwsRtzOp>(op) ||
-    isa<FmvwxOp>(op) ||
-    isa<FeqOp>(op) ||
-    isa<FltOp>(op) ||
-    isa<FleOp>(op) ||
-    isa<FmvOp>(op);
+  return !(
+    isa<StoreOp>(op) ||
+    isa<RetOp>(op) ||
+    isa<JOp>(op) ||
+    isa<BeqOp>(op) ||
+    isa<BltOp>(op) ||
+    isa<BgeOp>(op) ||
+    isa<BneOp>(op) ||
+    isa<WriteRegOp>(op) ||
+    isa<CallOp>(op)
+  );
 }
 
 }

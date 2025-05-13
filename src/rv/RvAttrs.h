@@ -137,7 +137,27 @@ public:
   Rs2Attr *clone() { return new Rs2Attr(reg); }
 };
 
+// Stack offset from bp.
+class StackOffsetAttr : public AttrImpl<StackOffsetAttr, RVLINE> {
+public:
+  int offset;
+
+  StackOffsetAttr(int offset): offset(offset) {}
+
+  std::string toString() { return "<offset = " + std::to_string(offset) + ">"; }
+  StackOffsetAttr *clone() { return new StackOffsetAttr(offset); }
+};
+
 }
+
+#define STACKOFF(op) (op)->get<StackOffsetAttr>()->offset
+#define RD(op) (op)->get<RdAttr>()->reg
+#define RS(op) (op)->get<RsAttr>()->reg
+#define RS2(op) (op)->get<Rs2Attr>()->reg
+#define REG(op) (op)->get<RegAttr>()->reg
+#define RDC(x) new RdAttr(x)
+#define RSC(x) new RsAttr(x)
+#define RS2C(x) new Rs2Attr(x)
 
 }
 

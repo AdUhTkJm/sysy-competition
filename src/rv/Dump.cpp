@@ -1,6 +1,5 @@
 #include <iostream>
 #include <fstream>
-#include <ostream>
 #include <sstream>
 
 #include "RvOps.h"

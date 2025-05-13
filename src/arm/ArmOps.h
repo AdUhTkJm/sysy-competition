@@ -42,9 +42,7 @@
 #define ARMOPL(Ty) ARMOPBASE(Value::i64, Ty)
 #define ARMOPF(Ty) ARMOPBASE(Value::f32, Ty)
 
-namespace sys {
-
-namespace arm {
+namespace sys::arm {
 
 // Note that ARM denotes length information on register names, rather than on instruction name.
 // We still denote it on instructions; when Dumping, we emit the same opcode but different registers.
@@ -160,9 +158,9 @@ ARMOPF(FmulOp);
 ARMOPF(FdivOp);
 
 // ==== Pseudo Ops ====
-ARMOP(ReadRegOp);
-ARMOPF(ReadFRegOp);
-ARMOP(WriteRegOp);
+ARMOP(CopyToOp);
+ARMOPF(CopyToFOp);
+ARMOP(CopyFromOp);
 
 inline bool hasRd(Op *op) {
   return !(
@@ -177,12 +175,12 @@ inline bool hasRd(Op *op) {
     isa<BltOp>(op) ||
     isa<BleOp>(op) ||
     isa<RetOp>(op) ||
-    isa<CmpOp>(op)
+    isa<CmpOp>(op) ||
+    isa<CopyToOp>(op) ||
+    isa<CopyFromOp>(op)
   );
 }
 
-
-}
 
 }
 

@@ -4,7 +4,7 @@
 using namespace sys;
 using namespace sys::arm;
 
-// First we only do lower, rather than anything else.
+// First we only do lower, without any optimizations.
 // More folds are in InstCombine.
 static ArmRule rules[] = {
   "(change (add x y) (addw x y))",
@@ -43,12 +43,35 @@ static ArmRule rules[] = {
     return true; \
   });
 
+// Collect allocas, and take them as an offset from base pointer (though we don't really use base pointer).
+// Also mark the function with an offset attribute.
+static void rewriteAlloca(FuncOp *func) {
+  Builder builder;
+
+  auto region = func->getRegion();
+  auto block = region->getFirstBlock();
+
+  size_t total = 0;
+  std::vector<AllocaOp*> allocas;
+  for (auto op : block->getOps()) {
+    if (!isa<AllocaOp>(op))
+      continue;
+
+    size_t size = SIZE(op);
+    op->add<StackOffsetAttr>(total);
+    total += size;
+  }
+
+  func->add<StackOffsetAttr>(total);
+}
+
 // We delay handling of calls etc. to RegAlloc.
 void Lower::run() {
   Builder builder;
 
   REPLACE(ReturnOp, RetOp);
   REPLACE(GetGlobalOp, AdrOp);
+  REPLACE(CallOp, BrOp);
 
   runRewriter([&](StoreOp *op) {
     if (op->getResultType() == Value::f32) {
@@ -96,5 +119,7 @@ void Lower::run() {
         }
       }
     }
+
+    rewriteAlloca(func);
   }
 }

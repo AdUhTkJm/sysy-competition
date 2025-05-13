@@ -116,10 +116,21 @@ public:
   StackOffsetAttr *clone() { return new StackOffsetAttr(offset); }
 };
 
+class PrecolorAttr : public AttrImpl<PrecolorAttr, ARMLINE> {
+public:
+  Reg color;
+
+  PrecolorAttr(Reg color): color(color) {}
+  
+  std::string toString() { return "<" + showReg(color) + ">"; }
+  PrecolorAttr *clone() { return new PrecolorAttr(color); }
+};
+
 }
   
 }
 
 #define STACKOFF(op) (op)->get<StackOffsetAttr>()->offset
+#define PRECOLOR(op) (op)->get<PrecolorAttr>()->color
 
 #endif

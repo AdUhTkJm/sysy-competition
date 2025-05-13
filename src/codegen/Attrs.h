@@ -197,6 +197,16 @@ public:
   RangeAttr *clone() { return new RangeAttr(range); }
 };
 
+// Marks whether an alloca is floating point.
+// This can't be deduced by return value because it's always i64.
+class FPAttr : public AttrImpl<FPAttr, __LINE__> {
+public:
+  FPAttr() {}
+
+  std::string toString() { return "<fp>"; }
+  FPAttr *clone() { return new FPAttr; }
+};
+
 }
 
 #define V(op) (op)->get<IntAttr>()->value
