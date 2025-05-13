@@ -100,10 +100,6 @@ void CanonicalizeLoop::canonicalize(LoopInfo *loop) {
         if (loop->contains(parent) || produced.count(use))
           continue;
 
-        // std::cerr << "replacing:\n  ";
-        // op->dump(std::cerr);
-        // std::cerr << "use in bb" << bbmap[parent] << "\n  ";
-        // use->dump(std::cerr);
         auto replace = getValueFor(parent, loop, phiMap);
         use->replaceOperand(op, replace);
       }
@@ -135,7 +131,7 @@ void CanonicalizeLoop::run() {
 
     for (auto loop : forest.getLoops()) {
       auto header = loop->getHeader();
-      if (true || !loop->getPreheader()) {
+      if (!loop->getPreheader()) {
         const auto &preds = header->getPreds();
         auto region = header->getParent();
         auto preheader = region->insert(header);

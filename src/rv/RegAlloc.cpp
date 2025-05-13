@@ -411,8 +411,6 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     std::set<Op*> active;
     for (const auto& event : events) {
       auto op = event.op;
-      if (!hasRd(op))
-        continue;
 
       if (event.start) {
         for (Op* activeOp : active) {
@@ -450,7 +448,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
   for (auto op : ops) {
     // Do not allocate colored instructions.
-    if (assignment.count(op) || !hasRd(op))
+    if (assignment.count(op))
       continue;
 
     std::set<Reg> bad;
