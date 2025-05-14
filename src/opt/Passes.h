@@ -220,6 +220,17 @@ public:
   void run();
 };
 
+class LateInline : public Pass {
+  int inlined = 0;
+  int threshold;
+public:
+  LateInline(ModuleOp *module, int threshold): Pass(module), threshold(threshold) {}
+    
+  std::string name() { return "late-inline"; };
+  std::map<std::string, int> stats();
+  void run();
+};
+
 class Verify : public Pass {
 public:
   Verify(ModuleOp *module): Pass(module) {}

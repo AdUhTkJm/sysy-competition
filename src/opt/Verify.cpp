@@ -3,6 +3,10 @@
 using namespace sys;
 
 void Verify::run() {
+  auto funcs = collectFuncs();
+  for (auto func : funcs)
+    func->getRegion()->updatePreds();
+  
   auto phis = module->findAll<PhiOp>();
   for (auto phi : phis) {
     // Check that all operands from Phi must come from the immediate predecessor.

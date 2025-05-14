@@ -6,6 +6,9 @@
 #include "../opt/CleanupPasses.h"
 #include "../opt/Analysis.h"
 #include "../arm/ArmPasses.h"
+#undef RS
+#undef RS2
+#undef RD
 #include "../rv/RvPasses.h"
 #include "Options.h"
 #include <fstream>
@@ -70,13 +73,18 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DSE>();
   pm.addPass<sys::DLE>();
   pm.addPass<sys::LateConstFold>();
-  pm.addPass<sys::StrengthReduct>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::GCM>();
+  pm.addPass<sys::LateInline>(/*threshold=*/ 200);
+  pm.addPass<sys::RegularFold>();
+  pm.addPass<sys::GVN>();
+  pm.addPass<sys::Alias>();
+  pm.addPass<sys::DSE>();
+  pm.addPass<sys::DLE>();
+  pm.addPass<sys::DCE>();
+  pm.addPass<sys::StrengthReduct>();
   pm.addPass<sys::Verify>();
-  // Note that Mem2Reg can only be executed once. 
-  // That's why we need a late inline here.
 
   if (opts.arm)
     initArmPipeline(pm);

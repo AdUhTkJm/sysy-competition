@@ -131,67 +131,66 @@ void CanonicalizeLoop::run() {
 
     for (auto loop : forest.getLoops()) {
       auto header = loop->getHeader();
-      if (!loop->getPreheader()) {
-        const auto &preds = header->getPreds();
-        auto region = header->getParent();
-        auto preheader = region->insert(header);
+      const auto &preds = header->getPreds();
+      auto region = header->getParent();
+      auto preheader = region->insert(header);
 
-        // Reconnect the predecessors to jump to preheader instead.
-        for (auto pred : preds) {
-          if (loop->contains(pred))
-            continue;
+      // Always insert a preheader regardless of whether there exists one.
+      // Reconnect the predecessors to jump to preheader instead.
+      for (auto pred : preds) {
+        if (loop->contains(pred))
+          continue;
 
-          auto term = pred->getLastOp();
-          if (term->has<TargetAttr>() && TARGET(term) == header)
-            TARGET(term) = preheader;
-          if (term->has<ElseAttr>() && ELSE(term) == header)
-            ELSE(term) = preheader;
-        }
-
-        // Rewire non-backedge phi's at header to preheader.
-        auto phis = header->getPhis();
-        for (auto phi : phis) {
-          std::vector<std::pair<Op*, BasicBlock*>> forwarded, preserved;
-          for (size_t i = 0; i < phi->getOperands().size(); i++) {
-            auto from = cast<FromAttr>(phi->getAttrs()[i])->bb;
-            if (!loop->getLatches().count(from))
-              forwarded.push_back({ phi->getOperand(i).defining, from });
-            else
-              preserved.push_back({ phi->getOperand(i).defining, from });
-          }
-
-          // These form a new phi at the preheader.
-          if (forwarded.size()) {
-            builder.setToBlockEnd(preheader);
-            Op *newPhi;
-            if (forwarded.size() > 1) {
-              newPhi = builder.create<PhiOp>();
-              for (auto [def, from] : forwarded) {
-                newPhi->pushOperand(def);
-                newPhi->add<FromAttr>(from);
-              }
-            } else {
-              auto [def, from] = forwarded[0];
-              newPhi = def;
-            }
-
-            // Remove all forwarded operands, and push a { newPhi, preheader } pair.
-            phi->removeAllOperands();
-            phi->removeAllAttributes();
-            
-            for (auto [def, from] : preserved) {
-              phi->pushOperand(def);
-              phi->add<FromAttr>(from);
-            }
-            phi->pushOperand(newPhi);
-            phi->add<FromAttr>(preheader);
-          }
-        }
-
-        // Wire preheader to the header.
-        builder.setToBlockEnd(preheader);
-        builder.create<GotoOp>({ new TargetAttr(header) });
+        auto term = pred->getLastOp();
+        if (term->has<TargetAttr>() && TARGET(term) == header)
+          TARGET(term) = preheader;
+        if (term->has<ElseAttr>() && ELSE(term) == header)
+          ELSE(term) = preheader;
       }
+
+      // Rewire non-backedge phi's at header to preheader.
+      auto phis = header->getPhis();
+      for (auto phi : phis) {
+        std::vector<std::pair<Op*, BasicBlock*>> forwarded, preserved;
+        for (size_t i = 0; i < phi->getOperands().size(); i++) {
+          auto from = cast<FromAttr>(phi->getAttrs()[i])->bb;
+          if (!loop->getLatches().count(from))
+            forwarded.push_back({ phi->getOperand(i).defining, from });
+          else
+            preserved.push_back({ phi->getOperand(i).defining, from });
+        }
+
+        // These form a new phi at the preheader.
+        if (forwarded.size()) {
+          builder.setToBlockEnd(preheader);
+          Op *newPhi;
+          if (forwarded.size() > 1) {
+            newPhi = builder.create<PhiOp>();
+            for (auto [def, from] : forwarded) {
+              newPhi->pushOperand(def);
+              newPhi->add<FromAttr>(from);
+            }
+          } else {
+            auto [def, from] = forwarded[0];
+            newPhi = def;
+          }
+
+          // Remove all forwarded operands, and push a { newPhi, preheader } pair.
+          phi->removeAllOperands();
+          phi->removeAllAttributes();
+          
+          for (auto [def, from] : preserved) {
+            phi->pushOperand(def);
+            phi->add<FromAttr>(from);
+          }
+          phi->pushOperand(newPhi);
+          phi->add<FromAttr>(preheader);
+        }
+      }
+
+      // Wire preheader to the header.
+      builder.setToBlockEnd(preheader);
+      builder.create<GotoOp>({ new TargetAttr(header) });
     }
   }
 

@@ -175,6 +175,28 @@ void InstCombine::run() {
     }
     return false;
   });
+
+  runRewriter([&](BeqOp *op) {
+    auto def = op->DEF(0);
+    auto zero = op->DEF(1);
+    // Replace `beq (seqz x), zero` with `bne x, zero`.
+    if (isa<SeqzOp>(def) && isa<ReadRegOp>(zero) && REG(zero) == Reg::zero) {
+      builder.replace<BneOp>(op, { def->DEF(0), zero }, op->getAttrs());
+      return true;
+    }
+    return false;
+  });
+  
+  // Similarly `bne (seqz x), zero` becomes `beq x, zero`.
+  runRewriter([&](BneOp *op) {
+    auto def = op->DEF(0);
+    auto zero = op->DEF(1);
+    if (isa<SeqzOp>(def) && isa<ReadRegOp>(zero) && REG(zero) == Reg::zero) {
+      builder.replace<BeqOp>(op, { def->DEF(0), zero }, op->getAttrs());
+      return true;
+    }
+    return false;
+  });
   
   // Only run this after all int-related fold completes.
   // Rewrite `li a0, 0` into reading from `zero`.

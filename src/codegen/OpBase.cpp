@@ -102,12 +102,18 @@ void Op::setName(std::string name) {
 }
 
 void Op::moveBefore(Op *op) {
+  if (op == this)
+    return;
+
   parent->remove(place);
   parent = op->parent;
   parent->insert(op->place, this);
 }
 
 void Op::moveAfter(Op *op) {
+  if (op == this)
+    return;
+  
   parent->remove(place);
   parent = op->parent;
   parent->insertAfter(op->place, this);

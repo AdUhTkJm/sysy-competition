@@ -411,6 +411,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     std::set<Op*> active;
     for (const auto& event : events) {
       auto op = event.op;
+      // Jumps will never interfere.
+      if (isa<JOp>(op))
+        continue;
 
       if (event.start) {
         for (Op* activeOp : active) {

@@ -63,7 +63,7 @@ bool LoopUnroll::runImpl(LoopInfo *loop) {
   if (lower && upper && isa<IntOp>(lower) && isa<IntOp>(upper)) {
     int low = V(lower);
     int high = V(upper);
-    if (high - low <= 32) {
+    if (high - low <= 1000 / loopsize) {
       unroll = high - low;
       complete = true;
     }
@@ -74,6 +74,8 @@ bool LoopUnroll::runImpl(LoopInfo *loop) {
   auto region = bb->getParent();
 
   // Record the phi values at the beginning of `exit` that are taken from the latch.
+  // Note that "taken from latch" doesn't necessarily mean it's in the loop.
+  // It can be from something that passes through all the loop, for example.
   auto exit = *loop->getExits().begin();
   std::map<Op*, Op*> exitlatch;
   auto exitphis = exit->getPhis();
@@ -196,6 +198,10 @@ bool LoopUnroll::runImpl(LoopInfo *loop) {
     // Fix exit phis.
     // A new predecessor is added to exit, so we need to add another operand.
     for (auto [k, v] : exitlatch) {
+      // The value doesn't come from the loop. It shouldn't be changed.
+      if (!cloneMap.count(v))
+        continue;
+      
       auto operand = cloneMap[v];
       k->pushOperand(operand);
       k->add<FromAttr>(curLatch);
@@ -236,8 +242,10 @@ bool LoopUnroll::runImpl(LoopInfo *loop) {
 
       FROM(attrs[i]) = lastLatch;
       // phiMap[phi] is the latch-value in the original phi.
+      auto latchval = phiMap[phi];
       // cloneMap[phiMap[phi]] is the latch-value in the last-copied block.
-      phi->setOperand(i, cloneMap[phiMap[phi]]);
+      if (cloneMap.count(latchval))
+        phi->setOperand(i, cloneMap[latchval]);
       break;
     }
   }

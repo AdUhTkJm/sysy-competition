@@ -23,12 +23,14 @@ void Alias::runImpl(Region *region) {
   // This should guarantee definition comes before all uses.
   for (auto bb : rpo) {
     for (auto op : bb->getOps()) {
-      if (isa<AllocaOp>(op) && !op->has<AliasAttr>()) {
+      if (isa<AllocaOp>(op)) {
+        op->remove<AliasAttr>();
         op->add<AliasAttr>(op, 0);
         continue;
       }
 
-      if (isa<GetGlobalOp>(op) && !op->has<AliasAttr>()) {
+      if (isa<GetGlobalOp>(op)) {
+        op->remove<AliasAttr>();
         op->add<AliasAttr>(gMap[NAME(op)], 0);
         continue;
       }
