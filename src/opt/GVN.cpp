@@ -70,6 +70,9 @@ void GVN::dvnt(BasicBlock *bb, Domtree &domtree) {
 
   auto phis = bb->getPhis();
   for (auto phi : phis) {
+    // Empty phi is not allowed.
+    assert(phi->getOperandCount() > 0);
+
     Value common = phi->getOperand(0);
     if (symbols.count(common.defining)) {
       // This phi is meaningless if all of its operands share the same value.

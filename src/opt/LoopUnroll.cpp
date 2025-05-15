@@ -192,12 +192,34 @@ BasicBlock *LoopUnroll::copyLoop(LoopInfo *loop, BasicBlock *bb, int unroll, boo
       auto value = cloneMap.count(latchval) ? cloneMap[latchval] : latchval;
       phi->pushOperand(value);
       phi->add<FromAttr>(lastLatch);
-      break;
     }
 
     // Also let preheader jump to this header instead.
-    auto term = preheader->getLastOp();
-    builder.replace<GotoOp>(term, { new TargetAttr(realHeader) });
+
+    // Finally, the `stop` value of the loop should become (x - unroll * step).
+    auto term = lastLatch->getLastOp();
+    auto cond = term->DEF(0);
+
+    // `cond` must be of form `i < stop`, as detected by LoopAnalysis.
+    assert(isa<LtOp>(cond));
+    auto i = cond->DEF(0);
+    auto stop = cond->DEF(1);
+    assert(stop == loop->getStop());
+    
+    // Replace with `i < stop - unroll * step`.
+    builder.setAfterOp(stop);
+    auto unrollv = builder.create<IntOp>({ new IntAttr(unroll * loop->getStep()) });
+    auto diff = builder.create<SubIOp>({ stop, unrollv });
+    builder.replace<LtOp>(cond, { i, diff });
+
+    // Similarly we need to construct another guard `i < stop - unroll * step` at preheader,
+    // and make it jump to the original header if that fails.
+    term = preheader->getLastOp();
+    builder.setBeforeOp(term);
+    unrollv = builder.create<IntOp>({ new IntAttr(unroll * loop->getStep()) });
+    diff = builder.create<SubIOp>({ stop, unrollv });
+    auto lt = builder.create<LtOp>({ loop->getStart(), diff });
+    builder.replace<BranchOp>(term, { lt }, { new TargetAttr(realHeader), new ElseAttr(header) });
   }
 
   // Phis at the header should also now point to the new latch.
@@ -217,15 +239,16 @@ BasicBlock *LoopUnroll::copyLoop(LoopInfo *loop, BasicBlock *bb, int unroll, boo
         }
       }
 
-      // Moreover, we remove the operand from preheader.
-      // It won't reach the side loop anymore.
-      for (int i = 0; i < ops.size(); i++) {
-        if (FROM(attrs[i]) == preheader) {
-          phi->removeOperand(i);
-          phi->removeAttribute(i);
-          break;
-        }
-      }
+      // // Moreover, we remove the operand from preheader if this is not the only loop.
+      // // It won't reach the side loop anymore.
+      // if (!complete)
+      //   for (int i = 0; i < ops.size(); i++) {
+      //     if (FROM(attrs[i]) == preheader) {
+      //       phi->removeOperand(i);
+      //       phi->removeAttribute(i);
+      //       break;
+      //     }
+      //   }
       continue;
     }
 
@@ -260,6 +283,12 @@ bool LoopUnroll::runImpl(LoopInfo *loop) {
   auto latch = loop->getLatch();
   // The loop is not rotated. Don't unroll it.
   if (!isa<BranchOp>(latch->getLastOp()))
+    return false;
+
+  auto exit = *loop->getExits().begin();
+  // We don't want an internal `break` to interfere.
+  // It should come from either preheader or latch.
+  if (exit->getPreds().size() > 2)
     return false;
 
   int loopsize = 0;
@@ -299,6 +328,9 @@ bool LoopUnroll::runImpl(LoopInfo *loop) {
 
   auto lower = loop->getStart();
   auto upper = loop->getStop();
+  if (!upper)
+    return false;
+
   // Fully unroll constant-bounded loops if it's small enough.
   if (lower && upper && isa<IntOp>(lower) && isa<IntOp>(upper)) {
     int low = V(lower);
@@ -312,7 +344,6 @@ bool LoopUnroll::runImpl(LoopInfo *loop) {
   // Record the phi values at the beginning of `exit` that are taken from the latch.
   // Note that "taken from latch" doesn't necessarily mean it's in the loop.
   // It can be from something that passes through all the loop, for example.
-  auto exit = *loop->getExits().begin();
   auto exitphis = exit->getPhis();
   exitlatch.clear();
   for (auto phi : exitphis) {
@@ -356,7 +387,7 @@ void LoopUnroll::run() {
     do {
       changed = false;
       // Don't unroll too much.
-      if (region->getBlocks().size() > 2500)
+      if (region->getBlocks().size() > 1000)
         break;
 
       // We want to unroll small loops first.
@@ -368,6 +399,11 @@ void LoopUnroll::run() {
       }
 
       for (auto loop : order) {
+        // We only want to unroll innermost loops.
+        // Also, we can't unroll nested loops correctly.
+        if (loop->getSubloops().size() > 0)
+          continue;
+
         if (runImpl(loop)) {
           // No worries of repeated unrolling;
           // We require a single exit, and unrolled loops don't have that.

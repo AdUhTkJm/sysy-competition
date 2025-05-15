@@ -25,7 +25,7 @@ class LoopInfo {
   std::set<BasicBlock*> exits;
   std::set<BasicBlock*> latches;
   std::set<BasicBlock*> bbs;
-  BasicBlock *preheader;
+  BasicBlock *preheader = nullptr;
   BasicBlock *header;
   LoopInfo *parent = nullptr;
   // Induction variable. Though there might be multiple, we only preserve the first encountered.

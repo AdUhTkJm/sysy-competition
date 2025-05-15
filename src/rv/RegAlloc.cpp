@@ -741,11 +741,20 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         auto terminator = *--bb->getOps().end();
         builder.setBeforeOp(terminator);
         auto def = ops[i].defining;
-        auto mv = builder.create<MvOp>({
-          new ImpureAttr,
-          spillOffset.count(phi) ? (Attr*) new SpilledRdAttr GET_SPILLED_ARGS(phi) : new RdAttr(getReg(phi)),
-          spillOffset.count(def) ? (Attr*) new SpilledRsAttr GET_SPILLED_ARGS(def) : new RsAttr(getReg(def))
-        });
+        Op *mv;
+        if (phi->getResultType() == Value::f32) {
+          mv = builder.create<FmvOp>({
+            new ImpureAttr,
+            spillOffset.count(phi) ? (Attr*) new SpilledRdAttr GET_SPILLED_ARGS(phi) : new RdAttr(getReg(phi)),
+            spillOffset.count(def) ? (Attr*) new SpilledRsAttr GET_SPILLED_ARGS(def) : new RsAttr(getReg(def))
+          });
+        } else {
+          mv = builder.create<MvOp>({
+            new ImpureAttr,
+            spillOffset.count(phi) ? (Attr*) new SpilledRdAttr GET_SPILLED_ARGS(phi) : new RdAttr(getReg(phi)),
+            spillOffset.count(def) ? (Attr*) new SpilledRsAttr GET_SPILLED_ARGS(def) : new RsAttr(getReg(def))
+          });
+        }
         moves.push_back(mv);
       }
     }

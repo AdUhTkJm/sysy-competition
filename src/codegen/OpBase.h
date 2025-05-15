@@ -202,7 +202,7 @@ protected:
   std::string opname;
   // This is for ease of writing macro.
   void setName(std::string name);
-
+  void removeOperandUse(Op *op);
 public:
   int getID() const { return id; }
   const std::string &getName() { return opname; }

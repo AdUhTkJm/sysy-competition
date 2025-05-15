@@ -157,26 +157,37 @@ void Op::removeRegion(Region *region) {
   }
 }
 
+// Remove `def`'s use if we don't refer to it anymore.
+void Op::removeOperandUse(Op *def) {
+  bool hasDef = false;
+  for (auto x : operands) {
+    if (x.defining == def) {
+      hasDef = true;
+      break;
+    }
+  }
+  if (!hasDef)
+    def->uses.erase(this);
+}
+
 void Op::setOperand(int i, Value v) {
   auto def = operands[i].defining;
   operands[i] = v;
-  def->uses.erase(this);
+  removeOperandUse(def);
   v.defining->uses.insert(this);
 }
 
 void Op::removeOperand(int i) {
   auto def = operands[i].defining;
-  def->uses.erase(this);
   operands.erase(operands.begin() + i);
+  removeOperandUse(def);
 }
 
 void Op::replaceOperand(Op *before, Value v) {
-  for (auto &x : operands) {
-    auto def = x.defining;
+  for (int i = 0; i < operands.size(); i++) {
+    auto def = operands[i].defining;
     if (def == before) {
-      x = v;
-      def->uses.erase(this);
-      v.defining->uses.insert(this);
+      setOperand(i, v);
       return;
     }
   }
