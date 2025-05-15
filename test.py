@@ -19,6 +19,8 @@ parser.add_argument("-s", "--stats", action="store_true")
 parser.add_argument("-r", "--dump-mid-ir", action="store_true")
 parser.add_argument("--arm", action="store_true")
 parser.add_argument("-n", "--no-execute", action="store_true")
+parser.add_argument("-S", "--no-link", action="store_true")
+parser.add_argument("-O1", action="store_true")
 parser.add_argument("-d", "--directory", type=str)
 parser.add_argument("--timeout", type=float, default=1)
 parser.add_argument("--asm", type=str)
@@ -239,6 +241,12 @@ def run(full_file: str, no_exec: bool):
 
   if args.print_after:
     command.extend(["--print-after", args.print_after])
+
+  if args.no_link:
+    command.extend(["-S"])
+
+  if args.O1:
+    command.extend(["-O1"])
 
   command.extend(["-o", f"temp/{basename}.s"])
   

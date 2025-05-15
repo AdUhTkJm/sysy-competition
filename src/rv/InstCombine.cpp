@@ -197,6 +197,23 @@ void InstCombine::run() {
     }
     return false;
   });
+
+  //   sraiw a, b, i
+  //   sraiw c, a, j
+  // becomes
+  //   sraiw c, b, (i + j)
+  runRewriter([&](SraiwOp *op) {
+    auto c = op;
+    auto a = op->DEF();
+    auto j = V(c);
+    if (!isa<SraiwOp>(a))
+      return false;
+
+    auto b = a->DEF();
+    auto i = V(a);
+    builder.replace<SraiwOp>(op, { a }, { new IntAttr(i + j) });
+    return true;
+  });
   
   // Only run this after all int-related fold completes.
   // Rewrite `li a0, 0` into reading from `zero`.

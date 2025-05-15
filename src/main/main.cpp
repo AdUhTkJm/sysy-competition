@@ -72,7 +72,8 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DAE>();
   pm.addPass<sys::DSE>();
   pm.addPass<sys::DLE>();
-  pm.addPass<sys::LateConstFold>();
+  pm.addPass<sys::RegularFold>();
+  pm.addPass<sys::HoistConstArray>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::GCM>();
@@ -168,7 +169,14 @@ int main(int argc, char **argv) {
   pm.setPrintAfter(opts.printAfter);
   pm.setVerify(opts.verify);
   
-  initPipeline(pm);
+  // We want that, when we test locally, always enable -O1;
+  // When we test remotely, don't enable -O1 unless explicitly passed `-O1`.
+  // Use `-S` for this distinction.
+  if (opts.noLink && !opts.o1)
+    initLessOptPipeline(pm);
+  else
+    initPipeline(pm);
+  
   pm.run();
   return 0;
 }

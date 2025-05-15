@@ -129,6 +129,26 @@ public:
   void run();
 };
 
+class LoopUnswitch : public Pass {
+  int unswitched = 0;
+public:
+  LoopUnswitch(ModuleOp *module): Pass(module) {}
+
+  std::string name() { return "loop-unswitch"; }
+  std::map<std::string, int> stats();
+  void run();
+};
+
+class SCEV : public Pass {
+  int expanded = 0;
+public:
+  SCEV(ModuleOp *module): Pass(module) {}
+
+  std::string name() { return "scev"; }
+  std::map<std::string, int> stats();
+  void run();
+};
+
 }
 
 #endif

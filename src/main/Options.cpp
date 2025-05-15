@@ -42,7 +42,7 @@ Options sys::parseArgs(int argc, char **argv) {
     PARSEOPT("--dump-mid-ir", dumpMidIR);
     PARSEOPT("--rv", rv);
     PARSEOPT("--arm", arm);
-    PARSEOPT("--O1", o1);
+    PARSEOPT("-O1", o1);
     PARSEOPT("-S", noLink);
     PARSEOPT("-v", verbose);
     PARSEOPT("--stats", stats);

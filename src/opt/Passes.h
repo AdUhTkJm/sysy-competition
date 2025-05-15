@@ -231,6 +231,18 @@ public:
   void run();
 };
 
+class HoistConstArray : public Pass {
+  int hoisted = 0;
+  
+  void attemptHoist(AllocaOp *op);
+public:
+  HoistConstArray(ModuleOp *module): Pass(module) {}
+
+  std::string name() { return "hoist-const-array"; }
+  std::map<std::string, int> stats();
+  void run();
+};
+
 class Verify : public Pass {
 public:
   Verify(ModuleOp *module): Pass(module) {}
