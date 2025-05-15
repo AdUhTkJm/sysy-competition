@@ -24,8 +24,11 @@ Token Lexer::nextToken() {
   assert(loc < input.size());
 
   // Skip whitespace
-  while (loc < input.size() && std::isspace(input[loc]))
+  while (loc < input.size() && std::isspace(input[loc])) {
+    if (input[loc] == '\n')
+      lineno++;
     loc++;
+  }
 
   // Hit end of input because of skipping whitespace
   if (loc >= input.size())
@@ -42,6 +45,12 @@ Token Lexer::nextToken() {
     if (keywords.count(name))
       return keywords[name];
 
+    // Pay special attention to stoptime() and starttime().
+    // They are macros; we add in line number here.
+    if (name == "stoptime")
+      return Token("_sysy_stoptime_" + std::to_string(lineno));
+    if (name == "starttime")
+      return Token("_sysy_starttime_" + std::to_string(lineno));
     return Token(name);
   }
 

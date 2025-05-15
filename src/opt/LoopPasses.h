@@ -117,10 +117,17 @@ public:
 };
 
 class LoopUnroll : public Pass {
+  std::map<Op*, Op*> phiMap;
+  std::map<Op*, Op*> exitlatch;
   int unrolled = 0;
 
   // Returns true if changed.
   bool runImpl(LoopInfo *info);
+  // Returns the new latch.
+  // Starts insertion after `bb`, and duplicate `info` a total of `unroll` times.
+  // If `isMainLoop`, then substitute every branch into goto; otherwise leave it as it is.
+  // If `complete`, mark all phis as coming from preheader.
+  BasicBlock *copyLoop(LoopInfo *info, BasicBlock *bb, int unroll, bool isMainLoop, bool complete);
 public:
   LoopUnroll(ModuleOp *module): Pass(module) {}
 

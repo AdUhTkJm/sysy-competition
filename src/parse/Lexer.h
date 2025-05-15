@@ -48,10 +48,10 @@ class Lexer {
   std::string input;
 
   // Index of `input`
-  size_t loc;
-
+  size_t loc = 0;
+  size_t lineno = 1;
 public:
-  Lexer(const std::string &input): input(input), loc(0) {}
+  Lexer(const std::string &input): input(input) {}
 
   Token nextToken();
   bool hasMore() const;

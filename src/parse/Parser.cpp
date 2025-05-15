@@ -245,7 +245,19 @@ ASTNode *Parser::primary() {
         if (!test(Token::Comma) && !peek(Token::RPar))
           expect(Token::RPar);
       }
-      return new CallNode(vs, args);
+
+      // Take special care for _sysy_{start,stop}time.
+      // Their line numbers are encoded in their names.
+      std::string name = vs;
+      if (name.rfind("_sysy_starttime_", 0) != std::string::npos) {
+        name = "_sysy_starttime";
+        args.push_back(new IntNode(strtol(vs + 16, NULL, 10)));
+      }
+      if (name.rfind("_sysy_stoptime_", 0) != std::string::npos) {
+        name = "_sysy_stoptime";
+        args.push_back(new IntNode(strtol(vs + 15, NULL, 10)));
+      }
+      return new CallNode(name, args);
     }
 
     if (test(Token::LBrak)) {
