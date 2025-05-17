@@ -207,19 +207,6 @@ public:
   void run();
 };
 
-// Folds after mem2reg.
-class LateConstFold : public Pass {
-  int foldedTotal = 0;
-
-  int foldImpl();
-public:
-  LateConstFold(ModuleOp *module): Pass(module) {}
-    
-  std::string name() { return "late-const-fold"; };
-  std::map<std::string, int> stats();
-  void run();
-};
-
 class LateInline : public Pass {
   int inlined = 0;
   int threshold;

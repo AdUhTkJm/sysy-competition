@@ -151,9 +151,9 @@ bool Rule::matchExpr(Expr *expr, Op* op) {
   MATCH_BINARY("and", AndIOp);
   MATCH_BINARY("or", OrIOp);
   MATCH_BINARY("xor", XorIOp);
-  MATCH_BINARY("shl", LShiftImmOp);
-  MATCH_BINARY("shr", RShiftImmOp);
-  MATCH_BINARY("shrl", RShiftImmLOp);
+  MATCH_BINARY("shl", LShiftOp);
+  MATCH_BINARY("shr", RShiftOp);
+  MATCH_BINARY("shrl", RShiftLOp);
   MATCH_BINARY("addl", AddLOp);
   MATCH_BINARY("mull", MulLOp);
   MATCH_BINARY("addf", AddFOp);

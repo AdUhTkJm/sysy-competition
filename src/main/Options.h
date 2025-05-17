@@ -23,6 +23,8 @@ struct Options {
   std::string inputFile;
   std::string outputFile;
   std::string printAfter;
+  std::string compareWith;
+  std::string simulateInput;
   
   Options();
 };

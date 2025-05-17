@@ -83,9 +83,9 @@ int StrengthReduct::runImpl() {
 
     if (bits == 1) {
       converted++;
-      builder.replace<LShiftImmOp>(op, { x }, {
-        new IntAttr(__builtin_ctz(i))
-      });
+      builder.setBeforeOp(op);
+      auto amt = builder.create<IntOp>({ new IntAttr(__builtin_ctz(i)) });
+      builder.replace<LShiftOp>(op, { x, amt });
       return true;
     }
 
@@ -96,14 +96,13 @@ int StrengthReduct::runImpl() {
       Op *lowerBits;
       if (firstPlace == 0) // Multiplying by 1
         lowerBits = x.defining;
-      else
-        lowerBits = builder.create<LShiftImmOp>({ x }, {
-          new IntAttr(firstPlace)
-        });
+      else {
+        auto amt = builder.create<IntOp>({ new IntAttr(firstPlace) });
+        lowerBits = builder.create<LShiftOp>({ x, amt });
+      }
 
-      auto upperBits = builder.create<LShiftImmOp>({ x }, {
-        new IntAttr(__builtin_ctz(i - (1 << firstPlace)))
-      });
+      auto amt = builder.create<IntOp>({ new IntAttr(__builtin_ctz(i - (1 << firstPlace))) });
+      auto upperBits = builder.create<LShiftOp>({ x, amt });
       builder.replace<AddIOp>(op, { lowerBits, upperBits });
       return true;
     }
@@ -116,14 +115,13 @@ int StrengthReduct::runImpl() {
         Op *lowerBits;
         if (place == 0) // Multiplying by 1
           lowerBits = x.defining;
-        else
-          lowerBits = builder.create<LShiftImmOp>({ x }, {
-            new IntAttr(place)
-          });
+        else {
+          auto amt = builder.create<IntOp>({ new IntAttr(place) });
+          lowerBits = builder.create<LShiftOp>({ x, amt });
+        }
 
-        auto upperBits = builder.create<LShiftImmOp>({ x }, {
-          new IntAttr(__builtin_ctz(i + (1 << place)))
-        });
+        auto amt = builder.create<IntOp>({ new IntAttr(__builtin_ctz(i + (1 << place))) });
+        auto upperBits = builder.create<LShiftOp>({ x, amt });
         builder.replace<SubIOp>(op, { upperBits, lowerBits });
         return true;
       }
@@ -166,9 +164,9 @@ int StrengthReduct::runImpl() {
     if (bits == 1) {
       auto place = __builtin_ctz(i);
       converted++;
-      builder.replace<RShiftImmOp>(op, { x }, {
-        new IntAttr(place)
-      });
+      builder.setBeforeOp(op);
+      Value amt = builder.create<IntOp>({ new IntAttr(place) });
+      builder.replace<RShiftOp>(op, { x, amt });
       return true;
     }
 
@@ -186,20 +184,26 @@ int StrengthReduct::runImpl() {
       // We only need to `sra` an extra 32 bit to retrieve it.
       Value mVal = builder.create<IntOp>({ new IntAttr(m) });
       Value mulsh = builder.create<MulLOp>({ mVal, n });
-      Value sra = builder.create<RShiftImmLOp>({ mulsh }, { new IntAttr(32 + shPost) });
-      Value xsign = builder.create<RShiftImmOp>({ n }, { new IntAttr(31) });
+      Value amt = builder.create<IntOp>({ new IntAttr(32 + shPost) });
+      Value sra = builder.create<RShiftLOp>({ mulsh, amt });
+      Value amt2 = builder.create<IntOp>({ new IntAttr(31) });
+      Value xsign = builder.create<RShiftOp>({ n, amt2 });
       builder.replace<SubIOp>(op, { sra, xsign });
       return true;
     } else {
       // Issue q = SRA(n + MULSH(m − 2^N, n), shPost) − XSIGN(n);
       Value mVal = builder.create<IntOp>({ new IntAttr(m - (1ull << 32)) });
       Value mul = builder.create<MulLOp>({ mVal, n });
-      Value mulsh = builder.create<RShiftImmLOp>({ mul }, { new IntAttr(32) });
+      Value amt = builder.create<IntOp>({ new IntAttr(32) });
+      Value mulsh = builder.create<RShiftLOp>({ mul, amt });
       Value add = builder.create<AddIOp>({ mulsh, n });
       Value sra = add;
-      if (shPost > 0)
-        sra = builder.create<RShiftImmOp>({ add }, { new IntAttr(shPost) });
-      Value xsign = builder.create<RShiftImmOp>({ n }, { new IntAttr(31) });
+      if (shPost > 0) {
+        Value amt = builder.create<IntOp>({ new IntAttr(shPost) });
+        sra = builder.create<RShiftOp>({ add, amt });
+      }
+      Value amt2 = builder.create<IntOp>({ new IntAttr(31) });
+      Value xsign = builder.create<RShiftOp>({ n, amt2 });
       builder.replace<SubIOp>(op, { sra, xsign });
       return true;
     }

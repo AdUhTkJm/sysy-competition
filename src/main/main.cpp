@@ -1,6 +1,7 @@
 #include "../parse/Parser.h"
 #include "../parse/Sema.h"
 #include "../codegen/CodeGen.h"
+#include "../opt/PassManager.h"
 #include "../opt/Passes.h"
 #include "../opt/LoopPasses.h"
 #include "../opt/CleanupPasses.h"
@@ -129,7 +130,7 @@ void initLessOptPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DAE>();
   pm.addPass<sys::DSE>();
   pm.addPass<sys::DLE>();
-  pm.addPass<sys::LateConstFold>();
+  pm.addPass<sys::RegularFold>();
   pm.addPass<sys::StrengthReduct>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GVN>();
@@ -168,11 +169,7 @@ int main(int argc, char **argv) {
   if (opts.dumpMidIR)
     cg.getModule()->dump(std::cerr);
 
-  sys::PassManager pm(cg.getModule());
-  pm.setVerbose(opts.verbose);
-  pm.setPrintStats(opts.stats);
-  pm.setPrintAfter(opts.printAfter);
-  pm.setVerify(opts.verify);
+  sys::PassManager pm(cg.getModule(), opts);
   
   // We want that, when we test locally, always enable -O1;
   // When we test remotely, don't enable -O1 unless explicitly passed `-O1`.

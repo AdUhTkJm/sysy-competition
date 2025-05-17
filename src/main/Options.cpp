@@ -37,6 +37,18 @@ Options sys::parseArgs(int argc, char **argv) {
       i++;
       continue;
     }
+    
+    if (strcmp(argv[i], "--compare") == 0) {
+      opts.compareWith = argv[i + 1];
+      i++;
+      continue;
+    }
+
+    if (strcmp(argv[i], "-i") == 0) {
+      opts.simulateInput = argv[i + 1];
+      i++;
+      continue;
+    }
 
     PARSEOPT("--dump-ast", dumpAST);
     PARSEOPT("--dump-mid-ir", dumpMidIR);

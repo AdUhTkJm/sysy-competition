@@ -63,9 +63,9 @@ void Lower::run() {
   REPLACE(MulshOp, MulhOp);
   REPLACE(MuluhOp, MulhuOp);
   REPLACE(DivIOp, DivwOp);
-  REPLACE(LShiftImmOp, SlliwOp);
-  REPLACE(RShiftImmOp, SraiwOp);
-  REPLACE(RShiftImmLOp, SraiOp);
+  REPLACE(LShiftOp, SllwOp);
+  REPLACE(RShiftOp, SrawOp);
+  REPLACE(RShiftLOp, SraOp);
   REPLACE(GotoOp, JOp);
   REPLACE(GetGlobalOp, LaOp);
   REPLACE(AndIOp, AndOp);

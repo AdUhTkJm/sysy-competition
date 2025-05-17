@@ -91,9 +91,9 @@ OPF(I2FOp);
 OP(MinusOp); // for input x, returns -x. Don't confuse with SubI/SubF.
 OPF(MinusFOp);
 OP(NotOp);
-OP(LShiftImmOp);
-OP(RShiftImmOp);
-OPL(RShiftImmLOp); // Shift for 64 bit.
+OP(LShiftOp);
+OP(RShiftOp);
+OPL(RShiftLOp);
 OP(MulshOp);
 OP(MuluhOp);
 OP(SetNotZeroOp);

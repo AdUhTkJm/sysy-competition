@@ -267,9 +267,9 @@ bool ArmRule::matchExprForLower(Expr *expr, Op* op) {
   MATCH_UNARY("snz", SetNotZeroOp);
   MATCH_UNARY("minus", MinusOp);
   
-  MATCH_UNARY_IMM("shl", LShiftImmOp);
-  MATCH_UNARY_IMM("shr", RShiftImmOp);
-  MATCH_UNARY_IMM("shrl", RShiftImmLOp);
+  MATCH_UNARY_IMM("shl", LShiftOp);
+  MATCH_UNARY_IMM("shr", RShiftOp);
+  MATCH_UNARY_IMM("shrl", RShiftLOp);
 
   MATCH_BRANCH("br", BranchOp);
 

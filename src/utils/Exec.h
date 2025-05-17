@@ -2,6 +2,7 @@
 #define EXEC_H
 
 #include "../codegen/Ops.h"
+#include <cstdint>
 #include <sstream>
 #include <map>
 #include <unordered_map>
@@ -10,31 +11,35 @@ namespace sys::exec {
 
 class Interpreter {
   union Value {
-    int vi;
+    intptr_t vi;
     float vf;
-    int *vp;
-    float *vfp;
   };
 
   using SymbolTable = std::unordered_map<Op*, Value>;
 
-  std::stringstream buffer;
+  std::stringstream outbuf, inbuf;
   std::map<std::string, Op*> fnMap;
+  std::set<std::string> fpGlobals;
   std::map<std::string, Value> globalMap;
 
   SymbolTable value;
+  // Used for phi functions.
+  BasicBlock *prev;
   // Instruction pointer.
   Op *ip;
 
-  int eval(Op *op);
+  intptr_t eval(Op *op);
   float evalf(Op *op);
-  int *evalp(Op *op);
-  float *evalfp(Op *op);
+
+  void store(Op *op, float v);
+  void store(Op *op, intptr_t v);
 
   void exec(Op *op);
-  Value execf(Region *region);
+  Value execf(Region *region, const std::vector<Value> &args);
 
-  int retcode = 0;
+  Value applyExtern(const std::string &name);
+
+  unsigned retcode;
 
   struct SemanticScope {
     Interpreter &parent;
@@ -48,8 +53,8 @@ public:
   ~Interpreter();
 
   void run(std::istream &input);
-  std::string out() { return buffer.str(); }
-  int exitcode() { return retcode; }
+  std::string out() { return outbuf.str(); }
+  int exitcode() { return retcode & 0xff; }
 };
 
 }

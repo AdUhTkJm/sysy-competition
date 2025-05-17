@@ -67,6 +67,10 @@ RVOP(SlliwOp); // Shift left.
 RVOP(SrliwOp); // Shift right, unsigned.
 RVOPL(SraiOp); // Shift right (64 bit), signed.
 RVOP(SraiwOp); // Shift right, signed.
+RVOP(SllwOp); // Shift left.
+RVOP(SrlwOp); // Shift right, unsigned.
+RVOPL(SraOp); // Shift right (64 bit), signed.
+RVOP(SrawOp); // Shift right, signed.
 RVOP(MulhOp); // Higher bits of mul, signed.
 RVOP(MulhuOp); // Higher bits of mul, unsigned.
 RVOP(AndOp);

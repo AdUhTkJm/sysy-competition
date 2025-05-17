@@ -21,11 +21,11 @@ parser.add_argument("-V", "--valgrind", action="store_true")
 parser.add_argument("-v", "--verbose", action="store_true")
 parser.add_argument("--verify", action="store_true")
 parser.add_argument("-s", "--stats", action="store_true")
-parser.add_argument("-r", "--dump-mid-ir", action="store_true")
 parser.add_argument("--arm", action="store_true")
 parser.add_argument("-n", "--no-execute", action="store_true")
 parser.add_argument("-S", "--no-link", action="store_true")
 parser.add_argument("-O1", action="store_true")
+parser.add_argument("-r", "--run", action="store_true")
 parser.add_argument("-d", "--directory", type=str)
 parser.add_argument("--timeout", type=float, default=1)
 parser.add_argument("--asm", type=str)
@@ -240,9 +240,6 @@ def run(full_file: str, no_exec: bool):
     command = ["valgrind", *command]
     no_exec = True
   
-  if args.dump_mid_ir:
-    command.append("--dump-mid-ir")
-  
   if args.arm:
     command.append("--arm")
   
@@ -259,10 +256,17 @@ def run(full_file: str, no_exec: bool):
     command.extend(["--print-after", args.print_after])
 
   if args.no_link:
-    command.extend(["-S"])
+    command.append("-S")
 
   if args.O1:
-    command.extend(["-O1"])
+    command.append("-O1")
+
+  if args.run:
+    dir = Path(full_file).parent.absolute()
+    input = dir / f"{basename}.in"
+    command.extend(["--compare", f"{dir}/{basename}.out"])
+    if input.exists():
+      command.extend(["-i", str(input)])
 
   command.extend(["-o", f"temp/{basename}.s"])
   

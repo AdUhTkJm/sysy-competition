@@ -14,6 +14,8 @@ namespace sys {
   
 using DomTree = std::unordered_map<BasicBlock*, std::vector<BasicBlock*>>;
 
+bool isExtern(const std::string &name);
+
 class Pass {
   template<typename F, typename Ret, typename A>
   static A helper(Ret (F::*)(A) const);
@@ -46,8 +48,6 @@ protected:
     runRewriter(module, rewriter);
   }
 
-  static bool isExtern(const std::string &name);
-
   // This will be faster than module->findAll<FuncOp>,
   // as it doesn't need to iterate through the contents of functions.
   std::vector<FuncOp*> collectFuncs();
@@ -62,33 +62,6 @@ public:
   virtual std::string name() = 0;
   virtual std::map<std::string, int> stats() = 0;
   virtual void run() = 0;
-};
-
-class PassManager {
-  std::vector<Pass*> passes;
-  ModuleOp *module;
-
-  bool verbose = false;
-  bool print = false;
-  bool verify = false;
-  std::string printAfter;
-public:
-  PassManager(ModuleOp *module): module(module) {}
-  ~PassManager();
-
-  void setVerbose(bool verbose);
-  void setPrintStats(bool print);
-  void setPrintAfter(const std::string &passName);
-  void setVerify(bool verify);
-
-  void run();
-  ModuleOp *getModule() { return module; }
-
-  template<class T, class... Args>
-  void addPass(Args... args) {
-    auto pass = new T(module, std::forward<Args>(args)...);
-    passes.push_back(pass);
-  }
 };
 
 }
