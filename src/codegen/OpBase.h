@@ -326,6 +326,8 @@ inline std::ostream &operator<<(std::ostream &os, Op *op) {
 template<class T, int OpID>
 class OpImpl : public Op {
 public:
+  constexpr static int id = OpID;
+  
   static bool classof(Op *op) {
     return op->getID() == OpID;
   }

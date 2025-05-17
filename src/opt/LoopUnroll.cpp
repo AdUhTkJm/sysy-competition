@@ -331,6 +331,12 @@ bool LoopUnroll::runImpl(LoopInfo *loop) {
   if (!upper)
     return false;
 
+  // Check the real op.
+  while (isa<PhiOp>(lower) && lower->getOperandCount() == 1)
+    lower = lower->DEF();
+  while (isa<PhiOp>(upper) && upper->getOperandCount() == 1)
+    upper = upper->DEF();
+
   // Fully unroll constant-bounded loops if it's small enough.
   if (lower && upper && isa<IntOp>(lower) && isa<IntOp>(upper)) {
     int low = V(lower);
@@ -340,6 +346,10 @@ bool LoopUnroll::runImpl(LoopInfo *loop) {
       complete = true;
     }
   }
+
+  // If the constant-bounded loop has a single iteration, it'll be handled by regular fold.
+  if (unroll == 1)
+    return false;
 
   // Record the phi values at the beginning of `exit` that are taken from the latch.
   // Note that "taken from latch" doesn't necessarily mean it's in the loop.

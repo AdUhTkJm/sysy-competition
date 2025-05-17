@@ -43,6 +43,7 @@ static Rule rules[] = {
   "(change (mul x -1) (minus x))",
   "(change (mul 'a 'b) (!mul 'a 'b))",
   "(change (mul 'a x) (mul x 'a))",
+  "(change (mul (mul x 'a) 'b) (mul x (!mul 'a 'b)))",
 
   // Division
   "(change (div 0 x) 0)",
@@ -51,6 +52,7 @@ static Rule rules[] = {
   "(change (div x x) 1)",
   "(change (div 'a 'b) (!div 'a 'b))",
   "(change (div (mul x 'a) 'b) (!only-if (!eq (!mod 'a 'b) 0) (mul x (!div 'a 'b))))",
+  "(change (div (div x 'a) 'b) (!only-if (!ne (!mul 'a 'b) -1) (div x (!mul 'a 'b))))",
 
   // Modulus
   "(change (mod x 1) 0)",
