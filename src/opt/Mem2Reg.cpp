@@ -188,14 +188,6 @@ void Mem2Reg::run() {
     runImpl(func);
 
   runRewriter([&](PhiOp *op) {
-    // Discard trivial phis.
-    if (op->getOperands().size() == 1) {
-      auto def = op->getOperand().defining;
-      op->replaceAllUsesWith(def);
-      op->erase();
-      return true;
-    }
-
     // In case a phi references itself, we remove that operand.
     // (Why would this even happen?)
     const auto &ops = op->getOperands();

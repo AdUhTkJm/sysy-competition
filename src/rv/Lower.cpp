@@ -243,8 +243,9 @@ void Lower::run() {
     builder.setBeforeOp(op);
 
     if (op->getOperands().size()) {
+      auto fp = op->getOperand(0).ty == Value::f32;
       auto virt = builder.create<WriteRegOp>(op->getOperands(), {
-        new RegAttr(Reg::a0)
+        new RegAttr(fp ? Reg::fa0 : Reg::a0)
       });
       builder.replace<RetOp>(op, { virt });
       return true;

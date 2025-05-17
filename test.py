@@ -376,8 +376,8 @@ def test_all():
     failures = sorted(failures, key=lambda x: x[0])
     for path, reason in failures:
       print(f"- {path}")
-      first_line = reason.split('\n')[0].strip()
-      print(f"  Reason: {reason}")
+      lines = '\n'.join([x.strip() for x in reason.split('\n')[:10]])
+      print(f"  Reason: {lines}")
 
 
 if __name__ == "__main__":

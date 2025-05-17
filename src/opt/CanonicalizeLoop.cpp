@@ -163,16 +163,10 @@ void CanonicalizeLoop::run() {
         // These form a new phi at the preheader.
         if (forwarded.size()) {
           builder.setToBlockEnd(preheader);
-          Op *newPhi;
-          if (forwarded.size() > 1) {
-            newPhi = builder.create<PhiOp>();
-            for (auto [def, from] : forwarded) {
-              newPhi->pushOperand(def);
-              newPhi->add<FromAttr>(from);
-            }
-          } else {
-            auto [def, from] = forwarded[0];
-            newPhi = def;
+          Op *newPhi = builder.create<PhiOp>();
+          for (auto [def, from] : forwarded) {
+            newPhi->pushOperand(def);
+            newPhi->add<FromAttr>(from);
           }
 
           // Remove all forwarded operands, and push a { newPhi, preheader } pair.

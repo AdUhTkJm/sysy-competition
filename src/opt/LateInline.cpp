@@ -136,7 +136,7 @@ void LateInline::run() {
 
         auto ret = v->getOperand().defining;
         builder.setBeforeOp(v);
-        returns.push_back({ ret, ret->getParent() });
+        returns.push_back({ ret, v->getParent() });
         builder.replace<GotoOp>(v, { new TargetAttr(end) });
         continue;
       }
