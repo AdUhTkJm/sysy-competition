@@ -28,7 +28,12 @@ protected:
     using T = std::remove_pointer_t<argument_t<F>>;
     
     bool success;
+    int total = 0;
     do {
+      // Probably hit an infinite loop.
+      if (++total > 10000)
+        assert(false);
+      
       auto ts = op->findAll<T>();
       success = false;
       for (auto t : ts)
