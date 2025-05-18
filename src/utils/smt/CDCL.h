@@ -99,13 +99,14 @@ public:
 };
 
 class SATContext {
+  int total = 0;
 public:
-  Solver solver;
-  std::unordered_map<std::string, Variable> varMap;
+  int getTotal() { return total; }
 
-  Variable createVar(const std::string& name);
-  Atomic getAtomic(const std::string& name, bool neg = false);
-  void reset();
+  Variable create() { return total++; }
+  Atomic neg(Variable x) { return (x << 1) + 1; }
+  Atomic pos(Variable x) { return (x << 1); }
+  void reset() { total = 0; }
 };
 
 inline std::ostream &operator<<(std::ostream &os, const Clause *clause) {

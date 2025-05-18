@@ -80,7 +80,7 @@ void Lower::run() {
   REPLACE(LeFOp, FleOp);
   REPLACE(F2IOp, FcvtwsRtzOp);
   REPLACE(I2FOp, FcvtswOp);
-
+  
   runRewriter([&](FloatOp *op) {
     float value = F(op);
     

@@ -88,22 +88,24 @@ void Mem2Reg::fillPhi(BasicBlock *bb, BasicBlock *last) {
       break; 
 
     auto alloca = phiFrom[cast<PhiOp>(op)];
-    
-    // It doesn't have an initial value from this path.
-    // It's acceptable (programs without UB can also do this, see official/25.sy)
-    // Simply ignore phi from this branch.
-    if (!symbols.count(alloca))
-      continue;
 
     // We meet a PhiOp. This means the promoted register might hold value `symbols[alloca]` when it reaches here.
     // So this PhiOp should have that value as operand as well.
-    auto value = symbols[alloca];
-    // Found the same op. Alright to skip it.
-    if (value.defining == op)
-      continue;
+    Value value;
+    
+    // It doesn't have an initial value from this path.
+    // It's acceptable (for example a variable defined only in a loop)
+    // Mark undef from this branch.
+    // Also, it's possible to find the same op, which means it's undefined.
+    if (!symbols.count(alloca) || symbols[alloca].defining == op) {
+      // Create a zero at the back of the incoming edge.
+      auto term = last->getLastOp();
+      builder.setBeforeOp(term);
+      value = builder.create<IntOp>({ new IntAttr(0) });
+    } else
+      value = symbols[alloca];
 
     op->pushOperand(value);
-    assert(last);
     op->add<FromAttr>(last);
     symbols[alloca] = op;
   }
@@ -186,19 +188,4 @@ void Mem2Reg::run() {
   auto funcs = collectFuncs();
   for (auto func : funcs)
     runImpl(func);
-
-  runRewriter([&](PhiOp *op) {
-    // In case a phi references itself, we remove that operand.
-    // (Why would this even happen?)
-    const auto &ops = op->getOperands();
-    const auto &attrs = op->getAttrs();
-    for (size_t i = 0; i < ops.size(); i++) {
-      if (ops[i].defining == op) {
-        op->removeOperand(i);
-        op->removeAttribute(i);
-        return true;
-      }
-    }
-    return false;
-  });
 }

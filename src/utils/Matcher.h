@@ -23,7 +23,6 @@ struct List : Expr {
   template<class T>
   static bool classof(T *t) { return t->id == 2; }
 
-  // The rules are living globally anyway. No need to release.
   std::vector<Expr*> elements;
   List(): Expr(2) {}
 };

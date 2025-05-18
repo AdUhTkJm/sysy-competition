@@ -272,6 +272,7 @@ def run(full_file: str, no_exec: bool):
   
   # Invoke SysY compiler.
   proc.run(command, check=True)
+  print("Done.")
 
   if no_exec:
     return;

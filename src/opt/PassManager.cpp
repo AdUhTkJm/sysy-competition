@@ -17,7 +17,7 @@ PassManager::PassManager(ModuleOp *module, const Options &opts):
     truth = ss.str();
 
     // Strip the string.
-    while (std::isspace(truth.back()))
+    while (truth.size() && std::isspace(truth.back()))
       truth.pop_back();
     
     // We need to separate the final line.
@@ -75,15 +75,21 @@ void PassManager::run() {
     // Technically we have the capacity, but it's too much work.
     if (opts.compareWith.size() && pastMem2Reg && !inBackend) {
       exec::Interpreter itp(module);
-      std::stringstream buffer(truth);
+      std::stringstream buffer(input);
       itp.run(buffer);
       std::string str = itp.out();
+      // Strip output.
+      while (str.size() && std::isspace(str.back()))
+        str.pop_back();
+
       if (str != truth) {
         std::cerr << "output mismatch:\n" << str << "\n";
+        std::cerr << "after pass: " << pass->name() << "\n";
         assert(false);
       }
       if (exitcode != itp.exitcode()) {
         std::cerr << "exit code mismatch:" << itp.exitcode() << " (expected " << exitcode << ")\n";
+        std::cerr << "after pass: " << pass->name() << "\n";
         assert(false);
       }
     }

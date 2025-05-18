@@ -114,11 +114,10 @@ void Interpreter::exec(Op *op) {
   EXEC_BINARY(OrIOp, |);
   EXEC_BINARY(XorIOp, ^);
   EXEC_BINARY(LShiftOp, <<);
-  EXEC_BINARY(RShiftOp, >>);
   
   EXEC_BINARY_L(AddLOp, +);
   EXEC_BINARY_L(MulLOp, *);
-  EXEC_BINARY_L(RShiftLOp, *);
+  EXEC_BINARY_L(RShiftLOp, >>);
 
   EXEC_BINARY_F(AddFOp, +);
   EXEC_BINARY_F(SubFOp, -);
@@ -126,27 +125,16 @@ void Interpreter::exec(Op *op) {
   EXEC_BINARY_F(DivFOp, /);
 
   EXEC_UNARY(NotOp, !);
+  EXEC_UNARY(SetNotZeroOp, !!);
   EXEC_UNARY(MinusOp, -);
-  case CallOp::id: {
-    const auto &name = NAME(op);
-    if (isExtern(name))
-      value[op] = applyExtern(name);
-    else {
-      auto operands = op->getOperands();
-      std::vector<Value> args;
-      args.reserve(operands.size());
-      for (auto operand : operands)
-        args.push_back(value[operand.defining]);
-
-      SemanticScope scope(*this);
-      execf(fnMap[name]->getRegion(), args);
-    }
-    break;
-  }
-  case AllocaOp::id: {
-    bool fp = op->has<FPAttr>();
-    void *space = alloca(SIZE(op));
-    store(op, (intptr_t) space);
+  case RShiftOp::id: {
+    auto x = eval(op->DEF(0));
+    auto y = eval(op->DEF(1));
+    if (x & 0x80000000)
+      // This is a negative 32-bit integer.
+      store(op, (intptr_t) ((int) x >> y));
+    else
+      store(op, x >> y);
     break;
   }
   case PhiOp::id: {
@@ -164,15 +152,62 @@ void Interpreter::exec(Op *op) {
       sys_unreachable("undef phi: coming from " << bbmap[prev]);
     break;
   }
+  case GetGlobalOp::id: {
+    const auto &name = NAME(op);
+    if (!globalMap.count(name))
+      sys_unreachable("unknown global: " << name);
+
+    value[op] = globalMap[name];
+    break;
+  }
+  case LoadOp::id: {
+    size_t size = SIZE(op);
+    bool fp = op->getResultType() == sys::Value::f32;
+    intptr_t addr = eval(op->DEF());
+    if (fp)
+      store(op, *(float*) addr);
+    else if (size == 4)
+      store(op, (intptr_t) *(int*) addr);
+    else if (size == 8)
+      store(op, *(intptr_t*) addr);
+    else
+      assert(false);
+    break;
+  }
+  case StoreOp::id: {
+    size_t size = SIZE(op);
+    bool fp = op->getResultType() == sys::Value::f32;
+    intptr_t addr = eval(op->DEF(1));
+    Op *def = op->DEF(0);
+    if (fp)
+      *(float*) addr = evalf(def);
+    else if (size == 4)
+      *(int*) addr = eval(def);
+    else if (size == 8)
+      *(intptr_t*) addr = eval(def);
+    else
+      assert(false);
+    break;
+  }
   default:
     sys_unreachable("unknown op type: " << ip);
   }
 }
 
-Interpreter::Value Interpreter::applyExtern(const std::string &name) {
+Interpreter::Value Interpreter::applyExtern(const std::string &name, const std::vector<Value> &args) {
   if (name == "getint") {
     int x; inbuf >> x;
     return Value { .vi = x };
+  }
+  if (name == "putint") {
+    intptr_t v = args[0].vi;
+    // Direct cast of `(int) v` is implementation-defined.
+    outbuf << (int) (unsigned) v;
+    return Value();
+  }
+  if (name == "putch") {
+    outbuf << (char) args[0].vi;
+    return Value();
   }
   sys_unreachable("unknown extern function: " << name);
 }
@@ -195,9 +230,39 @@ Interpreter::Value Interpreter::execf(Region *region, const std::vector<Value> &
       ip = dest->getFirstOp();
       break;
     }
+    // Note that we need the stack space to live long enough,
+    // till we exit this interpreted function.
+    case AllocaOp::id: {
+      bool fp = ip->has<FPAttr>();
+      void *space = alloca(SIZE(ip));
+      store(ip, (intptr_t) space);
+      ip = ip->nextOp();
+      break;
+    }
+    case CallOp::id: {
+      const auto &name = NAME(ip);
+      auto operands = ip->getOperands();
+      std::vector<Value> args;
+      args.reserve(operands.size());
+      for (auto operand : operands)
+        args.push_back(value[operand.defining]);
+
+      if (isExtern(name)) {
+        value[ip] = applyExtern(name, args);
+        ip = ip->nextOp();
+      }
+      else {
+        SemanticScope scope(*this);
+        Op *before = ip;
+        execf(fnMap[name]->getRegion(), args);
+        ip = before->nextOp();
+      }
+      break;
+    }
     default:
       exec(ip);
       ip = ip->nextOp();
+      break;
     }
   }
   // Now `ip` is a ReturnOp.

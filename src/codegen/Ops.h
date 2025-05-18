@@ -99,7 +99,7 @@ OP(MuluhOp);
 OP(SetNotZeroOp);
 OP(BreakOp);
 OP(ContinueOp);
-OP(IdOp); // Used for building extended SSA.
+OP(UndefOp); // Put directly under ModuleOp, not in any function.
 
 }
 

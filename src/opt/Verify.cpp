@@ -9,6 +9,10 @@ void Verify::run() {
   
   auto phis = module->findAll<PhiOp>();
   for (auto phi : phis) {
+    // Check the number of phi's must be equal to the number of predecessors.
+    auto parent = phi->getParent();
+    assert(parent->getPreds().size() == phi->getOperandCount());
+
     // Check that all operands from Phi must come from the immediate predecessor.
     auto bb = phi->getParent();
     for (auto attr : phi->getAttrs()) {
@@ -18,6 +22,8 @@ void Verify::run() {
         assert(false);
       }
     }
+    
+    // Check phi doesn't reference itself.
     for (auto operand : phi->getOperands())
       assert(operand.defining != phi);
   }
