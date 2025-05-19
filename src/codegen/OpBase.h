@@ -19,9 +19,11 @@ class BasicBlock;
 class Value {
 public:
   Op *defining;
+  // Value itself shouldn't record type.
+  // The type is changeable and should be carried by the (unique) op.
   enum Type {
     unit, i32, i64, f32, i128, f128
-  } ty;
+  };
 
   Value() {} // uninitialized, for std::map
   Value(Op *from);

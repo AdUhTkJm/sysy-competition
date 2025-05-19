@@ -54,6 +54,22 @@ static void rewriteAlloca(FuncOp *func) {
 void Lower::run() {
   Builder builder;
 
+  // First fix type of phi's.
+  // If a phi has an operand of float type, then itself must also be of float type.
+  runRewriter([&](PhiOp *op) {
+    if (op->getResultType() == Value::f32)
+      return false;
+
+    for (auto operand : op->getOperands()) {
+      if (operand.defining->getResultType() == Value::f32) {
+        op->setResultType(Value::f32);
+        return true;
+      }
+    }
+
+    return false;
+  });
+
   REPLACE(IntOp, LiOp);
   REPLACE(AddIOp, AddwOp);
   REPLACE(AddLOp, AddOp);
@@ -243,7 +259,7 @@ void Lower::run() {
     builder.setBeforeOp(op);
 
     if (op->getOperands().size()) {
-      auto fp = op->getOperand(0).ty == Value::f32;
+      auto fp = op->DEF(0)->getResultType() == Value::f32;
       auto virt = builder.create<WriteRegOp>(op->getOperands(), {
         new RegAttr(fp ? Reg::fa0 : Reg::a0)
       });
@@ -273,14 +289,15 @@ void Lower::run() {
     std::vector<Value> spilled;
     for (size_t i = 0; i < args.size(); i++) {
       Value arg = args[i];
+      auto ty = arg.defining->getResultType();
       int fcnt = fargsNew.size();
       int cnt = argsNew.size();
 
-      if (arg.ty == Value::f32 && fcnt < 8) {
+      if (ty == Value::f32 && fcnt < 8) {
         fargsNew.push_back(builder.create<WriteRegOp>({ arg }, { new RegAttr(fregs[fcnt]) }));
         continue;
       }
-      if (arg.ty != Value::f32 && cnt < 8) {
+      if (ty != Value::f32 && cnt < 8) {
         argsNew.push_back(builder.create<WriteRegOp>({ arg }, { new RegAttr(regs[cnt]) }));
         continue;
       }

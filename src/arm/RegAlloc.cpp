@@ -180,7 +180,7 @@ void RegAlloc::allocate(Region *region, bool isLeaf) {
   // If a phi has an operand of float type, then itself must also be of float type.
   runRewriter(funcOp, [&](PhiOp *op) {
     for (auto operand : op->getOperands()) {
-      if (operand.ty == Value::f32) {
+      if (operand.defining->getResultType() == Value::f32) {
         op->setResultType(Value::f32);
         return false;
       }

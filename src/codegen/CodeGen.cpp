@@ -339,12 +339,17 @@ void CodeGen::emit(ASTNode *node) {
     // Function arguments are in the same scope with body.
     SemanticScope scope(*this);
     for (int i = 0; i < fn->args.size(); i++) {
-      auto size = getSize(fnTy->params[i]);
+      auto argTy = fnTy->params[i];
+      auto size = getSize(argTy);
       // Get the value of the argument and create a temp variable for it.
-      Value::Type ty = isa<FloatType>(fnTy->params[i]) ? Value::f32 : Value::i32;
+      Value::Type ty = isa<FloatType>(argTy) ? Value::f32 : Value::i32;
       auto arg = builder.create<GetArgOp>(ty, { new IntAttr(i) });
       auto addr = builder.create<AllocaOp>({ new SizeAttr(size) });
       builder.create<StoreOp>({ arg, addr }, { new SizeAttr(size) });
+      // Mark address as floating point if necessary.
+      if (isa<FloatType>(argTy))
+        addr->add<FPAttr>();
+      
       symbols[fn->args[i]] = addr;
     }
 
@@ -421,6 +426,8 @@ void CodeGen::emit(ASTNode *node) {
     auto addr = builder.create<AllocaOp>({
       new SizeAttr(getSize(vardecl->type))
     });
+    if (isa<FloatType>(vardecl->type))
+      addr->add<FPAttr>();
     
     symbols[vardecl->name] = addr;
     // An uninitialized local array.

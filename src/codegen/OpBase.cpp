@@ -44,8 +44,7 @@ Op *Op::nextOp() {
   return *++it;
 }
 
-Value::Value(Op *from):
-  defining(from), ty(from->getResultType()) {}
+Value::Value(Op *from): defining(from) {}
 
 Op::Op(int id, Value::Type resultTy, const std::vector<Value> &values):
   id(id), resultTy(resultTy) {

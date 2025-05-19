@@ -107,7 +107,10 @@ void Mem2Reg::fillPhi(BasicBlock *bb, SymbolTable symbols) {
   
       if (!symbols.count(alloca)) {
         builder.setBeforeOp(load);
-        symbols[alloca] = builder.create<IntOp>({ new IntAttr(0) });
+        bool fp = alloca->has<FPAttr>();
+        symbols[alloca] = fp
+          ? (Op*) builder.create<FloatOp>({ new FloatAttr(0) })
+          : (Op*) builder.create<IntOp>({ new IntAttr(0) });
       }
       
       load->replaceAllUsesWith(symbols[alloca].defining);
