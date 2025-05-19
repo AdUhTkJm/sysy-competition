@@ -171,13 +171,7 @@ int main(int argc, char **argv) {
 
   sys::PassManager pm(cg.getModule(), opts);
   
-  // We want that, when we test locally, always enable -O1;
-  // When we test remotely, don't enable -O1 unless explicitly passed `-O1`.
-  // Use `-S` for this distinction.
-  if (opts.noLink && !opts.o1)
-    initLessOptPipeline(pm);
-  else
-    initPipeline(pm);
+  initPipeline(pm);
   
   pm.run();
   return 0;

@@ -24,24 +24,17 @@ class Mem2Reg : public Pass {
   int count = 0;  // Total converted count
   int missed = 0; // Unconvertible alloca's
 
-  void runImpl(FuncOp *func);
-  void fillPhi(BasicBlock *bb, BasicBlock *last);
-
   // Maps AllocaOp* to Value (the real value of this alloca).
   using SymbolTable = std::map<Op*, Value>;
-  SymbolTable symbols;
+
+  void runImpl(FuncOp *func);
+  void fillPhi(BasicBlock *bb, SymbolTable symbols);
+  
   std::map<PhiOp*, AllocaOp*> phiFrom;
   std::set<BasicBlock*> visited;
   // Allocas we're going to convert in the pass.
   std::set<Op*> converted;
-
-  class SemanticScope {
-    Mem2Reg &pass;
-    SymbolTable symbols;
-  public:
-    SemanticScope(Mem2Reg &pass): pass(pass), symbols(pass.symbols) {}
-    ~SemanticScope() { pass.symbols = symbols; }
-  };
+  DomTree domtree;
 public:
   Mem2Reg(ModuleOp *module): Pass(module) {}
     

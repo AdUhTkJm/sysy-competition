@@ -14,11 +14,14 @@ std::map<std::string, int> Mem2Reg::stats() {
 
 // See explanation at https://longfangsong.github.io/en/mem2reg-made-simple/
 void Mem2Reg::runImpl(FuncOp *func) {
-  func->getRegion()->updateDomFront();
   converted.clear();
   visited.clear();
-  symbols.clear();
   phiFrom.clear();
+  domtree.clear();
+
+  auto region = func->getRegion();
+  region->updateDomFront();
+  domtree = getDomTree(region);
 
   Builder builder;
 
@@ -81,80 +84,34 @@ void Mem2Reg::runImpl(FuncOp *func) {
     }
   }
 
-  fillPhi(func->getRegion()->getFirstBlock(), nullptr);
+  fillPhi(func->getRegion()->getFirstBlock(), {});
 
   for (auto alloca : converted)
     alloca->erase();
 }
 
-void Mem2Reg::fillPhi(BasicBlock *bb, BasicBlock *last) {
-  Builder builder;
-
-  // Use a temporary map to avoid interfering with other PhiOps in the same block
-  std::map<Op*, Op*> newSymbols;
-  for (auto op : bb->getOps()) {
-    if (!isa<PhiOp>(op))
-      // phi's are always at the front.
-      break; 
-
-    auto alloca = phiFrom[cast<PhiOp>(op)];
-
-    // We meet a PhiOp. This means the promoted register might hold value `symbols[alloca]` when it reaches here.
-    // So this PhiOp should have that value as operand as well.
-    Value value;
-    
-    // It doesn't have an initial value from this path.
-    // It's acceptable (for example a variable defined only in a loop)
-    // Treat it as zero from this branch.
-    if (!symbols.count(alloca)) {
-      // Create a zero at the back of the incoming edge.
-      auto term = last->getLastOp();
-      builder.setBeforeOp(term);
-      value = builder.create<IntOp>({ new IntAttr(0) });
-    } else
-      value = symbols[alloca];
-
-    op->pushOperand(value);
-    op->add<FromAttr>(last);
-    newSymbols[alloca] = op;
-  }
-
-  // Now update the main symbol table after all PhiOps are processed
-  for (auto &[alloca, phi] : newSymbols)
-    symbols[alloca] = phi;
-
+void Mem2Reg::fillPhi(BasicBlock *bb, SymbolTable symbols) {
   if (visited.count(bb))
     return;
   visited.insert(bb);
 
-  std::vector<std::pair<LoadOp*, Value>> loads;
-  std::vector<StoreOp*> stores;
+  Builder builder;
+
+  std::vector<Op*> removed;
   for (auto op : bb->getOps()) {
     // Loads are now ordinary reads.
     if (auto load = dyn_cast<LoadOp>(op)) {
       auto alloca = load->getOperand().defining;
-      // This is a global variable.
       if (!converted.count(alloca))
         continue;
   
-      // It's possible for arrays - in which case it isn't undefined behaviour.
       if (!symbols.count(alloca)) {
-        builder.setBeforeOp(alloca);
+        builder.setBeforeOp(load);
         symbols[alloca] = builder.create<IntOp>({ new IntAttr(0) });
       }
       
-      auto value = symbols[alloca];
-      // `value` might not be the ground truth value; Consider:
-      //   %1 = load %alloca0
-      //   store %1, %alloca1
-      // In this case we actually want the value in `alloca0`.
-      auto def = value.defining;
-      while (isa<LoadOp>(def) && converted.count(def->getOperand().defining)) {
-        def = symbols[def->getOperand().defining].defining;
-      }
-      value.defining = def;
-      
-      loads.push_back(std::make_pair(load, value));
+      load->replaceAllUsesWith(symbols[alloca].defining);
+      removed.push_back(load);
     }
     
     // Stores are now mutating symbol table.
@@ -165,7 +122,7 @@ void Mem2Reg::fillPhi(BasicBlock *bb, BasicBlock *last) {
         continue;
       symbols[alloca] = value;
 
-      stores.push_back(store);
+      removed.push_back(store);
     }
 
     if (auto phi = dyn_cast<PhiOp>(op)) {
@@ -174,27 +131,38 @@ void Mem2Reg::fillPhi(BasicBlock *bb, BasicBlock *last) {
       auto alloca = phiFrom[phi];
       symbols[alloca] = phi;
     }
+  }
 
-    if (auto branch = dyn_cast<BranchOp>(op)) {
-      {
-        SemanticScope scope(*this);
-        fillPhi(TARGET(branch), bb);
-      }
-      SemanticScope scope(*this);
-      fillPhi(ELSE(branch), bb);
+  for (auto succ : bb->getSuccs()) {
+    auto phis = succ->getPhis();
+    for (auto op : phis) {
+      auto alloca = phiFrom[cast<PhiOp>(op)];
+
+      // We meet a PhiOp. This means the promoted register might hold value `symbols[alloca]` when it reaches here.
+      // So this PhiOp should have that value as operand as well.
+      Value value;
+      
+      // It doesn't have an initial value from this path.
+      // It's acceptable (for example a variable defined only in a loop)
+      // Treat it as zero from this branch.
+      if (!symbols.count(alloca)) {
+        // Create a zero at the back of the incoming edge.
+        auto term = bb->getLastOp();
+        builder.setBeforeOp(term);
+        value = builder.create<IntOp>({ new IntAttr(0) });
+      } else
+        value = symbols[alloca];
+
+      op->pushOperand(value);
+      op->add<FromAttr>(bb);
     }
-
-    if (auto jmp = dyn_cast<GotoOp>(op))
-      fillPhi(TARGET(jmp), bb);
   }
 
-  for (auto [load, value] : loads) {
-    load->replaceAllUsesWith(value.defining);
-    load->erase();
-  }
-
-  for (auto store : stores)
-    store->erase();
+  for (auto x : removed)
+    x->erase();
+  
+  for (auto child : domtree[bb])
+    fillPhi(child, symbols);
 }
 
 void Mem2Reg::run() {
