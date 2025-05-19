@@ -277,7 +277,7 @@ Value CodeGen::emitExpr(ASTNode *node) {
     if (symbols.count(access->array))
       addr = builder.create<LoadOp>(Value::i64, {
         symbols[access->array]
-      }, { new SizeAttr(getSize(arrTy->base)) });
+      }, { new SizeAttr(8) });
     else if (globals.count(access->array))
       addr = builder.create<GetGlobalOp>({
         new NameAttr(access->array)
@@ -575,7 +575,7 @@ void CodeGen::emit(ASTNode *node) {
     if (symbols.count(write->array))
       addr = builder.create<LoadOp>(Value::i64, {
         symbols[write->array]
-      }, { new SizeAttr(getSize(arrTy->base)) });
+      }, { new SizeAttr(8) });
     else if (globals.count(write->array))
       addr = builder.create<GetGlobalOp>({
         new NameAttr(write->array)

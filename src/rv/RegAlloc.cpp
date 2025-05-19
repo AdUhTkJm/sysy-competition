@@ -919,8 +919,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         if (offset < 2048)
           builder.create<LoadOp>(ldty, { RDC(reg), RSC(Reg::sp), new IntAttr(offset), new SizeAttr(8) });
         else if (offset < 4096) {
-          builder.create<AddiOp>({ RDC(spillReg), RSC(Reg::sp), new IntAttr(2047), new SizeAttr(8) });
-          builder.create<LoadOp>(ldty, { RDC(reg), RSC(spillReg), new IntAttr(offset - 2047), new SizeAttr(8) });
+          builder.create<AddiOp>({ RDC(spillReg2), RSC(Reg::sp), new IntAttr(2047), new SizeAttr(8) });
+          builder.create<LoadOp>(ldty, { RDC(reg), RSC(spillReg2), new IntAttr(offset - 2047), new SizeAttr(8) });
         }
         else assert(false);
         op->add<Rs2Attr>(reg);

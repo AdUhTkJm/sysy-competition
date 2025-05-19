@@ -188,12 +188,4 @@ void Range::run() {
 
   for (auto func : funcs)
     runImpl(func->getRegion(), forests[func]);
-
-  // Destruct the auxiliary ops we've introduced.
-  runRewriter([&](IdOp *op) {
-    auto def = op->getOperand().defining;
-    op->replaceAllUsesWith(def);
-    op->erase();
-    return true;
-  });
 }

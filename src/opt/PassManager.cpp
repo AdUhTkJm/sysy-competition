@@ -73,7 +73,7 @@ void PassManager::run() {
 
     // We can't simulate for backend.
     // Technically we have the capacity, but it's too much work.
-    if (opts.compareWith.size() && pastMem2Reg && !inBackend) {
+    if (opts.compareWith.size() && pastFlatten && !inBackend) {
       exec::Interpreter itp(module);
       std::stringstream buffer(input);
       itp.run(buffer);

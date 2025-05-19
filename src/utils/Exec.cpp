@@ -199,6 +199,10 @@ Interpreter::Value Interpreter::applyExtern(const std::string &name, const std::
     int x; inbuf >> x;
     return Value { .vi = x };
   }
+  if (name == "getch") {
+    char x = inbuf.get();
+    return Value { .vi = x };
+  }
   if (name == "putint") {
     intptr_t v = args[0].vi;
     // Direct cast of `(int) v` is implementation-defined.
@@ -252,11 +256,20 @@ Interpreter::Value Interpreter::execf(Region *region, const std::vector<Value> &
         ip = ip->nextOp();
       }
       else {
-        SemanticScope scope(*this);
-        Op *before = ip;
-        execf(fnMap[name]->getRegion(), args);
-        ip = before->nextOp();
+        Op *call = ip;
+        Value v;
+        {
+          SemanticScope scope(*this);
+          v = execf(fnMap[name]->getRegion(), args);
+        }
+        value[call] = v;
+        ip = call->nextOp();
       }
+      break;
+    }
+    case GetArgOp::id: {
+      value[ip] = args[V(ip)];
+      ip = ip->nextOp();
       break;
     }
     default:

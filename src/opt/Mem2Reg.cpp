@@ -35,6 +35,11 @@ void Mem2Reg::runImpl(FuncOp *func) {
         good = false;
         break;
       }
+      // If the alloca is used as a value in a StoreOp, then it has to be an array.
+      if (isa<StoreOp>(use) && use->DEF(0) == alloca) {
+        good = false;
+        break;
+      }
     }
 
     if (!good) {
@@ -77,11 +82,16 @@ void Mem2Reg::runImpl(FuncOp *func) {
   }
 
   fillPhi(func->getRegion()->getFirstBlock(), nullptr);
+
+  for (auto alloca : converted)
+    alloca->erase();
 }
 
 void Mem2Reg::fillPhi(BasicBlock *bb, BasicBlock *last) {
   Builder builder;
 
+  // Use a temporary map to avoid interfering with other PhiOps in the same block
+  std::map<Op*, Op*> newSymbols;
   for (auto op : bb->getOps()) {
     if (!isa<PhiOp>(op))
       // phi's are always at the front.
@@ -95,9 +105,8 @@ void Mem2Reg::fillPhi(BasicBlock *bb, BasicBlock *last) {
     
     // It doesn't have an initial value from this path.
     // It's acceptable (for example a variable defined only in a loop)
-    // Mark undef from this branch.
-    // Also, it's possible to find the same op, which means it's undefined.
-    if (!symbols.count(alloca) || symbols[alloca].defining == op) {
+    // Treat it as zero from this branch.
+    if (!symbols.count(alloca)) {
       // Create a zero at the back of the incoming edge.
       auto term = last->getLastOp();
       builder.setBeforeOp(term);
@@ -107,8 +116,12 @@ void Mem2Reg::fillPhi(BasicBlock *bb, BasicBlock *last) {
 
     op->pushOperand(value);
     op->add<FromAttr>(last);
-    symbols[alloca] = op;
+    newSymbols[alloca] = op;
   }
+
+  // Now update the main symbol table after all PhiOps are processed
+  for (auto &[alloca, phi] : newSymbols)
+    symbols[alloca] = phi;
 
   if (visited.count(bb))
     return;

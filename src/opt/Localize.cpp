@@ -64,7 +64,7 @@ void Localize::run() {
         new FloatAttr(k->get<FloatArrayAttr>()->vf[0])
       });
     }
-    builder.create<StoreOp>({ init, addr });
+    builder.create<StoreOp>({ init, addr }, { new SizeAttr(4) });
 
     if (!beforeFlatten) {
       // Remember to supply terminators for after FlattenCFG.
