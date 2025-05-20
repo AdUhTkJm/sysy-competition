@@ -5,7 +5,30 @@ using namespace sys;
 #define INT(op) isa<IntOp>(op)
 
 // Defined in Pureness.cpp.
-bool hasStoresTo(Op *op);
+static bool hasStoresTo(Op *op) {
+  for (auto use : op->getUses()) {
+    // This checks both the case when the address is stored elsewhere,
+    // and the value at the address is mutated.
+    // (Same for loads.)
+    if (isa<StoreOp>(use))
+      return true;
+
+    // It's a new address. Find all stores there.
+    if (isa<AddIOp>(use) || isa<AddLOp>(use)) {
+      if (hasStoresTo(use))
+        return true;
+      continue;
+    }
+
+    if (isa<LoadOp>(use))
+      continue;
+
+    // If something else happens, then it isn't an address.
+    return false;
+  }
+
+  return false;
+}
 
 std::map<std::string, int> EarlyConstFold::stats() {
   return {

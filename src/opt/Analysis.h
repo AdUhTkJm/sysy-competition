@@ -17,7 +17,7 @@ class Pureness : public Pass {
 public:
   Pureness(ModuleOp *module): Pass(module) {}
     
-  std::string name() { return "pureness-analysis"; };
+  std::string name() { return "pureness"; };
   std::map<std::string, int> stats() { return {}; }
   void run();
 };

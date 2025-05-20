@@ -12,12 +12,13 @@ bool pinned(Op *op) {
     PINNED(ReturnOp)
     PINNED(BranchOp)
     PINNED(GotoOp)
-    PINNED(PhiOp);
+    PINNED(PhiOp)
+    PINNED(AllocaOp);
 }
 
 // Schedule `op` to the first block that is dominated by its inputs.
 void GCM::scheduleEarly(BasicBlock *entry, Op *op) {
-  if (visited.count(op))
+  if (visited.count(op) || pinned(op))
     return;
   visited.insert(op);
 
@@ -40,7 +41,7 @@ void GCM::scheduleEarly(BasicBlock *entry, Op *op) {
 
 // Schedule `op` to the latest block that dominates its uses, but as out-of-loop as possible.
 void GCM::scheduleLate(Op *op) {
-  if (visited.count(op))
+  if (visited.count(op) || pinned(op))
     return;
   visited.insert(op);
 
@@ -96,7 +97,7 @@ void GCM::updateDepth(BasicBlock *bb, int dep) {
   for (auto child : tree[bb])
     updateDepth(child, dep + 1);
 }
-// 30 33 37 40 44 47 15 52 2 4 0
+
 void GCM::updateLoopDepth(LoopInfo *info, int dep) {
   for (auto bb : info->getBlocks())
     loopDepth[bb] = dep;
@@ -105,7 +106,7 @@ void GCM::updateLoopDepth(LoopInfo *info, int dep) {
     updateLoopDepth(subloop, dep + 1);
 }
 
-static void postorder(BasicBlock *current, DomTree &tree, std::vector<BasicBlock*> order) {
+static void postorder(BasicBlock *current, DomTree &tree, std::vector<BasicBlock*> &order) {
   for (auto child : tree[current])
     postorder(child, tree, order);
   order.push_back(current);

@@ -276,6 +276,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     for (auto reg : callerSaved) {
       auto placeholder = builder.create<PlaceHolderOp>();
       assignment[placeholder] = reg;
+      // Make floating point respect the placeholders.
+      if (isFP(reg))
+        placeholder->setResultType(Value::f32);
     }
     return false;
   });

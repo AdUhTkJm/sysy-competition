@@ -4,23 +4,20 @@ using namespace sys;
 
 // Find all stores to an address.
 // An address might be loaded, stored or added by some offset.
-bool hasStoresTo(Op *op) {
+static bool accesses(Op *op) {
   for (auto use : op->getUses()) {
     // This checks both the case when the address is stored elsewhere,
     // and the value at the address is mutated.
-    // The language seems to prevent the first case, but it doesn't matter.
-    if (isa<StoreOp>(use))
+    // (Same for loads.)
+    if (isa<StoreOp>(use) || isa<LoadOp>(use))
       return true;
 
     // It's a new address. Find all stores there.
     if (isa<AddIOp>(use) || isa<AddLOp>(use)) {
-      if (hasStoresTo(use))
+      if (accesses(use))
         return true;
       continue;
     }
-
-    if (isa<LoadOp>(use))
-      continue;
 
     // If something else happens, then it isn't an address.
     return false;
@@ -30,7 +27,7 @@ bool hasStoresTo(Op *op) {
 }
 
 // A function is impure if one of the following holds:
-//   1) it stores to one of its arguments;
+//   1) it reads/stores to one of its (array-typed) arguments;
 //   2) it reads/writes a global variable;
 //   3) it calls another impure function.
 // We determine 1) here.
@@ -52,7 +49,7 @@ void Pureness::predetermineImpure(FuncOp *func) {
 
       // This is a load, retrieving the underlying argument, which is an address.
       // If anything stores to the address then the function is impure.
-      if (hasStoresTo(use) && !func->has<ImpureAttr>()) {
+      if (accesses(use) && !func->has<ImpureAttr>()) {
         func->add<ImpureAttr>();
         return;
       }
