@@ -133,12 +133,7 @@ def get_all_includes(src_path: Path, visited=None) -> set[Path]:
   return includes
 
 # Note that the type of counter is not easily representable.
-def compile_cpp(src_path: Path, obj_path: Path, counter, total: int, lock: thread.Lock):
-  with lock:
-    current = counter.value + 1
-    counter.value = current
-    print(f"\r[{current}/{total}] Compiling {src_path.name}...".rjust(80), flush=True)
-  
+def compile_cpp(src_path: Path, obj_path: Path):
   obj_path.parent.mkdir(parents=True, exist_ok=True)
   proc.check_call([COMPILER] + CFLAGS + ["-o", str(obj_path), str(src_path)])
 
@@ -181,11 +176,10 @@ def build():
     obj_files.append((rel_dir, obj_path))
 
   total = len(tasks)
-  with mp.Pool() as pool, mp.Manager() as manager:
-    counter = manager.Value('i', 0)
-    lock = manager.Lock()
-    bound_worker = f.partial(compile_cpp, counter=counter, total=total, lock=lock)
-    pool.starmap(bound_worker, tasks)
+  file_prompt = "file" if total == 1 else "files"
+  print(f"Compiling {total} {file_prompt}")
+  with mp.Pool() as pool:
+    pool.starmap(compile_cpp, tasks)
   
   save_cache(cache)
 

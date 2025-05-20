@@ -5,7 +5,7 @@ using namespace sys;
 
 // Pinned operations cannot move.
 #define PINNED(Ty) || isa<Ty>(op)
-bool pinned(Op *op) {
+static bool pinned(Op *op) {
   return (isa<CallOp>(op) && op->has<ImpureAttr>())
     PINNED(LoadOp)
     PINNED(StoreOp)

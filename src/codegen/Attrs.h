@@ -207,6 +207,16 @@ public:
   FPAttr *clone() { return new FPAttr; }
 };
 
+// Checks whether the value is loop-invariant.
+// If a value is not, then it is marked with this attribute.
+class VariantAttr : public AttrImpl<VariantAttr, __LINE__> {
+public:
+  VariantAttr() {}
+
+  std::string toString() { return "<variant>"; }
+  VariantAttr *clone() { return new VariantAttr; }
+};
+
 }
 
 #define V(op) (op)->get<IntAttr>()->value

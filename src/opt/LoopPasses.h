@@ -156,6 +156,22 @@ public:
   void run();
 };
 
+class LICM : public Pass {
+  int hoisted = 0;
+  DomTree domtree;
+  // All addresses stored inside current loop.
+  std::vector<Op*> stores;
+
+  void markVariant(LoopInfo *info, BasicBlock *bb);
+  void runImpl(LoopInfo *info);
+public:
+  LICM(ModuleOp *module): Pass(module) {}
+
+  std::string name() { return "licm"; }
+  std::map<std::string, int> stats();
+  void run();
+};
+
 }
 
 #endif

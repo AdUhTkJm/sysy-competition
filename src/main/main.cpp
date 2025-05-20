@@ -59,10 +59,12 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::Localize>(/*beforeFlattenCFG=*/ false);
   pm.addPass<sys::Globalize>();
   pm.addPass<sys::Mem2Reg>();
+  pm.addPass<sys::Alias>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::CanonicalizeLoop>(/*lcssa=*/ true);
-  pm.addPass<sys::LoopRotate>(); // Destroys preheader.
+  pm.addPass<sys::LoopRotate>();
   pm.addPass<sys::CanonicalizeLoop>(/*lcssa=*/ false);
+  pm.addPass<sys::LICM>();
   pm.addPass<sys::LoopUnroll>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::RegularFold>();
