@@ -76,8 +76,8 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::RegularFold>();
   pm.addPass<sys::HoistConstArray>();
   pm.addPass<sys::DCE>();
-  pm.addPass<sys::GVN>();
   pm.addPass<sys::GCM>();
+  pm.addPass<sys::GVN>();
 
   // ===== Late Inline =====
 
@@ -89,8 +89,8 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DLE>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::StrengthReduct>();
-  pm.addPass<sys::GVN>();
   pm.addPass<sys::GCM>();
+  pm.addPass<sys::GVN>();
   pm.addPass<sys::Verify>();
 
   if (opts.arm)

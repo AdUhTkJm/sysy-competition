@@ -77,6 +77,43 @@ void DCE::run() {
       op->erase();
   } while (removeable.size());
 
+  // Remove unused phi's. 
+  // They might be cyclically referencing each other, but not used elsewhere.
+  std::vector<Op*> unused;
+  runRewriter([&](PhiOp *op) {
+    if (!op->getOperandCount())
+      return false;
+    
+    std::vector<Op*> worklist { op };
+    std::set<Op*> visited;
+
+    while (!worklist.empty()) {
+      auto *op = worklist.back();
+      worklist.pop_back();
+      visited.insert(op);
+
+      for (auto *use : op->getUses()) {
+        if (visited.count(use))
+          continue;
+        
+        if (isa<PhiOp>(use))
+          worklist.push_back(use);
+        else
+          return false; 
+      }
+    }
+
+    // Here all phi's in worklist are dead.
+    for (auto phi : visited) {
+      phi->removeAllOperands();
+      unused.push_back(phi);
+    }
+    return true;
+  });
+
+  for (auto dead : unused)
+    dead->erase();
+
   // Remove unused functions.
   bool changed;
   do {

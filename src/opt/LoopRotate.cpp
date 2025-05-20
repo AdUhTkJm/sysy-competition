@@ -25,14 +25,19 @@ void LoopRotate::runImpl(LoopInfo *info) {
 
   auto induction = info->getInduction();
   auto header = info->getHeader();
-  // We only rotate canonicalized loop in form `for (int i = %0; i < 'a; i += 'b)`
-  // That's because it's difficult (taking me >5h but still unable to implement) to hoist an arbitrary condition out of loop.
+  // We only rotate canonicalized loop in form `for (int i = %0; i < x; i += 'b)`
+  // Here `x` is an SSA value defined outside loop.
   // Check header condition for this.
   auto term = header->getLastOp();
-  Rule br("(br (lt i 'a))");
+  Rule br("(br (lt i x))");
   if (!br.match(term, { { "i", induction } }))
     return;
   if (ELSE(term) != exit)
+    return;
+  
+  auto upper = br.extract("x");
+  auto upperFrom = upper->getParent();
+  if (!upperFrom->dominates(header) || upperFrom == header)
     return;
 
   auto latch = info->getLatch();
@@ -76,7 +81,6 @@ void LoopRotate::runImpl(LoopInfo *info) {
   }
 
   builder.setBeforeOp(preterm);
-  auto upper = builder.create<IntOp>({ new IntAttr(V(br.extract("'a"))) });
   auto lt = builder.create<LtOp>({ (Value) info->getStart(), upper });
   builder.replace<BranchOp>(preterm, { lt }, { new TargetAttr(header), new ElseAttr(exit) });
 
@@ -89,7 +93,7 @@ void LoopRotate::runImpl(LoopInfo *info) {
   // This time we should compare the increased induction variable with the upper bound,
   // i.e. the value from latch.
   builder.setBeforeOp(latchterm);
-  auto lt2 = builder.create<LtOp>({ valueMap[induction], upper });
+  auto lt2 = builder.create<LtOp>({ valueMap[induction], upper->getResult() });
   builder.replace<BranchOp>(latchterm, { lt2 }, { new TargetAttr(header), new ElseAttr(exit) });
 
   // Fix phi nodes at exit.
