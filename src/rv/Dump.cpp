@@ -41,7 +41,11 @@ void dumpOp(Op *op, std::ostream &os) {
   };
 
   // Skip the initial "rv."
-  assert(opname[0] == 'r' && opname[1] == 'v' && opname[2] == '.');
+  if (!(opname[0] == 'r' && opname[1] == 'v' && opname[2] == '.')) {
+    std::cerr << "bad opname: " << opname << "\n";
+    assert(false);
+  }
+  
   name.reserve(opname.size() - 3);
   for (int i = 3; i < opname.size(); i++)
     name.push_back(opname[i]);

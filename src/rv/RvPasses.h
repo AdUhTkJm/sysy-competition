@@ -4,6 +4,9 @@
 #include "../opt/Pass.h"
 #include "RvAttrs.h"
 #include "RvOps.h"
+#include "../codegen/Ops.h"
+#include "../codegen/Attrs.h"
+#include "../codegen/CodeGen.h"
 
 namespace sys {
 
@@ -15,6 +18,18 @@ public:
   
   std::string name() { return "rv-lower"; };
   std::map<std::string, int> stats() { return {}; };
+  void run();
+};
+
+class StrengthReduct : public Pass {
+  int convertedTotal = 0;
+
+  int runImpl();
+public:
+  StrengthReduct(ModuleOp *module): Pass(module) {}
+    
+  std::string name() { return "strength-reduction"; };
+  std::map<std::string, int> stats();
   void run();
 };
 

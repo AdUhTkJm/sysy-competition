@@ -187,7 +187,25 @@ void RegularFold::run() {
     Builder builder;
 
     runRewriter([&](BranchOp *op) {
-      auto cond = op->getOperand().defining;
+      auto cond = op->DEF();
+
+      // (br (snz x)) becomes (br x)
+      // Do note that "set-not-zero" of float cannot be fold.
+      if (isa<SetNotZeroOp>(cond) && cond->DEF()->getResultType() != Value::f32) {
+        folded++;
+        auto def = cond->DEF();
+        builder.replace<BranchOp>(op, { def }, op->getAttrs());
+        return true;
+      }
+      
+      // (br (not x) >bb >bb2) becomes (br x >bb2 >bb)
+      if (isa<NotOp>(cond) && cond->DEF()->getResultType() != Value::f32) {
+        folded++;
+        auto def = cond->DEF();
+        builder.replace<BranchOp>(op, { def }, { new TargetAttr(ELSE(op)), new ElseAttr(TARGET(op)) });
+        return true;
+      }
+
       if (!isa<IntOp>(cond))
         return false;
       

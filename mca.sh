@@ -5,4 +5,4 @@
 # Only the mainstream one has `llvm-mca` with AArch64 and RISC-V enabled.
 # Hence this script, used as an alias of `llvm-mca` from mainstream though it's not on path.
 
-~/llvm/llvm-project/llvm-mca $@ -march=riscv
+~/llvm/llvm-project/build/bin/llvm-mca $@ -march=riscv64 -mcpu=xiangshan-nanhu

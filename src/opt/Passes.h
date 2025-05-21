@@ -34,18 +34,6 @@ public:
   void run();
 };
 
-class StrengthReduct : public Pass {
-  int convertedTotal = 0;
-
-  int runImpl();
-public:
-  StrengthReduct(ModuleOp *module): Pass(module) {}
-    
-  std::string name() { return "strength-reduction"; };
-  std::map<std::string, int> stats();
-  void run();
-};
-
 // Global value numbering.
 class GVN : public Pass {
   int elim = 0;

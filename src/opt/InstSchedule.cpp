@@ -113,10 +113,6 @@ void InstSchedule::runImpl(BasicBlock *bb) {
     }
   }
 
-  std::cerr << bbmap[bb] << ":\n";
-  for (auto op : bb->getOps())
-    std::cerr << "  " << op;
-
   auto term = bb->getLastOp();
   for (auto op : bb->getOps()) {
     if (op != term && !isa<PhiOp>(op)) {

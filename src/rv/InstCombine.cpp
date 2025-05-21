@@ -149,6 +149,23 @@ void InstCombine::run() {
     return false;
   });
 
+  runRewriter([&](SllOp *op) {
+    auto x = op->getOperand(0).defining;
+    auto y = op->getOperand(1).defining;
+
+    if (isa<LiOp>(y) && inRange(y)) {
+      auto val = V(y);
+      if (!inRange(val))
+        return false;
+
+      combined++;
+      builder.replace<SlliOp>(op, { x }, { new IntAttr(val) });
+      return true;
+    }
+
+    return false;
+  });
+
   runRewriter([&](AndOp *op) {
     auto x = op->getOperand(0).defining;
     auto y = op->getOperand(1).defining;

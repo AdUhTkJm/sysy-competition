@@ -92,6 +92,7 @@ OP(MinusOp); // for input x, returns -x. Don't confuse with SubI/SubF.
 OPF(MinusFOp);
 OP(NotOp);
 OP(LShiftOp);
+OPL(LShiftLOp);
 OP(RShiftOp);
 OPL(RShiftLOp);
 OP(MulshOp);

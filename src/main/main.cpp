@@ -32,6 +32,7 @@ void initRvPipeline(sys::PassManager &pm) {
   using namespace sys::rv;
 
   pm.addPass<Lower>();
+  pm.addPass<StrengthReduct>();
   pm.addPass<InstCombine>();
   pm.addPass<RvDCE>();
   pm.addPass<RegAlloc>();
@@ -90,7 +91,6 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DSE>();
   pm.addPass<sys::DLE>();
   pm.addPass<sys::DCE>();
-  pm.addPass<sys::StrengthReduct>();
   pm.addPass<sys::GCM>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::InstSchedule>();
@@ -134,7 +134,6 @@ void initLessOptPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DSE>();
   pm.addPass<sys::DLE>();
   pm.addPass<sys::RegularFold>();
-  pm.addPass<sys::StrengthReduct>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::GCM>();

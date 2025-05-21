@@ -538,6 +538,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(MulOp, BINARY);
   LOWER(DivwOp, BINARY);
   LOWER(DivOp, BINARY);
+  LOWER(RemwOp, BINARY);
+  LOWER(RemOp, BINARY);
   LOWER(BneOp, BINARY);
   LOWER(BeqOp, BINARY);
   LOWER(BltOp, BINARY);
@@ -558,6 +560,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(SrlwOp, BINARY);
   LOWER(SrawOp, BINARY);
   LOWER(SraOp, BINARY);
+  LOWER(SllOp, BINARY);
+  LOWER(SrlOp, BINARY);
   
   LOWER(LoadOp, UNARY);
   LOWER(AddiwOp, UNARY);
@@ -566,6 +570,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(SrliwOp, UNARY);
   LOWER(SraiwOp, UNARY);
   LOWER(SraiOp, UNARY);
+  LOWER(SlliOp, UNARY);
+  LOWER(SrliOp, UNARY);
   LOWER(SeqzOp, UNARY);
   LOWER(SnezOp, UNARY);
   LOWER(SltiOp, UNARY);

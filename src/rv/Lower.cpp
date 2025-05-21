@@ -79,7 +79,9 @@ void Lower::run() {
   REPLACE(MulshOp, MulhOp);
   REPLACE(MuluhOp, MulhuOp);
   REPLACE(DivIOp, DivwOp);
+  REPLACE(ModIOp, RemwOp);
   REPLACE(LShiftOp, SllwOp);
+  REPLACE(LShiftLOp, SllOp);
   REPLACE(RShiftOp, SrawOp);
   REPLACE(RShiftLOp, SraOp);
   REPLACE(GotoOp, JOp);
@@ -149,7 +151,7 @@ void Lower::run() {
   });
 
   runRewriter([&](SetNotZeroOp *op) {
-    if (op->getOperand().defining->getResultType() == Value::f32) {
+    if (op->DEF()->getResultType() == Value::f32) {
       builder.setBeforeOp(op);
       auto zero = builder.create<LiOp>({ new IntAttr(0) });
       auto zerof = builder.create<FmvwxOp>({ zero });
@@ -163,7 +165,7 @@ void Lower::run() {
   });
 
   runRewriter([&](NotOp *op) {
-    if (op->getOperand().defining->getResultType() == Value::f32) {
+    if (op->DEF()->getResultType() == Value::f32) {
       builder.setBeforeOp(op);
       auto zero = builder.create<LiOp>({ new IntAttr(0) });
       auto zerof = builder.create<FmvwxOp>({ zero });
