@@ -13,7 +13,6 @@ std::map<std::string, int> LICM::stats() {
 #define PINNED(Ty) || isa<Ty>(op)
 static bool pinned(Op *op) {
   return (isa<CallOp>(op) && op->has<ImpureAttr>())
-    PINNED(StoreOp)
     PINNED(ReturnOp)
     PINNED(BranchOp)
     PINNED(GotoOp)
@@ -32,14 +31,20 @@ static bool noAlias(Op *load, const std::vector<Op*> stores) {
 }
 
 // This also hoists ops besides giving variant.
-void LICM::markVariant(LoopInfo *info, BasicBlock *bb) {
+void LICM::markVariant(LoopInfo *info, BasicBlock *bb, bool hoistable) {
   std::vector<Op*> invariant;
 
   for (auto op : bb->getOps()) {
+    if (isa<LoadOp>(op) || isa<BranchOp>(op))
+      hoistable = false;
+
     if (op->has<VariantAttr>())
       continue;
 
-    if (pinned(op) || (isa<LoadOp>(op) && !noAlias(op, stores)))
+    if (pinned(op) || (isa<LoadOp>(op) && !noAlias(op, stores))
+        // When a store only writes a loop-invariant value to loop-invariant address,
+        // and it doesn't follow any load, then it's safe to hoist it out.
+        || (isa<StoreOp>(op) && (!hoistable || op->DEF(0)->has<VariantAttr>() || op->DEF(1)->has<VariantAttr>())))
       op->add<VariantAttr>();
     else for (auto operand : op->getOperands()) {
       auto def = operand.defining;
@@ -61,7 +66,7 @@ void LICM::markVariant(LoopInfo *info, BasicBlock *bb) {
 
   for (auto child : domtree[bb]) {
     if (info->contains(child))
-      markVariant(info, child);
+      markVariant(info, child, hoistable);
   }
 }
 
@@ -94,7 +99,7 @@ void LICM::runImpl(LoopInfo *info) {
   // Mark invariants inside the loop, and try hoisting it out.
   // We must traverse through domtree to preserve def-use chain.
   auto header = info->getHeader();
-  markVariant(info, header);
+  markVariant(info, header, true);
 }
 
 void LICM::run() {

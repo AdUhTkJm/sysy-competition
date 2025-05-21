@@ -278,7 +278,13 @@ int StrengthReduct::runImpl() {
       Value ls = builder.create<SlliOp>({ x }, { new IntAttr(1) });
       Value bias = builder.create<SrliOp>({ ls }, { new IntAttr(64 - n) });
       Value plus = builder.create<AddOp>({ x, bias });
-      Value andi = builder.create<AndiOp>({ plus }, { new IntAttr(-i) });
+      Value andi;
+      if (i <= 2048)
+        andi = builder.create<AndiOp>({ plus }, { new IntAttr(-i) });
+      else {
+        Value value = builder.create<LiOp>({ new IntAttr(-i) });
+        andi = builder.create<AndOp>({ plus, value });
+      }
       builder.replace<SubwOp>(op, { x, andi });
       return true;
     }

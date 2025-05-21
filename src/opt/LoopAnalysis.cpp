@@ -152,29 +152,7 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
 
         // addi: (add x 'a)
         if (addi.match(def2, { { "x", phi } })) {
-          // This should be in latch.
-          if (def2->getParent() != latch)
-            continue;
-
           auto step = addi.extract("'a");
-
-          // If, after this `add` there's still something else (other than branch), 
-          // then we change the `def2`s there to use `phi + 'a` instead.
-          Builder builder;
-          for (Op *op = def2->nextOp(); op != latch->getLastOp(); op = op->nextOp()) {
-            const auto &ops = op->getOperands();
-            for (size_t i = 0; i < ops.size(); i++) {
-              auto def = ops[i].defining;
-              if (def == def2) {
-                builder.setBeforeOp(op);
-                auto a = builder.create<IntOp>({ new IntAttr(V(step)) });
-                auto addi = builder.create<AddIOp>({ phi, a });
-                op->setOperand(i, addi);
-              }
-            }
-          }
-          // Then we sink `def2` to the bottom.
-          def2->moveBefore(latch->getLastOp());
 
           // OK, now this is definitely an induction variable.
           loop->induction = phi;

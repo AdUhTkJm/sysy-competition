@@ -17,33 +17,36 @@ class SpilledRdAttr : public AttrImpl<SpilledRdAttr, RVLINE> {
 public:
   bool fp;
   int offset;
+  Op *ref;
 
-  SpilledRdAttr(bool fp, int offset): fp(fp), offset(offset) {}
+  SpilledRdAttr(bool fp, int offset, Op *ref): fp(fp), offset(offset), ref(ref) {}
 
   std::string toString() { return "<rd = " + std::to_string(offset) + (fp ? "f" : "") + ">"; }
-  SpilledRdAttr *clone() { return new SpilledRdAttr(fp, offset); }
+  SpilledRdAttr *clone() { return new SpilledRdAttr(fp, offset, ref); }
 };
 
 class SpilledRsAttr : public AttrImpl<RegAttr, RVLINE> {
 public:
   bool fp;
   int offset;
+  Op *ref;
 
-  SpilledRsAttr(bool fp, int offset): fp(fp), offset(offset) {}
+  SpilledRsAttr(bool fp, int offset, Op *ref): fp(fp), offset(offset), ref(ref) {}
 
   std::string toString() { return "<rd = " + std::to_string(offset) + (fp ? "f" : "") + ">"; }
-  SpilledRsAttr *clone() { return new SpilledRsAttr(fp, offset); }
+  SpilledRsAttr *clone() { return new SpilledRsAttr(fp, offset, ref); }
 };
 
 class SpilledRs2Attr : public AttrImpl<SpilledRs2Attr, RVLINE> {
 public:
   bool fp;
   int offset;
+  Op *ref;
 
-  SpilledRs2Attr(bool fp, int offset): fp(fp), offset(offset) {}
+  SpilledRs2Attr(bool fp, int offset, Op *ref): fp(fp), offset(offset), ref(ref) {}
 
   std::string toString() { return "<rd = " + std::to_string(offset) + + (fp ? "f" : "") + ">"; }
-  SpilledRs2Attr *clone() { return new SpilledRs2Attr(fp, offset); }
+  SpilledRs2Attr *clone() { return new SpilledRs2Attr(fp, offset, ref); }
 };
 
 }
@@ -72,10 +75,10 @@ std::map<std::string, int> RegAlloc::stats() {
   if (!spillOffset.count(v##Index)) \
     op->add<AttrTy>(getReg(v##Index)); \
   else \
-    op->add<Spilled##AttrTy>(v##Index->getResultType() == Value::f32, spillOffset[v##Index]);
+    op->add<Spilled##AttrTy>(v##Index->getResultType() == Value::f32, spillOffset[v##Index], v##Index);
 
 #define GET_SPILLED_ARGS(op) \
-  (op->getResultType() == Value::f32, spillOffset[op])
+  (op->getResultType() == Value::f32, spillOffset[op], op)
 
 #define BINARY ADD_ATTR(0, RsAttr) ADD_ATTR(1, Rs2Attr)
 #define UNARY ADD_ATTR(0, RsAttr)
@@ -250,6 +253,10 @@ static const Reg fargRegs[] = {
 constexpr int leafRegCntf = 30;
 constexpr int normalRegCntf = 30;
 
+static bool isConstant(Op *op) {
+  return isa<LiOp>(op) || isa<LaOp>(op);
+}
+
 // Used in constructing interference graph.
 struct Event {
   int timestamp;
@@ -364,10 +371,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         assignment[op] = REG(op);
         priority[op] = 1;
       }
-      if (isa<ReadRegOp>(op)) {
+      if (isa<ReadRegOp>(op))
         priority[op] = 1;
-      }
-
+      
       if (isa<PhiOp>(op)) {
         priority[op] = 2;
         for (auto x : op->getOperands()) {
@@ -375,6 +381,10 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
           prefer[x.defining] = op;
         }
       }
+
+      // We tend to spill constants, because they're easy to rematerialize.
+      if (isConstant(op))
+        priority[op] = -1;
     }
 
     // For all liveOuts, they are last-used at place size().
@@ -716,19 +726,6 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
 
 #define SPILLABLE(op, Ty) (op->has<Ty##Attr>() ? op->get<Ty##Attr>()->reg : (Reg) -op->get<Spilled##Ty##Attr>()->offset)
-#define CREATE_SPILLABLE_MV(fp, rd, rs) \
-  if (fp) \
-    builder.create<FmvOp>({ \
-      new ImpureAttr, /* An unused marker to let C++ distinguish between ambiguous calls */ \
-      (int) rd < 0 ? (Attr*) new SpilledRdAttr(true, -(int) rd) : new RdAttr((rd)), \
-      (int) rs < 0 ? (Attr*) new SpilledRsAttr(true, -(int) rd) : new RsAttr((rs)), \
-    }); \
-  else \
-    builder.create<MvOp>({ \
-      new ImpureAttr, \
-      (int) rd < 0 ? (Attr*) new SpilledRdAttr(false, -(int) rd) : new RdAttr((rd)), \
-      (int) rs < 0 ? (Attr*) new SpilledRsAttr(false, -(int) rd) : new RsAttr((rs)), \
-    });
 
   for (auto bb : bbs) {
     auto phis = bb->getPhis();
@@ -808,22 +805,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       // The chain is actually a cycle.
       // It has to have at least 2 arguments (as self-loop is not acceptable).
       std::cerr << "remark: cycle detected\n";
-
-      // Break cycle using a temp register, say the spill register s11.
-      Reg first = chain.front();
-      builder.setBeforeOp(mv);
-      bool fp = isFP(first);
-
-      auto spill = fp ? fspillReg : spillReg;
-      CREATE_SPILLABLE_MV(fp, spill, first);
-
-      for (size_t i = 1; i < chain.size(); ++i)
-        CREATE_SPILLABLE_MV(fp, chain[i - 1], chain[i]);
-
-      CREATE_SPILLABLE_MV(fp, chain.back(), spill);
-
-      // The original moves are now for removal.
-      std::copy(ops.begin(), ops.end(), std::back_inserter(toErase));
+      // Unhandled yet.
+      assert(false);
     }
 
     for (auto mv : toErase)
@@ -851,12 +834,13 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         if (!spillOffset.count(op))
           op->add<RdAttr>(getReg(op));
         else
-          op->add<SpilledRdAttr>(op->getResultType() == Value::f32, spillOffset[op]);
+          op->add<SpilledRdAttr>(op->getResultType() == Value::f32, spillOffset[op], op);
       }
     }
   }
 
   // Deal with spilled variables.
+  std::vector<Op*> rematerialized;
   for (auto bb : region->getBlocks()) {
     int delta = 0;
     for (auto op : bb->getOps()) {
@@ -877,6 +861,11 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         int offset = delta + rd->offset;
         bool fp = rd->fp;
         auto reg = fp ? fspillReg : spillReg;
+        if (isConstant(rd->ref)) {
+          // Mark for removal and rematerialize when needed.
+          rematerialized.push_back(rd->ref);
+          continue;
+        }
 
         builder.setAfterOp(op);
         if (offset < 2048)
@@ -896,7 +885,14 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         auto ldty = fp ? Value::f32 : Value::i64;
 
         builder.setBeforeOp(op);
-        if (offset < 2048)
+        if (isConstant(rs->ref)) {
+          auto ref = rs->ref;
+          // Copy it here.
+          if (isa<LiOp>(ref))
+            builder.create<LiOp>({ RDC(reg), new IntAttr(V(ref)) });
+          if (isa<LaOp>(ref))
+            builder.create<LaOp>({ RDC(reg), new NameAttr(NAME(ref)) });
+        } else if (offset < 2048)
           builder.create<LoadOp>(ldty, { RDC(reg), RSC(Reg::sp), new IntAttr(offset), new SizeAttr(8) });
         else if (offset < 4096) {
           builder.create<AddiOp>({ RDC(spillReg), RSC(Reg::sp), new IntAttr(2047), new SizeAttr(8) });
@@ -913,7 +909,14 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         auto ldty = fp ? Value::f32 : Value::i64;
 
         builder.setBeforeOp(op);
-        if (offset < 2048)
+        if (isConstant(rs2->ref)) {
+          auto ref = rs2->ref;
+          // Copy it here.
+          if (isa<LiOp>(ref))
+            builder.create<LiOp>({ RDC(reg), new IntAttr(V(ref)) });
+          if (isa<LaOp>(ref))
+            builder.create<LaOp>({ RDC(reg), new NameAttr(NAME(ref)) });
+        } else if (offset < 2048)
           builder.create<LoadOp>(ldty, { RDC(reg), RSC(Reg::sp), new IntAttr(offset), new SizeAttr(8) });
         else if (offset < 4096) {
           builder.create<AddiOp>({ RDC(spillReg2), RSC(Reg::sp), new IntAttr(2047), new SizeAttr(8) });
@@ -924,6 +927,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       }
     }
   }
+
+  for (auto x : rematerialized)
+    x->erase();
 }
 
 int RegAlloc::latePeephole(Op *funcOp) {

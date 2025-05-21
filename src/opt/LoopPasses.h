@@ -162,7 +162,7 @@ class LICM : public Pass {
   // All addresses stored inside current loop.
   std::vector<Op*> stores;
 
-  void markVariant(LoopInfo *info, BasicBlock *bb);
+  void markVariant(LoopInfo *info, BasicBlock *bb, bool metLoad);
   void runImpl(LoopInfo *info);
 public:
   LICM(ModuleOp *module): Pass(module) {}
