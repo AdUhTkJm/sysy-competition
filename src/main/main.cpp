@@ -5,6 +5,7 @@
 #include "../opt/Passes.h"
 #include "../opt/LoopPasses.h"
 #include "../opt/CleanupPasses.h"
+#include "../opt/LowerPasses.h"
 #include "../opt/Analysis.h"
 #include "../arm/ArmPasses.h"
 #undef RS
@@ -65,7 +66,6 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::LoopRotate>();
   pm.addPass<sys::CanonicalizeLoop>(/*lcssa=*/ false);
   pm.addPass<sys::LICM>();
-  // pm.addPass<sys::LoopUnroll>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::RegularFold>();
   pm.addPass<sys::DCE>();
@@ -93,6 +93,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::StrengthReduct>();
   pm.addPass<sys::GCM>();
   pm.addPass<sys::GVN>();
+  pm.addPass<sys::InstSchedule>();
   pm.addPass<sys::Verify>();
 
   if (opts.arm)

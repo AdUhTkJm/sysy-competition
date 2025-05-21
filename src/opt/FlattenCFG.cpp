@@ -1,4 +1,4 @@
-#include "Passes.h"
+#include "LowerPasses.h"
 #include "../codegen/CodeGen.h"
 #include "../codegen/Attrs.h"
 #include <vector>

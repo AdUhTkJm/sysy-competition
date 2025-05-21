@@ -2,11 +2,34 @@
 
 using namespace sys;
 
+// Checks whether every operation dominates its uses.
+static void checkDom(Region *region) {
+  for (auto bb : region->getBlocks()) {
+    for (auto op : bb->getOps()) {
+      // Phi's are checked later on.
+      if (isa<PhiOp>(op))
+        continue;
+
+      for (auto operand : op->getOperands()) {
+        auto def = operand.defining;
+        if (!def->getParent()->dominates(bb)) {
+          std::cerr << "non-dominating: " << op;
+          std::cerr << "operand: " << def;
+          assert(false);
+        }
+      }
+    }
+  }
+};
+
 void Verify::run() {
   auto funcs = collectFuncs();
-  for (auto func : funcs)
-    func->getRegion()->updatePreds();
-  
+  for (auto func : funcs) {
+    auto region = func->getRegion();
+    region->updateDoms();
+    checkDom(region);
+  }
+
   auto phis = module->findAll<PhiOp>();
   for (auto phi : phis) {
     // Check the number of phi's must be equal to the number of predecessors.

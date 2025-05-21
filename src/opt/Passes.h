@@ -9,15 +9,6 @@
 
 namespace sys {
 
-class FlattenCFG : public Pass {
-public:
-  FlattenCFG(ModuleOp *module): Pass(module) {}
-  
-  std::string name() { return "flatten-cfg"; };
-  std::map<std::string, int> stats() { return {}; };
-  void run();
-};
-
 // Converts alloca's to SSA values.
 // This must run on flattened CFG, otherwise `break` and `continue` are hard to deal with.
 class Mem2Reg : public Pass {

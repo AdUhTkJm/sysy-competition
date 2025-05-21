@@ -3,6 +3,7 @@
 
 #include "../opt/Pass.h"
 #include "RvAttrs.h"
+#include "RvOps.h"
 
 namespace sys {
 
@@ -40,17 +41,6 @@ public:
     
   std::string name() { return "rv-dce"; };
   std::map<std::string, int> stats();
-  void run();
-};
-
-// A weak scheduler that only works on basic blocks.
-class InstSchedule : public Pass {
-  void runImpl(BasicBlock *bb);
-public:
-  InstSchedule(ModuleOp *module): Pass(module) {}
-
-  std::string name() { return "rv-inst-schedule"; };
-  std::map<std::string, int> stats() { return {}; }
   void run();
 };
 
