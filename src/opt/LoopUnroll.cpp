@@ -108,6 +108,20 @@ BasicBlock *LoopUnroll::copyLoop(LoopInfo *loop, BasicBlock *bb, int unroll, boo
     // Update the current latch.
     lastLatch = curLatch;
 
+    if (!isMainLoop) {
+      // Fix exit phis.
+      // A new predecessor is added to exit, so we need to add another operand.
+      for (auto [k, v] : exitlatch) {
+        // The value doesn't come from the loop. It shouldn't be changed.
+        if (!cloneMap.count(v))
+          continue;
+        
+        auto operand = cloneMap[v];
+        k->pushOperand(operand);
+        k->add<FromAttr>(curLatch);
+      }
+    }
+
     // Replace phis at header.
     // All phis come from either the preheader or the latch.
     // Now the "preheader" is the previous latch. 
@@ -123,15 +137,15 @@ BasicBlock *LoopUnroll::copyLoop(LoopInfo *loop, BasicBlock *bb, int unroll, boo
 
         // For the block succeeding the original loop body, `prevLatch` is empty.
         // Just use the latch value.
-        if (!prevLatch.count(latchvalue)) {
-          copiedphi->replaceAllUsesWith(latchvalue);
-          copiedphi->erase();
-          continue;
-        }
+        Op *value;
+        if (!prevLatch.count(latchvalue))
+          value = latchvalue;
+        else 
+          // Otherwise, use `prevLatch` (which is actually the cloneMap of the previous iteration)
+          // to find the inherited value.
+          value = prevLatch[latchvalue];
 
-        // Otherwise, use `prevLatch` (which is actually the cloneMap of the previous iteration)
-        // to find the inherited value.
-        copiedphi->replaceAllUsesWith(prevLatch[latchvalue]);
+        copiedphi->replaceAllUsesWith(value);
         copiedphi->erase();
       }
     }
@@ -145,20 +159,6 @@ BasicBlock *LoopUnroll::copyLoop(LoopInfo *loop, BasicBlock *bb, int unroll, boo
 
       for (auto attr : k->getAttrs())
         FROM(attr) = rewireMap[FROM(attr)];
-    }
-
-    if (!isMainLoop) {
-      // Fix exit phis.
-      // A new predecessor is added to exit, so we need to add another operand.
-      for (auto [k, v] : exitlatch) {
-        // The value doesn't come from the loop. It shouldn't be changed.
-        if (!cloneMap.count(v))
-          continue;
-        
-        auto operand = cloneMap[v];
-        k->pushOperand(operand);
-        k->add<FromAttr>(curLatch);
-      }
     }
 
     prevLatch = cloneMap;
@@ -238,17 +238,6 @@ BasicBlock *LoopUnroll::copyLoop(LoopInfo *loop, BasicBlock *bb, int unroll, boo
           break;
         }
       }
-
-      // // Moreover, we remove the operand from preheader if this is not the only loop.
-      // // It won't reach the side loop anymore.
-      // if (!complete)
-      //   for (int i = 0; i < ops.size(); i++) {
-      //     if (FROM(attrs[i]) == preheader) {
-      //       phi->removeOperand(i);
-      //       phi->removeAttribute(i);
-      //       break;
-      //     }
-      //   }
       continue;
     }
 

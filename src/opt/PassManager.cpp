@@ -30,6 +30,10 @@ PassManager::PassManager(ModuleOp *module, const Options &opts):
       exitcode = std::stoi(truth.substr(pos + 1));
       truth.erase(pos);
     }
+
+    // Strip the output again.
+    while (truth.size() && std::isspace(truth.back()))
+      truth.pop_back();
   }
 
   if (opts.simulateInput.size()) {

@@ -50,12 +50,18 @@ Interpreter::~Interpreter() {
 }
 
 intptr_t Interpreter::eval(Op *op) {
-  assert(value.count(op) && op->getResultType() != sys::Value::f32);
+  if (!value.count(op))
+    sys_unreachable("undefined op" << op);
+  if (op->getResultType() == sys::Value::f32)
+    sys_unreachable("op of float type: " << op);
   return value[op].vi;
 }
 
 float Interpreter::evalf(Op *op) {
-  assert(value.count(op) && op->getResultType() == sys::Value::f32);
+  if (!value.count(op))
+    sys_unreachable("undefined op" << op);
+  if (op->getResultType() != sys::Value::f32)
+    sys_unreachable("op of non-float type: " << op);
   return value[op].vi;
 }
 
@@ -83,6 +89,11 @@ void Interpreter::store(Op *op, float v) {
     store(op, evalf(op->DEF(0)) sign evalf(op->DEF(1))); \
     break
 
+#define EXEC_BINARY_FCOMP(Ty, sign) \
+  case Ty::id: \
+    store(op, (intptr_t) (evalf(op->DEF(0)) sign evalf(op->DEF(1)))); \
+    break
+
 #define EXEC_UNARY(Ty, sign) \
   case Ty::id: \
     store(op, (intptr_t) (sign eval(op->DEF()))); \
@@ -100,6 +111,12 @@ void Interpreter::exec(Op *op) {
     break;
   case FloatOp::id:
     store(op, F(op));
+    break;
+  case I2FOp::id:
+    store(op, (float) eval(op->DEF()));
+    break;
+  case F2IOp::id:
+    store(op, (intptr_t) evalf(op->DEF()));
     break;
   EXEC_BINARY(AddIOp, +);
   EXEC_BINARY(SubIOp, -);
@@ -123,6 +140,10 @@ void Interpreter::exec(Op *op) {
   EXEC_BINARY_F(SubFOp, -);
   EXEC_BINARY_F(MulFOp, *);
   EXEC_BINARY_F(DivFOp, /);
+  EXEC_BINARY_FCOMP(EqFOp, ==);
+  EXEC_BINARY_FCOMP(LeFOp, <=);
+  EXEC_BINARY_FCOMP(LtFOp, <);
+  EXEC_BINARY_FCOMP(NeFOp, !=);
 
   EXEC_UNARY(NotOp, !);
   EXEC_UNARY(SetNotZeroOp, !!);
@@ -176,9 +197,9 @@ void Interpreter::exec(Op *op) {
   }
   case StoreOp::id: {
     size_t size = SIZE(op);
-    bool fp = op->getResultType() == sys::Value::f32;
     intptr_t addr = eval(op->DEF(1));
     Op *def = op->DEF(0);
+    bool fp = def->getResultType() == sys::Value::f32;
     if (fp)
       *(float*) addr = evalf(def);
     else if (size == 4)
@@ -203,6 +224,10 @@ Interpreter::Value Interpreter::applyExtern(const std::string &name, const std::
     char x = inbuf.get();
     return Value { .vi = x };
   }
+  if (name == "getfloat") {
+    float x; inbuf >> x;
+    return Value { .vf = x };
+  }
   if (name == "putint") {
     intptr_t v = args[0].vi;
     // Direct cast of `(int) v` is implementation-defined.
@@ -213,6 +238,8 @@ Interpreter::Value Interpreter::applyExtern(const std::string &name, const std::
     outbuf << (char) args[0].vi;
     return Value();
   }
+  if (name == "_sysy_starttime" || name == "_sysy_stoptime")
+    return Value();
   sys_unreachable("unknown extern function: " << name);
 }
 
