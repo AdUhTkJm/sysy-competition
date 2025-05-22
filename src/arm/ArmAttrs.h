@@ -140,10 +140,10 @@ public:
   };
 
 RATTR(RegAttr);
-RPOLYATTR(RdAttr);
-RPOLYATTR(RsAttr);
-RPOLYATTR(Rs2Attr);
-RPOLYATTR(Rs3Attr);
+RATTR(RdAttr);
+RATTR(RsAttr);
+RATTR(Rs2Attr);
+RATTR(Rs3Attr);
 
 }
   
@@ -151,13 +151,13 @@ RPOLYATTR(Rs3Attr);
 
 #define STACKOFF(op) (op)->get<StackOffsetAttr>()->offset
 #define REG(op) (op)->get<RegAttr>()->reg
-#define RDOFF(op) (op)->get<RdAttr>()->offset
-#define RSOFF(op) (op)->get<RsAttr>()->offset
-#define RS2OFF(op) (op)->get<Rs2Attr>()->offset
-#define RS3OFF(op) (op)->get<Rs3Attr>()->offset
-#define RD(op) ((Reg) RDOFF(op))
-#define RS(op) ((Reg) RSOFF(op))
-#define RS2(op) ((Reg) RS2OFF(op))
-#define RS3(op) ((Reg) RS3OFF(op))
+#define RD(op) (op)->get<RdAttr>()->reg
+#define RS(op) (op)->get<RsAttr>()->reg
+#define RS2(op) (op)->get<Rs2Attr>()->reg
+#define RS3(op) (op)->get<Rs3Attr>()->reg
+#define RDC(x) new RdAttr(x)
+#define RSC(x) new RsAttr(x)
+#define RS2C(x) new Rs2Attr(x)
+#define RS3C(x) new Rs3Attr(x)
 
 #endif

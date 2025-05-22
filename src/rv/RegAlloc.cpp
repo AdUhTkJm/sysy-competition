@@ -13,7 +13,7 @@ using namespace sys::rv;
 
 namespace {
 
-class SpilledRdAttr : public AttrImpl<SpilledRdAttr, RVLINE> {
+class SpilledRdAttr : public AttrImpl<SpilledRdAttr, RVLINE + 2097152> {
 public:
   bool fp;
   int offset;
@@ -25,7 +25,7 @@ public:
   SpilledRdAttr *clone() { return new SpilledRdAttr(fp, offset, ref); }
 };
 
-class SpilledRsAttr : public AttrImpl<RegAttr, RVLINE> {
+class SpilledRsAttr : public AttrImpl<RegAttr, RVLINE + 2097152> {
 public:
   bool fp;
   int offset;
@@ -33,11 +33,11 @@ public:
 
   SpilledRsAttr(bool fp, int offset, Op *ref): fp(fp), offset(offset), ref(ref) {}
 
-  std::string toString() { return "<rd = " + std::to_string(offset) + (fp ? "f" : "") + ">"; }
+  std::string toString() { return "<rs = " + std::to_string(offset) + (fp ? "f" : "") + ">"; }
   SpilledRsAttr *clone() { return new SpilledRsAttr(fp, offset, ref); }
 };
 
-class SpilledRs2Attr : public AttrImpl<SpilledRs2Attr, RVLINE> {
+class SpilledRs2Attr : public AttrImpl<SpilledRs2Attr, RVLINE + 2097152> {
 public:
   bool fp;
   int offset;
@@ -45,7 +45,7 @@ public:
 
   SpilledRs2Attr(bool fp, int offset, Op *ref): fp(fp), offset(offset), ref(ref) {}
 
-  std::string toString() { return "<rd = " + std::to_string(offset) + + (fp ? "f" : "") + ">"; }
+  std::string toString() { return "<rs2 = " + std::to_string(offset) + + (fp ? "f" : "") + ">"; }
   SpilledRs2Attr *clone() { return new SpilledRs2Attr(fp, offset, ref); }
 };
 

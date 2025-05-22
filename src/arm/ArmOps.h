@@ -66,6 +66,7 @@ ARMOP(SubWOp);
 ARMOP(RsbWOp); // Reverse subtract
 ARMOP(SubWIOp); // Accept immediate
 ARMOP(SubSWOp); // Sub and set flag; Note that only S-suffixed ops will set flag.
+ARMOP(SubXOp);
 
 ARMOP(MulWOp);
 ARMOPL(MulXOp);

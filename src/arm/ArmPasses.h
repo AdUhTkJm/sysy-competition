@@ -2,8 +2,9 @@
 #define ARM_PASSES_H
 
 #include "../opt/Pass.h"
-#include "../codegen/Ops.h"
 #include "../codegen/CodeGen.h"
+#include "../codegen/Ops.h"
+#include "../codegen/Attrs.h"
 #include "ArmOps.h"
 #include "ArmAttrs.h"
 
@@ -45,36 +46,27 @@ public:
 };
 
 class RegAlloc : public Pass {
+  int spilled;
+  int convertedTotal;
+
   std::map<FuncOp*, std::set<Reg>> usedRegisters;
   std::map<std::string, FuncOp*> fnMap;
 
   std::map<Op*, std::set<Op*>> interf;
   std::map<Op*, std::set<Reg>> forbidden;
-
-  // Fill in the internal data structures.
-  void allocate(Region *region, bool isLeaf);
-public:
   std::map<Op*, Reg> assignment;
   std::unordered_map<Op*, int> spillOffset;
+
+  void runImpl(Region *region, bool isLeaf);
+  void proEpilogue(FuncOp *funcOp, bool isLeaf);
+  int latePeephole(Op *funcOp);
+  void tidyup(Region *region);
+public:
 
   RegAlloc(ModuleOp *module): Pass(module) {}
 
   std::string name() { return "arm-regalloc"; };
-  std::map<std::string, int> stats() { return {}; }
-  void run();
-};
-
-class Destruct : public Pass {
-  std::map<Op*, Reg> assignment;
-  std::unordered_map<Op*, int> spillOffset;
-
-  void runImpl(Region *region);
-  bool spilled(Op *op);
-public:
-  Destruct(ModuleOp *module): Pass(module) {}
-
-  std::string name() { return "arm-destruct"; };
-  std::map<std::string, int> stats() { return {}; }
+  std::map<std::string, int> stats();
   void run();
 };
 
