@@ -116,7 +116,7 @@ public:
   void run();
 };
 
-class LoopUnroll : public Pass {
+class ConstLoopUnroll : public Pass {
   std::map<Op*, Op*> phiMap;
   std::map<Op*, Op*> exitlatch;
   int unrolled = 0;
@@ -125,13 +125,12 @@ class LoopUnroll : public Pass {
   bool runImpl(LoopInfo *info);
   // Returns the new latch.
   // Starts insertion after `bb`, and duplicate `info` a total of `unroll` times.
-  // If `isMainLoop`, then substitute every branch into goto; otherwise leave it as it is.
-  // If `complete`, mark all phis as coming from preheader.
-  BasicBlock *copyLoop(LoopInfo *info, BasicBlock *bb, int unroll, bool isMainLoop, bool complete);
+  // This only unrolls constant loops.
+  BasicBlock *copyLoop(LoopInfo *info, BasicBlock *bb, int unroll);
 public:
-  LoopUnroll(ModuleOp *module): Pass(module) {}
+  ConstLoopUnroll(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "loop-unroll"; }
+  std::string name() { return "const-loop-unroll"; }
   std::map<std::string, int> stats();
   void run();
 };
@@ -162,7 +161,8 @@ class LICM : public Pass {
   // All addresses stored inside current loop.
   std::vector<Op*> stores;
 
-  void markVariant(LoopInfo *info, BasicBlock *bb, bool metLoad);
+  // A store is hoistable when no branch or load has been met.
+  void markVariant(LoopInfo *info, BasicBlock *bb, bool hoistable);
   void runImpl(LoopInfo *info);
 public:
   LICM(ModuleOp *module): Pass(module) {}

@@ -62,12 +62,12 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::Globalize>();
   pm.addPass<sys::Mem2Reg>();
   pm.addPass<sys::Alias>();
-  pm.addPass<sys::RegularFold>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::CanonicalizeLoop>(/*lcssa=*/ true);
   pm.addPass<sys::LoopRotate>();
   pm.addPass<sys::CanonicalizeLoop>(/*lcssa=*/ false);
   pm.addPass<sys::LICM>();
+  pm.addPass<sys::ConstLoopUnroll>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::RegularFold>();
   pm.addPass<sys::DCE>();

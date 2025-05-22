@@ -56,9 +56,10 @@ int EarlyConstFold::foldImpl() {
 
       folded++;
       changed = true;
-      auto ifso = op->getRegion(V(cond) ? 0 : 1);
+      auto region = V(cond) ? 0 : 1;
       // Note that the else clause can be empty.
-      if (ifso) {
+      if (op->getRegions().size() > region) {
+        auto ifso = op->getRegion(region);
         for (auto bb : ifso->getBlocks()) {
           auto ops = bb->getOps();
           for (auto inner : ops)

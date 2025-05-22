@@ -34,11 +34,6 @@ void LoopRotate::runImpl(LoopInfo *info) {
     return;
   if (ELSE(term) != exit)
     return;
-  
-  auto upper = br.extract("x");
-  auto upperFrom = upper->getParent();
-  if (!upperFrom->dominates(header) || upperFrom == header)
-    return;
 
   auto latch = info->getLatch();
   auto latchterm = latch->getLastOp();
@@ -52,6 +47,16 @@ void LoopRotate::runImpl(LoopInfo *info) {
   auto preterm = preheader->getLastOp();
   if (!isa<GotoOp>(preterm))
     return;
+  
+  auto upper = br.extract("x");
+  auto upperFrom = upper->getParent();
+  if (!upperFrom->dominates(header) || upperFrom == header) {
+    if (!isa<IntOp>(upper))
+      return;
+
+    // We can hoist that constant out of loop.
+    upper->moveBefore(preterm);
+  }
 
   rotated++;
 
