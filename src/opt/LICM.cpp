@@ -41,10 +41,10 @@ void LICM::markVariant(LoopInfo *info, BasicBlock *bb, bool hoistable) {
     if (op->has<VariantAttr>())
       continue;
 
-    if (pinned(op) || (isa<LoadOp>(op) && !noAlias(op, stores))
+    if (pinned(op) || (isa<LoadOp>(op) && (!noAlias(op, stores) || impure))
         // When a store only writes a loop-invariant value to loop-invariant address,
         // and it doesn't follow any load, then it's safe to hoist it out.
-        || (isa<StoreOp>(op) && (!hoistable || op->DEF(0)->has<VariantAttr>() || op->DEF(1)->has<VariantAttr>())))
+        || (isa<StoreOp>(op) && (!hoistable || impure || op->DEF(0)->has<VariantAttr>() || op->DEF(1)->has<VariantAttr>())))
       op->add<VariantAttr>();
     else for (auto operand : op->getOperands()) {
       auto def = operand.defining;
@@ -89,10 +89,13 @@ void LICM::runImpl(LoopInfo *info) {
 
   // Record all stores in the loop.
   stores.clear();
+  impure = false;
   for (auto bb : info->getBlocks()) {
     for (auto op : bb->getOps()) {
       if (isa<StoreOp>(op))
         stores.push_back(op->DEF(1));
+      if (isa<CallOp>(op) && op->has<ImpureAttr>())
+        impure = true;
     }
   }
 

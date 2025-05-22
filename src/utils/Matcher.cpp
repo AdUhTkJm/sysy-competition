@@ -15,6 +15,64 @@ using namespace sys;
     return matchExpr(list->elements[1], op->getOperand(0).defining); \
   }
 
+#define EVAL_BINARY(opcode, op) \
+  if (opname == "!" opcode) { \
+    int a = evalExpr(list->elements[1]); \
+    int b = evalExpr(list->elements[2]); \
+    return a op b; \
+  }
+
+#define EVAL_UNARY(opcode, op) \
+  if (opname == "!" opcode) { \
+    int a = evalExpr(list->elements[1]); \
+    return op a; \
+  }
+
+#define EVAL_BINARY_F_OPERAND(opcode, op) \
+  if (opname == "!" opcode) { \
+    float a = evalFExpr(list->elements[1]); \
+    float b = evalFExpr(list->elements[2]); \
+    return a op b; \
+  }
+
+#define EVAL_UNARY_F_OPERAND(opcode, op) \
+  if (opname == "!" opcode) { \
+    float a = evalFExpr(list->elements[1]); \
+    return op a; \
+  }
+
+#define EVAL_BINARY_F(opcode, op) \
+  if (opname == "?" opcode) { \
+    float a = evalFExpr(list->elements[1]); \
+    float b = evalFExpr(list->elements[2]); \
+    return a op b; \
+  }
+
+#define EVAL_UNARY_F(opcode, op) \
+  if (opname == "?" opcode) { \
+    float a = evalFExpr(list->elements[1]); \
+    return op a; \
+  }
+
+#define EVAL_UNARY_I_OPERAND(opcode, op) \
+  if (opname == "?" opcode) { \
+    int a = evalExpr(list->elements[1]); \
+    return op a; \
+  }
+
+#define BUILD_BINARY(opcode, Ty) \
+  if (opname == opcode) { \
+    Value a = buildExpr(list->elements[1]); \
+    Value b = buildExpr(list->elements[2]); \
+    return builder.create<Ty>({ a, b }); \
+  }
+
+#define BUILD_UNARY(opcode, Ty) \
+  if (opname == opcode) { \
+    Value a = buildExpr(list->elements[1]); \
+    return builder.create<Ty>({ a }); \
+  }
+
 Rule::Rule(const char *text): text(text) {
   pattern = parse();
 }
@@ -96,6 +154,24 @@ bool Rule::matchExpr(Expr *expr, Op* op) {
   if (auto* atom = dyn_cast<Atom>(expr)) {
     std::string_view var = atom->value;
 
+    // This is a float literal.
+    if (var[0] == '*') {
+      if (!isa<FloatOp>(op))
+        return false;
+
+      if (std::isdigit(var[1]) || var[1] == '-') {
+        std::string str(var.substr(1));
+        if (std::stof(str) != F(op))
+          return false;
+      }
+
+      if (binding.count(var))
+        return F(binding[var]) == F(op);
+
+      binding[var] = op;
+      return true;
+    }
+
     // A normal binding.
     if (var[0] != '\'' && !(std::isdigit(var[0]) || var[0] == '-')) {
       if (binding.count(var))
@@ -139,10 +215,10 @@ bool Rule::matchExpr(Expr *expr, Op* op) {
   MATCH_BINARY("ne", NeOp);
   MATCH_BINARY("le", LeOp);
   MATCH_BINARY("lt", LtOp);
-  MATCH_BINARY("eqf", EqFOp);
-  MATCH_BINARY("nef", NeFOp);
-  MATCH_BINARY("lef", LeFOp);
-  MATCH_BINARY("ltf", LtFOp);
+  MATCH_BINARY("feq", EqFOp);
+  MATCH_BINARY("fne", NeFOp);
+  MATCH_BINARY("fle", LeFOp);
+  MATCH_BINARY("flt", LtFOp);
   MATCH_BINARY("add", AddIOp);
   MATCH_BINARY("sub", SubIOp);
   MATCH_BINARY("mul", MulIOp);
@@ -156,15 +232,18 @@ bool Rule::matchExpr(Expr *expr, Op* op) {
   MATCH_BINARY("shrl", RShiftLOp);
   MATCH_BINARY("addl", AddLOp);
   MATCH_BINARY("mull", MulLOp);
-  MATCH_BINARY("addf", AddFOp);
-  MATCH_BINARY("subf", SubFOp);
-  MATCH_BINARY("mulf", MulFOp);
-  MATCH_BINARY("divf", DivFOp);
+  MATCH_BINARY("fadd", AddFOp);
+  MATCH_BINARY("fsub", SubFOp);
+  MATCH_BINARY("fmul", MulFOp);
+  MATCH_BINARY("fdiv", DivFOp);
 
   MATCH_UNARY("not", NotOp);
   MATCH_UNARY("snz", SetNotZeroOp);
   MATCH_UNARY("minus", MinusOp);
+  MATCH_UNARY("fminus", MinusFOp);
   MATCH_UNARY("br", BranchOp);
+  MATCH_UNARY("f2i", F2IOp);
+  MATCH_UNARY("i2f", I2FOp);
 
   return false;
 }
@@ -177,7 +256,7 @@ int Rule::evalExpr(Expr *expr) {
     }
 
     if (atom->value[0] == '\'') {
-      auto lint = cast<IntOp>(binding[atom->value]);
+      auto lint = binding[atom->value];
       return V(lint);
     }
   }
@@ -189,82 +268,30 @@ int Rule::evalExpr(Expr *expr) {
   auto head = dyn_cast<Atom>(list->elements[0]);
   std::string_view opname = head->value;
 
-  if (opname == "!add") {
-    int a = evalExpr(list->elements[1]);
-    int b = evalExpr(list->elements[2]);
-    return a + b;
-  }
+  EVAL_BINARY("add", +);
+  EVAL_BINARY("sub", -);
+  EVAL_BINARY("mul", *);
+  EVAL_BINARY("div", /);
+  EVAL_BINARY("mod", %);
+  EVAL_BINARY("gt", >);
+  EVAL_BINARY("lt", <);
+  EVAL_BINARY("ge", >=);
+  EVAL_BINARY("le", <=);
+  EVAL_BINARY("eq", ==);
+  EVAL_BINARY("ne", !=);
+  EVAL_BINARY("and", &);
+  EVAL_BINARY("or", |);
 
-  if (opname == "!mul") {
-    int a = evalExpr(list->elements[1]);
-    int b = evalExpr(list->elements[2]);
-    return a * b;
-  }
-  
-  if (opname == "!sub") {
-    int a = evalExpr(list->elements[1]);
-    int b = evalExpr(list->elements[2]);
-    return a - b;
-  }
+  EVAL_BINARY_F_OPERAND("feq", ==);
+  EVAL_BINARY_F_OPERAND("fne", !=);
+  EVAL_BINARY_F_OPERAND("fle", <=);
+  EVAL_BINARY_F_OPERAND("fge", >=);
+  EVAL_BINARY_F_OPERAND("flt", <);
+  EVAL_BINARY_F_OPERAND("fgt", >);
 
-  if (opname == "!div") {
-    int a = evalExpr(list->elements[1]);
-    int b = evalExpr(list->elements[2]);
-    return a / b;
-  }
+  EVAL_UNARY("not", !);
 
-  if (opname == "!mod") {
-    int a = evalExpr(list->elements[1]);
-    int b = evalExpr(list->elements[2]);
-    return a % b;
-  }
-
-  if (opname == "!gt") {
-    int a = evalExpr(list->elements[1]);
-    int b = evalExpr(list->elements[2]);
-    return a > b;
-  }
-
-  if (opname == "!lt") {
-    int a = evalExpr(list->elements[1]);
-    int b = evalExpr(list->elements[2]);
-    return a < b;
-  }
-  
-  if (opname == "!le") {
-    int a = evalExpr(list->elements[1]);
-    int b = evalExpr(list->elements[2]);
-    return a <= b;
-  }
-
-  if (opname == "!eq") {
-    int a = evalExpr(list->elements[1]);
-    int b = evalExpr(list->elements[2]);
-    return a == b;
-  }
-
-  if (opname == "!ne") {
-    int a = evalExpr(list->elements[1]);
-    int b = evalExpr(list->elements[2]);
-    return a != b;
-  }
-  
-  if (opname == "!and") {
-    int a = evalExpr(list->elements[1]);
-    int b = evalExpr(list->elements[2]);
-    return a && b;
-  }
-  
-  if (opname == "!or") {
-    int a = evalExpr(list->elements[1]);
-    int b = evalExpr(list->elements[2]);
-    return a || b;
-  }
-
-  if (opname == "!not") {
-    int a = evalExpr(list->elements[1]);
-    return !a;
-  }
+  EVAL_UNARY_F_OPERAND("cvt", (int));
 
   if (opname == "!only-if") {
     int a = evalExpr(list->elements[1]);
@@ -272,6 +299,37 @@ int Rule::evalExpr(Expr *expr) {
       failed = true;
     return 0;
   }
+
+  std::cerr << "unknown opname: " << opname << "\n";
+  assert(false);
+}
+
+float Rule::evalFExpr(Expr *expr) {
+  if (auto atom = dyn_cast<Atom>(expr)) {
+    if (std::isdigit(atom->value[1]) || atom->value[1] == '-') {
+      std::string str(atom->value.substr(1));
+      return std::stof(str);
+    }
+
+    if (atom->value[0] == '*') {
+      auto lint = binding[atom->value];
+      return F(lint);
+    }
+  }
+
+  auto list = dyn_cast<List>(expr);
+
+  assert(list && !list->elements.empty());
+
+  auto head = dyn_cast<Atom>(list->elements[0]);
+  std::string_view opname = head->value;
+
+  EVAL_BINARY_F("add", +);
+  EVAL_BINARY_F("sub", -);
+  EVAL_BINARY_F("mul", *);
+  EVAL_BINARY_F("div", /);
+  
+  EVAL_UNARY_I_OPERAND("cvt", (float));
 
   std::cerr << "unknown opname: " << opname << "\n";
   assert(false);
@@ -307,71 +365,32 @@ Op *Rule::buildExpr(Expr *expr) {
     return builder.create<IntOp>({ new IntAttr(result) });
   }
 
-  if (opname == "add") {
-    Value a = buildExpr(list->elements[1]);
-    Value b = buildExpr(list->elements[2]);
-    return builder.create<AddIOp>({ a, b });
+  if (opname[0] == '?') {
+    float result = evalFExpr(expr);
+
+    return builder.create<FloatOp>({ new FloatAttr(result) });
   }
 
-  if (opname == "sub") {
-    Value a = buildExpr(list->elements[1]);
-    Value b = buildExpr(list->elements[2]);
-    return builder.create<SubIOp>({ a, b });
-  }
+  BUILD_BINARY("add", AddIOp);
+  BUILD_BINARY("sub", SubIOp);
+  BUILD_BINARY("mul", MulIOp);
+  BUILD_BINARY("div", DivIOp);
+  BUILD_BINARY("fadd", AddFOp);
+  BUILD_BINARY("fsub", SubFOp);
+  BUILD_BINARY("fmul", MulFOp);
+  BUILD_BINARY("fdiv", DivFOp);
+  BUILD_BINARY("mod", ModIOp);
+  BUILD_BINARY("and", AndIOp);
+  BUILD_BINARY("or", OrIOp);
+  BUILD_BINARY("eq", EqOp);
+  BUILD_BINARY("ne", NeOp);
+  BUILD_BINARY("le", LeOp);
+  BUILD_BINARY("lt", LtOp);
 
-  if (opname == "mul") {
-    Value a = buildExpr(list->elements[1]);
-    Value b = buildExpr(list->elements[2]);
-    return builder.create<MulIOp>({ a, b });
-  }
-
-  if (opname == "div") {
-    Value a = buildExpr(list->elements[1]);
-    Value b = buildExpr(list->elements[2]);
-    return builder.create<DivIOp>({ a, b });
-  }
-
-  if (opname == "mod") {
-    Value a = buildExpr(list->elements[1]);
-    Value b = buildExpr(list->elements[2]);
-    return builder.create<ModIOp>({ a, b });
-  }
-
-  if (opname == "and") {
-    Value a = buildExpr(list->elements[1]);
-    Value b = buildExpr(list->elements[2]);
-    return builder.create<AndIOp>({ a, b });
-  }
-
-  if (opname == "or") {
-    Value a = buildExpr(list->elements[1]);
-    Value b = buildExpr(list->elements[2]);
-    return builder.create<OrIOp>({ a, b });
-  }
-
-  if (opname == "eq") {
-    Value a = buildExpr(list->elements[1]);
-    Value b = buildExpr(list->elements[2]);
-    return builder.create<EqOp>({ a, b });
-  } 
-  
-  if (opname == "ne") {
-    Value a = buildExpr(list->elements[1]);
-    Value b = buildExpr(list->elements[2]);
-    return builder.create<NeOp>({ a, b });
-  }
-
-  if (opname == "lt") {
-    Value a = buildExpr(list->elements[1]);
-    Value b = buildExpr(list->elements[2]);
-    return builder.create<LtOp>({ a, b });
-  }
-
-  if (opname == "le") {
-    Value a = buildExpr(list->elements[1]);
-    Value b = buildExpr(list->elements[2]);
-    return builder.create<LeOp>({ a, b });
-  }
+  BUILD_UNARY("minus", MinusOp);
+  BUILD_UNARY("fminus", MinusFOp);
+  BUILD_UNARY("not", NotOp);
+  BUILD_UNARY("snz", SetNotZeroOp);
 
   if (opname == "gt") {
     Value a = buildExpr(list->elements[1]);
@@ -383,21 +402,6 @@ Op *Rule::buildExpr(Expr *expr) {
     Value a = buildExpr(list->elements[1]);
     Value b = buildExpr(list->elements[2]);
     return builder.create<LeOp>({ b, a });
-  }
-
-  if (opname == "minus") {
-    Value a = buildExpr(list->elements[1]);
-    return builder.create<MinusOp>({ a });
-  }
-
-  if (opname == "not") {
-    Value a = buildExpr(list->elements[1]);
-    return builder.create<NotOp>({ a });
-  }
-
-  if (opname == "snz") {
-    Value a = buildExpr(list->elements[1]);
-    return builder.create<SetNotZeroOp>({ a });
   }
 
   std::cerr << "unknown opname: " << opname << "\n";

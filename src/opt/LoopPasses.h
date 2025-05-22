@@ -160,6 +160,8 @@ class LICM : public Pass {
   DomTree domtree;
   // All addresses stored inside current loop.
   std::vector<Op*> stores;
+  // Whether the current function has an impure call.
+  bool impure;
 
   // A store is hoistable when no branch or load has been met.
   void markVariant(LoopInfo *info, BasicBlock *bb, bool hoistable);

@@ -42,6 +42,7 @@ class Rule {
 
   bool matchExpr(Expr *expr, Op *op);
   int evalExpr(Expr *expr);
+  float evalFExpr(Expr *expr);
   Op *buildExpr(Expr *expr);
 
   void dump(Expr *expr, std::ostream &os);

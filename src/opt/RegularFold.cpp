@@ -22,6 +22,13 @@ static Rule rules[] = {
   "(change (add (add x x) x) (mul x 3))",
   "(change (add x (add x x)) (mul x 3))",
 
+  // FP Addition
+  "(change (fadd *a *b) (?add *a *b))",
+  "(change (fadd x *0) x)",
+  "(change (fadd *a x) (fadd x *a))",
+  "(change (fadd x (fminus y)) (fsub x y))",
+  "(change (fadd (fminus x) y) (fsub y x))",
+
   // Subtraction
   "(change (sub x 0) x)",
   "(change (sub x x) 0)",
@@ -37,6 +44,11 @@ static Rule rules[] = {
   "(change (sub (div 'a x) (div 'b x)) (div (!sub 'a 'b) x))",
   "(change (sub (div x 'a) (div y 'a)) (div (sub x y) 'a))",
 
+  // FP subtraction
+  "(change (fsub *a *b) (?sub *a *b))",
+  "(change (fsub x *0) x)",
+  "(change (fsub x (fminus y)) (fadd x y))",
+
   // Multiplication
   "(change (mul x 0) 0)",
   "(change (mul x 1) x)",
@@ -44,6 +56,14 @@ static Rule rules[] = {
   "(change (mul 'a 'b) (!mul 'a 'b))",
   "(change (mul 'a x) (mul x 'a))",
   "(change (mul (mul x 'a) 'b) (mul x (!mul 'a 'b)))",
+
+  // FP multiplication
+  "(change (fmul *a *b) (?mul *a *b))",
+  "(change (fmul x *0) *0)",
+  "(change (fmul x *1) x)",
+  "(change (fmul x *2) (fadd x x))",
+  "(change (fmul x *-1) (fminus x))",
+  "(change (fmul *a x) (fmul x *a))",
 
   // Division
   "(change (div 0 x) 0)",
@@ -53,6 +73,13 @@ static Rule rules[] = {
   "(change (div 'a 'b) (!div 'a 'b))",
   "(change (div (mul x 'a) 'b) (!only-if (!eq (!mod 'a 'b) 0) (mul x (!div 'a 'b))))",
   "(change (div (div x 'a) 'b) (!only-if (!ne (!mul 'a 'b) -1) (div x (!mul 'a 'b))))",
+
+  // FP Division
+  "(change (fdiv *a *b) (?div *a *b))",
+  "(change (fdiv *0 x) *0)",
+  "(change (fdiv x *1) x)",
+  "(change (fdiv x *-1) (fminus x))",
+  "(change (fdiv x x) *1)",
 
   // Modulus
   "(change (mod x 1) 0)",
@@ -65,6 +92,12 @@ static Rule rules[] = {
   "(change (minus (add x 'a)) (sub (!sub 0 'a) x))",
   "(change (minus (sub x y)) (sub y x))",
   "(change (minus (minus x)) x)",
+
+  // FP Minus
+  "(change (fminus *a) (?sub *0 *a))",
+  "(change (fminus (fadd x *a)) (fsub (?sub *0 *a) x))",
+  "(change (fminus (fsub x y)) (fsub y x))",
+  "(change (fminus (fminus x)) x)",
 
   // Equality
   "(change (eq x x) 1)",
@@ -80,11 +113,20 @@ static Rule rules[] = {
   "(change (eq x 0) (not x))",
   "(change (eq (not x) 0) (snz x))",
 
+  // FP Equality
+  "(change (feq x x) 1)",
+  "(change (feq *a *b) (!feq *a *b))",
+  "(change (feq *a x) (feq x *a))",
+
   // Less than or equal
   "(change (le x x) 1)",
   "(change (le 'a 'b) (!le 'a 'b))",
   "(change (le x 'a) (lt x (!add 'a 1)))",
   "(change (le 'a x) (lt (!sub 'a 1) x))",
+
+  // FP Less than or equal
+  "(change (fle x x) 1)",
+  "(change (fle *a *b) (!fle *a *b))",
 
   // Less than
   "(change (lt x x) 0)",
@@ -97,6 +139,10 @@ static Rule rules[] = {
   "(change (lt 'b (sub x 'a)) (lt (!add 'b 'a) x))",
   "(change (lt 'b (mul x 'a)) (!only-if (!and (!gt 'a 0) (!gt 'b 0)) (lt (!div 'b 'a) x)))",
   "(change (lt 'b (div x 'a)) (!only-if (!and (!gt 'a 0) (!gt 'b 0)) (le (!mul 'a (!add 'b 1)) x)))",
+  
+  // FP Less than
+  "(change (flt x x) 0)",
+  "(change (flt *a *b) (!flt *a *b))",
 
   // Not
   "(change (not 'a) (!not 'a))",
@@ -108,6 +154,13 @@ static Rule rules[] = {
   "(change (not (or x y)) (and (not x) (not y)))",
   "(change (not (and x y)) (or (not x) (not y)))",
 
+  // FP Not
+  "(change (not *a) (!feq *a *0))",
+  "(change (not (feq x y)) (fne x y))",
+  "(change (not (flt x y)) (flt y x))",
+  "(change (not (fle x y)) (fle y x))",
+  "(change (not (fne x y)) (feq x y))",
+
   // Not equal
   "(change (ne 'a 'b) (!ne 'a 'b))",
   "(change (ne 'a x) (ne x 'a))",
@@ -117,6 +170,9 @@ static Rule rules[] = {
   "(change (ne x 0) (snz x))",
   "(change (ne (not x) 0) (not x))",
 
+  // FP Not equal
+  "(change (fne *a *b) (!fne *a *b))",
+
   // Set not zero
   "(change (snz 0) 0)",
   "(change (snz 'a) (!only-if (!ne 'a 0) 1))",
@@ -125,6 +181,15 @@ static Rule rules[] = {
   "(change (snz (le x y)) (le x y))",
   "(change (snz (lt x y)) (lt x y))",
   "(change (snz (ne x y)) (ne x y))",
+
+  // FP Set not zero
+  "(change (snz *a) (!fne *a *0))",
+
+  // float -> int
+  "(change (f2i *a) (!cvt *a))",
+
+  // int -> float
+  "(change (i2f 'a) (?cvt 'a))",
 };
 
 std::map<std::string, int> RegularFold::stats() {
