@@ -88,6 +88,26 @@ void Lower::run() {
   REPLACE(ReturnOp, RetOp);
   REPLACE(GetGlobalOp, AdrOp);
   REPLACE(CallOp, BrOp);
+  REPLACE(AddIOp, AddWOp);
+  REPLACE(AddLOp, AddXOp);
+  REPLACE(SubIOp, SubWOp);
+  REPLACE(MulIOp, MulWOp);
+  REPLACE(MulLOp, MulXOp);
+  REPLACE(DivIOp, SdivWOp);
+  REPLACE(LShiftLOp, LslXOp);
+  REPLACE(LShiftOp, LslWOp);
+  REPLACE(RShiftLOp, AsrXIOp);
+  REPLACE(RShiftOp, AsrWIOp);
+
+  runRewriter([&](ModIOp *op) {
+    auto x = op->getOperand(0);
+    auto y = op->getOperand(1);
+
+    builder.setBeforeOp(op);
+    auto sdiv = builder.create<SdivWOp>({ x, y });
+    builder.replace<MsubWOp>(op, { sdiv, y, x });
+    return false;
+  });
 
   runRewriter([&](StoreOp *op) {
     if (op->getResultType() == Value::f32) {
@@ -179,6 +199,22 @@ void Lower::run() {
       builder.replace<ReadFRegOp>(op, { new RegAttr(Reg::v0) });
     else
       builder.replace<ReadRegOp>(op, { new RegAttr(Reg::x0) });
+    return true;
+  });
+
+  runRewriter([&](ReturnOp *op) {
+    builder.setBeforeOp(op);
+
+    if (op->getOperands().size()) {
+      auto fp = op->DEF(0)->getResultType() == Value::f32;
+      auto virt = builder.create<WriteRegOp>(op->getOperands(), {
+        new RegAttr(fp ? Reg::v0 : Reg::x0)
+      });
+      builder.replace<RetOp>(op, { virt });
+      return true;
+    }
+    
+    builder.replace<RetOp>(op);
     return true;
   });
 

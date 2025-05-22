@@ -13,7 +13,7 @@ using namespace sys::rv;
 
 namespace {
 
-class SpilledRdAttr : public AttrImpl<SpilledRdAttr, RVLINE> {
+class SpilledRdAttr : public AttrImpl<SpilledRdAttr, RVLINE + 2097152> {
 public:
   bool fp;
   int offset;
@@ -24,7 +24,7 @@ public:
   SpilledRdAttr *clone() { return new SpilledRdAttr(fp, offset); }
 };
 
-class SpilledRsAttr : public AttrImpl<RegAttr, RVLINE> {
+class SpilledRsAttr : public AttrImpl<SpilledRsAttr, RVLINE + 2097152> {
 public:
   bool fp;
   int offset;
@@ -35,7 +35,7 @@ public:
   SpilledRsAttr *clone() { return new SpilledRsAttr(fp, offset); }
 };
 
-class SpilledRs2Attr : public AttrImpl<SpilledRs2Attr, RVLINE> {
+class SpilledRs2Attr : public AttrImpl<SpilledRs2Attr, RVLINE + 2097152> {
 public:
   bool fp;
   int offset;

@@ -76,6 +76,7 @@ class Dump : public Pass {
 
   void dump(std::ostream &os);
   void dumpBody(Region *region, std::ostream &os);
+  void dumpOp(Op *op, std::ostream &os);
 public:
   Dump(ModuleOp *module, const std::string &out): Pass(module), out(out) {}
 

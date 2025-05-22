@@ -120,30 +120,20 @@ public:
   StackOffsetAttr *clone() { return new StackOffsetAttr(offset); }
 };
 
-#define RATTR(Ty) \
+#define RATTR(Ty, name) \
   class Ty : public AttrImpl<Ty, ARMLINE> { \
   public: \
     Reg reg; \
     Ty(Reg reg): reg(reg) {} \
-    std::string toString() { return "<" + showReg(reg) + ">"; } \
+    std::string toString() { return "<" name + showReg(reg) + ">"; } \
     Ty *clone() { return new Ty(reg); } \
   };
 
-#define RPOLYATTR(Ty) \
-  class Ty : public AttrImpl<Ty, ARMLINE> { \
-  public: \
-    int offset; \
-    Value::Type ty; \
-    Ty(int offset, Value::Type ty): offset(offset), ty(ty) {} \
-    std::string toString() { return "<" + std::to_string(offset) + ">"; } \
-    Ty *clone() { return new Ty(offset, ty); } \
-  };
-
-RATTR(RegAttr);
-RATTR(RdAttr);
-RATTR(RsAttr);
-RATTR(Rs2Attr);
-RATTR(Rs3Attr);
+RATTR(RegAttr, "");
+RATTR(RdAttr, "rd = ");
+RATTR(RsAttr, "rs = ");
+RATTR(Rs2Attr, "rs2 = ");
+RATTR(Rs3Attr, "rs3 = ");
 
 }
   

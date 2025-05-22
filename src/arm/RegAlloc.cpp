@@ -9,36 +9,44 @@ class SpilledRdAttr : public AttrImpl<SpilledRdAttr, ARMLINE + 4194304> {
 public:
   bool fp;
   int offset;
-  Op *ref;
 
-  SpilledRdAttr(bool fp, int offset, Op *ref): fp(fp), offset(offset), ref(ref) {}
+  SpilledRdAttr(bool fp, int offset): fp(fp), offset(offset) {}
 
   std::string toString() { return "<rd = " + std::to_string(offset) + (fp ? "f" : "") + ">"; }
-  SpilledRdAttr *clone() { return new SpilledRdAttr(fp, offset, ref); }
+  SpilledRdAttr *clone() { return new SpilledRdAttr(fp, offset); }
 };
 
-class SpilledRsAttr : public AttrImpl<RegAttr, ARMLINE + 4194304> {
+class SpilledRsAttr : public AttrImpl<SpilledRsAttr, ARMLINE + 4194304> {
 public:
   bool fp;
   int offset;
-  Op *ref;
 
-  SpilledRsAttr(bool fp, int offset, Op *ref): fp(fp), offset(offset), ref(ref) {}
+  SpilledRsAttr(bool fp, int offset): fp(fp), offset(offset) {}
 
   std::string toString() { return "<rs = " + std::to_string(offset) + (fp ? "f" : "") + ">"; }
-  SpilledRsAttr *clone() { return new SpilledRsAttr(fp, offset, ref); }
+  SpilledRsAttr *clone() { return new SpilledRsAttr(fp, offset); }
 };
 
 class SpilledRs2Attr : public AttrImpl<SpilledRs2Attr, ARMLINE + 4194304> {
 public:
   bool fp;
   int offset;
-  Op *ref;
 
-  SpilledRs2Attr(bool fp, int offset, Op *ref): fp(fp), offset(offset), ref(ref) {}
+  SpilledRs2Attr(bool fp, int offset): fp(fp), offset(offset) {}
 
   std::string toString() { return "<rs2 = " + std::to_string(offset) + + (fp ? "f" : "") + ">"; }
-  SpilledRs2Attr *clone() { return new SpilledRs2Attr(fp, offset, ref); }
+  SpilledRs2Attr *clone() { return new SpilledRs2Attr(fp, offset); }
+};
+
+class SpilledRs3Attr : public AttrImpl<SpilledRs3Attr, ARMLINE + 4194304> {
+public:
+  bool fp;
+  int offset;
+
+  SpilledRs3Attr(bool fp, int offset): fp(fp), offset(offset) {}
+
+  std::string toString() { return "<rs2 = " + std::to_string(offset) + + (fp ? "f" : "") + ">"; }
+  SpilledRs2Attr *clone() { return new SpilledRs2Attr(fp, offset); }
 };
 
 }
@@ -67,17 +75,19 @@ std::map<std::string, int> RegAlloc::stats() {
   if (!spillOffset.count(v##Index)) \
     op->add<AttrTy>(getReg(v##Index)); \
   else \
-    op->add<Spilled##AttrTy>(v##Index->getResultType() == Value::f32, spillOffset[v##Index], v##Index);
+    op->add<Spilled##AttrTy>(v##Index->getResultType() == Value::f32, spillOffset[v##Index]);
 
 #define GET_SPILLED_ARGS(op) \
-  (op->getResultType() == Value::f32, spillOffset[op], op)
+  (op->getResultType() == Value::f32, spillOffset[op])
 
-#define BINARY ADD_ATTR(0, RsAttr) ADD_ATTR(1, Rs2Attr)
+#define NULLARY
 #define UNARY ADD_ATTR(0, RsAttr)
+#define BINARY UNARY ADD_ATTR(1, Rs2Attr)
+#define TERNARY BINARY ADD_ATTR(2, Rs3Attr)
 
-#define REPLACE_BRANCH(T1, T2) \
-  REPLACE_BRANCH_IMPL(T1, T2); \
-  REPLACE_BRANCH_IMPL(T2, T1)
+#define REPLACE_BRANCH(T1, T2, attrs) \
+  REPLACE_BRANCH_IMPL(T1, T2, attrs); \
+  REPLACE_BRANCH_IMPL(T2, T1, attrs)
 
 // Say the before is `blt`, then we might see
 //   blt %1 %2 <target = bb1> <else = bb2>
@@ -86,7 +96,7 @@ std::map<std::string, int> RegAlloc::stats() {
 // If the next block is just <bb1>, then we flip it to bge, and make the target <bb2>.
 // if the next block is <bb2>, then we make the target <bb2>.
 // otherwise, make the target <bb1>, and add another `j <bb2>`.
-#define REPLACE_BRANCH_IMPL(BeforeTy, AfterTy) \
+#define REPLACE_BRANCH_IMPL(BeforeTy, AfterTy, attrs) \
   runRewriter(funcOp, [&](BeforeTy *op) { \
     if (!op->has<ElseAttr>()) \
       return false; \
@@ -100,9 +110,8 @@ std::map<std::string, int> RegAlloc::stats() {
     } \
     if (me->nextBlock() == target) { \
       builder.replace<AfterTy>(op, { \
-        op->get<RsAttr>(), \
-        op->get<Rs2Attr>(), \
         new TargetAttr(ifnot), \
+        attrs \
       }); \
       return true; \
     } \
@@ -141,8 +150,10 @@ static const Reg argRegs[] = {
 
 static const Reg spillReg = Reg::x28;
 static const Reg spillReg2 = Reg::x15;
+static const Reg spillReg3 = Reg::x14;
 static const Reg fspillReg = Reg::v31;
 static const Reg fspillReg2 = Reg::v15;
+static const Reg fspillReg3 = Reg::v30;
 
 // Order for leaf functions. Prioritize temporaries.
 static const Reg leafOrder[] = {
@@ -150,7 +161,7 @@ static const Reg leafOrder[] = {
   Reg::x4, Reg::x5, Reg::x6, Reg::x7,
 
   Reg::x8, Reg::x9, Reg::x10, Reg::x11,
-  Reg::x12, Reg::x13, Reg::x14,
+  Reg::x12, Reg::x13,
 
   Reg::x19, Reg::x20, Reg::x21, Reg::x22,
   Reg::x23, Reg::x24, Reg::x25, Reg::x26,
@@ -166,7 +177,7 @@ static const Reg normalOrder[] = {
   Reg::x4, Reg::x5, Reg::x6, Reg::x7,
 
   Reg::x8, Reg::x9, Reg::x10, Reg::x11,
-  Reg::x12, Reg::x13, Reg::x14,
+  Reg::x12, Reg::x13,
 };
 
 // The same, but for floating point registers.
@@ -180,13 +191,13 @@ static const Reg leafOrderf[] = {
   Reg::v16, Reg::v17, Reg::v18,
   Reg::v19, Reg::v20, Reg::v21, Reg::v22,
   Reg::v23, Reg::v24, Reg::v25, Reg::v26,
-  Reg::v27, Reg::v28, Reg::v29, Reg::v30,
+  Reg::v27, Reg::v28, Reg::v29,
 };
 // Order for non-leaf functions.
 static const Reg normalOrderf[] = {
   Reg::v19, Reg::v20, Reg::v21, Reg::v22,
   Reg::v23, Reg::v24, Reg::v25, Reg::v26,
-  Reg::v27, Reg::v28, Reg::v29, Reg::v30,
+  Reg::v27, Reg::v28, Reg::v29,
 
   Reg::v0, Reg::v1, Reg::v2, Reg::v3,
   Reg::v4, Reg::v5, Reg::v6, Reg::v7,
@@ -220,14 +231,10 @@ static const std::set<Reg> calleeSaved = {
   Reg::v27, Reg::v28, Reg::v29, Reg::v30,
 };
 
-constexpr int leafRegCnt = 24;
-constexpr int leafRegCntf = 30;
-constexpr int normalRegCnt = 24;
-constexpr int normalRegCntf = 30;
-
-static bool isConstant(Op *op) {
-  return isa<MovIOp>(op) || isa<AdrOp>(op);
-}
+constexpr int leafRegCnt = 23;
+constexpr int leafRegCntf = 29;
+constexpr int normalRegCnt = 23;
+constexpr int normalRegCntf = 29;
 
 // Used in constructing interference graph.
 struct Event {
@@ -249,8 +256,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   auto funcOp = region->getParent();
 
   // First of all, add 35 precolored placeholders before each call.
-  // This denotes that a CallOp clobbers those registers.
-  runRewriter(funcOp, [&](CallOp *op) {
+  // This denotes that a call clobbers those registers.
+  runRewriter(funcOp, [&](BrOp *op) {
     builder.setBeforeOp(op);
     for (auto reg : callerSaved) {
       auto placeholder = builder.create<PlaceHolderOp>();
@@ -353,10 +360,6 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
           prefer[x.defining] = op;
         }
       }
-
-      // We tend to spill constants, because they're easy to rematerialize.
-      if (isConstant(op))
-        priority[op] = -1;
     }
 
     // For all liveOuts, they are last-used at place size().
@@ -510,6 +513,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   };
 
   // Convert all operands to registers.
+  LOWER(MlaOp, TERNARY);
+  LOWER(MsubWOp, TERNARY);
+
   LOWER(AddXOp, BINARY);
   LOWER(AddWOp, BINARY);
   LOWER(SubWOp, BINARY);
@@ -522,20 +528,20 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(AndOp, BINARY);
   LOWER(OrOp, BINARY);
   LOWER(EorOp, BINARY);
-  LOWER(BltOp, BINARY);
-  LOWER(BgeOp, BINARY);
-  LOWER(StoreOp, BINARY);
-  LOWER(AndOp, BINARY);
-  LOWER(OrOp, BINARY);
   LOWER(StrWOp, BINARY);
   LOWER(StrXOp, BINARY);
   LOWER(StrFOp, BINARY);
-  LOWER(LslOp, BINARY);
-  LOWER(LsrOp, BINARY);
+  LOWER(LslWOp, BINARY);
+  LOWER(LsrWOp, BINARY);
+  LOWER(LslXOp, BINARY);
+  LOWER(LsrXOp, BINARY);
   LOWER(AsrWOp, BINARY);
   LOWER(AsrXOp, BINARY);
   LOWER(CmpOp, BINARY);
   LOWER(TstOp, BINARY);
+  LOWER(StrWOp, BINARY);
+  LOWER(StrXOp, BINARY);
+  LOWER(StrFOp, BINARY);
   
   LOWER(LdrWOp, UNARY);
   LOWER(LdrXOp, UNARY);
@@ -546,16 +552,26 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(AndIOp, UNARY);
   LOWER(OrIOp, UNARY);
   LOWER(EorIOp, UNARY);
-  LOWER(LslIOp, UNARY);
-  LOWER(LsrIOp, UNARY);
+  LOWER(LslWIOp, UNARY);
+  LOWER(LsrWIOp, UNARY);
+  LOWER(LslXIOp, UNARY);
+  LOWER(LsrXIOp, UNARY);
   LOWER(AsrWIOp, UNARY);
   LOWER(AsrXIOp, UNARY);
+  LOWER(CbzOp, UNARY);
+  LOWER(CbnzOp, UNARY);
+
+  // Branches don't have operands; they rely on flags.
+  LOWER(BltOp, NULLARY);
+  LOWER(BleOp, NULLARY);
+  LOWER(BeqOp, NULLARY);
+  LOWER(BneOp, NULLARY);
 
   // Note that some ops are dealt with later.
   // We can't remove all operands here.
   for (auto bb : region->getBlocks()) {
     for (auto op : bb->getOps()) {
-      if (isa<PlaceHolderOp>(op) || isa<CallOp>(op) || isa<RetOp>(op))
+      if (isa<PlaceHolderOp>(op) || isa<BrOp>(op) || isa<RetOp>(op))
         op->removeAllOperands();
     }
   }
@@ -702,14 +718,14 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         if (phi->getResultType() == Value::f32) {
           mv = builder.create<FmovOp>({
             new ImpureAttr,
-            spillOffset.count(phi) ? (Attr*) new SpilledRdAttr GET_SPILLED_ARGS(phi) : new RdAttr(getReg(phi)),
-            spillOffset.count(def) ? (Attr*) new SpilledRsAttr GET_SPILLED_ARGS(def) : new RsAttr(getReg(def))
+            spillOffset.count(phi) ? (Attr*) new SpilledRdAttr GET_SPILLED_ARGS(phi) : RDC(getReg(phi)),
+            spillOffset.count(def) ? (Attr*) new SpilledRsAttr GET_SPILLED_ARGS(def) : RSC(getReg(def))
           });
         } else {
           mv = builder.create<MovROp>({
             new ImpureAttr,
-            spillOffset.count(phi) ? (Attr*) new SpilledRdAttr GET_SPILLED_ARGS(phi) : new RdAttr(getReg(phi)),
-            spillOffset.count(def) ? (Attr*) new SpilledRsAttr GET_SPILLED_ARGS(def) : new RsAttr(getReg(def))
+            spillOffset.count(phi) ? (Attr*) new SpilledRdAttr GET_SPILLED_ARGS(phi) : RDC(getReg(phi)),
+            spillOffset.count(def) ? (Attr*) new SpilledRsAttr GET_SPILLED_ARGS(def) : RSC(getReg(def))
           });
         }
         moves.push_back(mv);
@@ -793,13 +809,12 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         if (!spillOffset.count(op))
           op->add<RdAttr>(getReg(op));
         else
-          op->add<SpilledRdAttr>(op->getResultType() == Value::f32, spillOffset[op], op);
+          op->add<SpilledRdAttr> GET_SPILLED_ARGS(op);
       }
     }
   }
 
   // Deal with spilled variables.
-  std::vector<Op*> rematerialized;
   for (auto bb : region->getBlocks()) {
     int delta = 0;
     for (auto op : bb->getOps()) {
@@ -820,20 +835,14 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         int offset = delta + rd->offset;
         bool fp = rd->fp;
         auto reg = fp ? fspillReg : spillReg;
-        if (isConstant(rd->ref)) {
-          // Mark for removal and rematerialize when needed.
-          rematerialized.push_back(rd->ref);
-          continue;
-        }
 
         builder.setAfterOp(op);
-        if (offset < 2048)
-          builder.create<StoreOp>({ RSC(reg), RS2C(Reg::x31), new IntAttr(offset), new SizeAttr(8) });
-        else if (offset < 4096) {
-          builder.create<AddWIOp>({ RDC(spillReg2), RSC(Reg::x31), new IntAttr(2047), new SizeAttr(8) });
-          builder.create<StoreOp>({ RSC(reg), RS2C(spillReg2), new IntAttr(offset - 2047), new SizeAttr(8) });
-        }
-        else assert(false);
+        if (offset < 16384) {
+          if (fp)
+            builder.create<StrFOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
+          else
+            builder.create<StrXOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
+        } else assert(false);
         op->add<RdAttr>(reg);
       }
 
@@ -841,23 +850,14 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         int offset = delta + rs->offset;
         bool fp = rs->fp;
         auto reg = fp ? fspillReg : spillReg;
-        auto ldty = fp ? Value::f32 : Value::i64;
 
         builder.setBeforeOp(op);
-        if (isConstant(rs->ref)) {
-          auto ref = rs->ref;
-          // Copy it here.
-          if (isa<MovIOp>(ref))
-            builder.create<MovIOp>({ RDC(reg), new IntAttr(V(ref)) });
-          if (isa<AdrOp>(ref))
-            builder.create<AdrOp>({ RDC(reg), new NameAttr(NAME(ref)) });
-        } else if (offset < 2048)
-          builder.create<LoadOp>(ldty, { RDC(reg), RSC(Reg::x31), new IntAttr(offset), new SizeAttr(8) });
-        else if (offset < 4096) {
-          builder.create<AddWIOp>({ RDC(spillReg), RSC(Reg::x31), new IntAttr(2047), new SizeAttr(8) });
-          builder.create<LoadOp>(ldty, { RDC(reg), RSC(spillReg), new IntAttr(offset - 2047), new SizeAttr(8) });
-        }
-        else assert(false);
+        if (offset < 16384) {
+          if (fp)
+            builder.create<LdrFOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
+          else
+            builder.create<LdrXOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
+        } else assert(false);
         op->add<RsAttr>(reg);
       }
 
@@ -865,30 +865,33 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         int offset = delta + rs2->offset;
         bool fp = rs2->fp;
         auto reg = fp ? fspillReg2 : spillReg2;
-        auto ldty = fp ? Value::f32 : Value::i64;
 
         builder.setBeforeOp(op);
-        if (isConstant(rs2->ref)) {
-          auto ref = rs2->ref;
-          // Copy it here.
-          if (isa<MovIOp>(ref))
-            builder.create<MovIOp>({ RDC(reg), new IntAttr(V(ref)) });
-          if (isa<AdrOp>(ref))
-            builder.create<AdrOp>({ RDC(reg), new NameAttr(NAME(ref)) });
-        } else if (offset < 2048)
-          builder.create<LoadOp>(ldty, { RDC(reg), RSC(Reg::x31), new IntAttr(offset), new SizeAttr(8) });
-        else if (offset < 4096) {
-          builder.create<AddWIOp>({ RDC(spillReg2), RSC(Reg::x31), new IntAttr(2047), new SizeAttr(8) });
-          builder.create<LoadOp>(ldty, { RDC(reg), RSC(spillReg2), new IntAttr(offset - 2047), new SizeAttr(8) });
-        }
-        else assert(false);
+        if (offset < 16384) {
+          if (fp)
+            builder.create<LdrFOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
+          else
+            builder.create<LdrXOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
+        } else assert(false);
+        op->add<Rs2Attr>(reg);
+      }
+
+      if (auto rs2 = op->find<SpilledRs3Attr>()) {
+        int offset = delta + rs2->offset;
+        bool fp = rs2->fp;
+        auto reg = fp ? fspillReg3 : spillReg3;
+
+        builder.setBeforeOp(op);
+        if (offset < 16384) {
+          if (fp)
+            builder.create<LdrFOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
+          else
+            builder.create<LdrXOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
+        } else assert(false);
         op->add<Rs2Attr>(reg);
       }
     }
   }
-
-  for (auto x : rematerialized)
-    x->erase();
 }
 
 int RegAlloc::latePeephole(Op *funcOp) {
@@ -896,7 +899,7 @@ int RegAlloc::latePeephole(Op *funcOp) {
 
   int converted = 0;
 
-  runRewriter(funcOp, [&](StoreOp *op) {
+  runRewriter(funcOp, [&](StrWOp *op) {
     if (op == op->getParent()->getLastOp())
       return false;
 
@@ -906,7 +909,7 @@ int RegAlloc::latePeephole(Op *funcOp) {
     //   sw a0, N(addr)
     //   mv a1, a0
     auto next = op->nextOp();
-    if (isa<LoadOp>(next) &&
+    if (isa<LdrWOp>(next) &&
         RS(next) == RS2(op) && V(next) == V(op) && SIZE(next) == SIZE(op)) {
       converted++;
       builder.setBeforeOp(next);
@@ -917,71 +920,6 @@ int RegAlloc::latePeephole(Op *funcOp) {
 
     return false;
   });
-
-  bool changed;
-  std::vector<StoreOp*> stores;
-  do {
-    changed = false;
-    // This modifies the content of stores, so cannot run in a rewriter.
-    stores = funcOp->findAll<StoreOp>();
-    for (auto op : stores) {
-      if (op == op->getParent()->getLastOp())
-        continue;
-      auto next = op->nextOp();
-
-      //   sw zero, N(sp)
-      //   sw zero, N+4(sp)
-      // becomes
-      //   sd zero, N(sp)
-      // only when N is a multiple of 8.
-      //
-      // We know `sp` is 16-aligned, but we don't know for other registers.
-      // That's why we fold it only for `sp`.
-      if (isa<StoreOp>(next) &&
-          RS(op) == Reg::x30 && RS2(op) == Reg::x31 &&
-          RS(next) == Reg::x30 && RS2(next) == Reg::x31 &&
-          V(op) % 8 == 0 && SIZE(op) == 4 &&
-          V(next) == V(op) + 4 && SIZE(next) == 4) {
-        converted++;
-        changed = true;
-
-        auto offset = V(op);
-        builder.replace<StoreOp>(op, {
-          new RsAttr(Reg::x30),
-          new Rs2Attr(Reg::x31),
-          new IntAttr(offset),
-          new SizeAttr(8),
-        });
-        next->erase();
-        break;
-      }
-
-      // Similarly:
-      //   sw zero, N(sp)
-      //   sw zero, N-4(sp)
-      // becomes
-      //   sd zero, N-4(sp)
-      // only when N-4 is a multiple of 8.
-      if (isa<StoreOp>(next) &&
-          RS(op) == Reg::x30 && RS2(op) == Reg::x31 &&
-          RS(next) == Reg::x30 && RS2(next) == Reg::x31 &&
-          V(op) % 8 == 4 && SIZE(op) == 4 &&
-          V(next) == V(op) - 4 && SIZE(next) == 4) {
-        converted++;
-        changed = true;
-
-        auto offset = V(op);
-        builder.replace<StoreOp>(op, {
-          new RsAttr(Reg::x30),
-          new Rs2Attr(Reg::x31),
-          new IntAttr(offset - 4),
-          new SizeAttr(8),
-        });
-        next->erase();
-        break;
-      }
-    }
-  } while (changed);
 
   // Eliminate useless MovROp.
   runRewriter(funcOp, [&](MovROp *op) {
@@ -1057,8 +995,9 @@ void RegAlloc::tidyup(Region *region) {
 
   // Now branches are still having both TargetAttr and ElseAttr.
   // Replace them (perform split when necessary), so that they only have one target.
-  REPLACE_BRANCH(BltOp, BgeOp);
-  REPLACE_BRANCH(BeqOp, BneOp);
+  REPLACE_BRANCH(BltOp, BgeOp,);
+  REPLACE_BRANCH(BeqOp, BneOp,);
+  REPLACE_BRANCH(CbzOp, CbnzOp, RSC(RS(op)));
 
   // Also, eliminate useless BOp.
   runRewriter(funcOp, [&](BOp *op) {
@@ -1078,65 +1017,22 @@ void RegAlloc::tidyup(Region *region) {
 void save(Builder builder, const std::vector<Reg> &regs, int offset) {
   for (auto reg : regs) {
     offset -= 8;
-    if (offset < 2048) {
-      builder.create<StrXOp>({
-        new RsAttr(reg),
-        new Rs2Attr(Reg::x31),
-        new IntAttr(offset)
-      });
-    } else {
-      // li t6, offset
-      // addi t6, t6, sp
-      // sd reg, 0(t6)
-      // (Because reg might be `s11`)
-      builder.create<MovIOp>({
-        new RdAttr(spillReg2),
-        new IntAttr(offset)
-      });
-      builder.create<AddXOp>({
-        new RdAttr(spillReg2),
-        new RsAttr(spillReg2),
-        new Rs2Attr(Reg::x31)
-      });
-      builder.create<StrXOp>({
-        new RsAttr(reg),
-        new Rs2Attr(spillReg2),
-        new IntAttr(0)
-      });
-    }
+    bool fp = isFP(reg);
+    if (fp)
+      builder.create<StrFOp>({ RSC(reg), RS2C(Reg::x31), new IntAttr(offset) });
+    else
+      builder.create<StrXOp>({ RSC(reg), RS2C(Reg::x31), new IntAttr(offset) });
   }
 }
 
 void load(Builder builder, const std::vector<Reg> &regs, int offset) {
   for (auto reg : regs) {
     offset -= 8;
-    auto isFloat = isFP(reg);
-    Value::Type ty = isFloat ? Value::f32 : Value::i64;
-    if (offset < 2048) {
-      builder.create<LdrXOp>({
-        new RdAttr(reg),
-        new RsAttr(Reg::x31),
-        new IntAttr(offset),
-      });
-    } else {
-      // li s11, offset
-      // addi s11, s11, sp
-      // ld reg, 0(s11)
-      builder.create<MovIOp>({
-        new RdAttr(spillReg),
-        new IntAttr(offset)
-      });
-      builder.create<AddXOp>({
-        new RdAttr(spillReg),
-        new RsAttr(spillReg),
-        new Rs2Attr(Reg::x31)
-      });
-      builder.create<LdrXOp>({
-        new RdAttr(reg),
-        new RsAttr(spillReg),
-        new IntAttr(0)
-      });
-    }
+    bool fp = isFP(reg);
+    if (fp)
+      builder.create<LdrFOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
+    else
+      builder.create<LdrXOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
   }
 }
 
@@ -1215,12 +1111,12 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
     assert(argOffsets.count(op));
     int myoffset = offset + argOffsets[op];
     builder.setBeforeOp(op);
-    builder.replace<LoadOp>(op, isFP(RD(op)) ? Value::f32 : Value::i64, {
-      new RdAttr(RD(op)),
-      new RsAttr(Reg::x31),
-      new IntAttr(myoffset),
-      new SizeAttr(8)
-    });
+    bool fp = isFP(RD(op));
+
+    if (fp)
+      builder.replace<LdrFOp>(op, { RDC(RD(op)), RSC(Reg::x31), new IntAttr(myoffset) });
+    else
+      builder.replace<LdrXOp>(op, { RDC(RD(op)), RSC(Reg::x31), new IntAttr(myoffset) });
     return false;
   });
 
@@ -1229,24 +1125,7 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
   //   addi <rd = sp> <rs = sp> <-4>
   runRewriter(funcOp, [&](SubSpOp *op) {
     int offset = V(op);
-    if (offset <= 2048 && offset > -2048) {
-      builder.replace<AddXIOp>(op, {
-        new RdAttr(Reg::x31),
-        new RsAttr(Reg::x31),
-        new IntAttr(-offset)
-      });
-    } else {
-      builder.setBeforeOp(op);
-      builder.create<MovIOp>({
-        new RdAttr(spillReg2),
-        new IntAttr(offset)
-      });
-      builder.replace<SubXOp>(op, {
-        new RdAttr(Reg::x31),
-        new RsAttr(Reg::x31),
-        new Rs2Attr(spillReg2)
-      });
-    }
+    builder.replace<AddXIOp>(op, { RDC(Reg::x31), RSC(Reg::x31), new IntAttr(-offset) });
     return true;
   });
 }

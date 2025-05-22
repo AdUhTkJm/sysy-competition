@@ -334,7 +334,10 @@ bool ArmRule::matchExpr(Expr *expr, Op* op) {
   MATCH_UNARY_IMM("ldrw", LdrWOp);
   MATCH_UNARY_IMM("ldrf", LdrFOp);
   MATCH_UNARY_IMM("ldrx", LdrXOp);
-  MATCH_UNARY_IMM("lsli", LslIOp);
+  MATCH_UNARY_IMM("lslwi", LslWIOp);
+  MATCH_UNARY_IMM("lslxi", LslXIOp);
+  MATCH_UNARY_IMM("rslwi", LsrWIOp);
+  MATCH_UNARY_IMM("lsrxi", LsrXIOp);
   MATCH_UNARY_IMM("asrwi", AsrWIOp);
   MATCH_UNARY_IMM("asrxi", AsrXIOp);
   MATCH_UNARY_IMM("cmpi", CmpIOp);
@@ -486,7 +489,8 @@ Op *ArmRule::buildExpr(Expr *expr) {
   BUILD_UNARY_IMM("ldrw", LdrWOp);
   BUILD_UNARY_IMM("ldrf", LdrFOp);
   BUILD_UNARY_IMM("ldrx", LdrXOp);
-  BUILD_UNARY_IMM("lsli", LslIOp);
+  BUILD_UNARY_IMM("lslwi", LslWIOp);
+  BUILD_UNARY_IMM("lslxi", LslXIOp);
   BUILD_UNARY_IMM("asrwi", AsrWIOp);
   BUILD_UNARY_IMM("asrxi", AsrXIOp);
   BUILD_UNARY_IMM("cmpi", CmpIOp);

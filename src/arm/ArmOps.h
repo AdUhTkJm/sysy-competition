@@ -76,6 +76,7 @@ ARMOPL(SdivXOp);
 ARMOP(UdivWOp);
 
 ARMOP(MlaOp);
+ARMOP(MsubWOp); // Multiply-sub: rs3 - rs2 * rs
 ARMOP(NegOp);
 
 ARMOPL(SmulhOp);
@@ -106,13 +107,17 @@ ARMOP(StrWROp); // Store i32
 ARMOP(StrXROp); // Store i64
 ARMOP(StrFROp); // Store f32
 
-ARMOP(LslOp); // L-shift
-ARMOP(LsrOp); // Logical r-shift
+ARMOP(LslWOp); // // L-shift
+ARMOPL(LslXOp); // L-shift
+ARMOP(LsrWOp); // Logical r-shift
+ARMOPL(LsrXOp); // Logical r-shift
 ARMOP(AsrWOp); // Arithmetic r-shift
 ARMOPL(AsrXOp); // Arithmetic r-shift
 
-ARMOP(LslIOp); // L-shift, accept immediate
-ARMOP(LsrIOp); // Logical r-shift, accept immediate
+ARMOP(LslWIOp); // L-shift, accept immediate
+ARMOPL(LslXIOp); // L-shift, accept immediate
+ARMOP(LsrWIOp); // Logical r-shift, accept immediate
+ARMOPL(LsrXIOp); // Logical r-shift, accept immediate
 ARMOP(AsrWIOp); // Arithmetic r-shift, accept immediate
 ARMOPL(AsrXIOp); // Arithmetic r-shift, accept immediate
 
@@ -184,6 +189,8 @@ inline bool hasRd(Op *op) {
     isa<BgtOp>(op) ||
     isa<BltOp>(op) ||
     isa<BleOp>(op) ||
+    isa<CbzOp>(op) ||
+    isa<CbnzOp>(op) ||
     isa<RetOp>(op) ||
     isa<CmpOp>(op) ||
     isa<WriteRegOp>(op) ||
