@@ -141,7 +141,7 @@ void handleWhile(WhileOp *x) {
   x->erase();
 }
 
-bool isTerminator(Op *op) {
+static bool isTerminator(Op *op) {
   return isa<BranchOp>(op) || isa<GotoOp>(op) || isa<ReturnOp>(op);
 }
 
@@ -150,7 +150,8 @@ void tidy(FuncOp *func) {
   auto body = func->getRegion();
 
   // If the last Op isn't a `return`, then supply a `return`.
-  if (!isa<ReturnOp>(body->getLastBlock()->getLastOp())) {
+  auto last = body->getLastBlock();
+  if (last->getOps().size() == 0 || !isa<ReturnOp>(last->getLastOp())) {
     builder.setToBlockEnd(body->getLastBlock());
     builder.create<ReturnOp>();
   }
@@ -158,12 +159,26 @@ void tidy(FuncOp *func) {
   // Remove redundant terminators.
   // These might be inserted by flattening when terminators are already present.
   for (auto bb : body->getBlocks()) {
-    auto &ops = bb->getOps();
-    auto size = bb->getOps().size();
-    while (size >= 2 && isTerminator(*--ops.end()) && isTerminator(*----ops.end())) {
-      bb->getLastOp()->erase();
-      size--;
+    Op *term = nullptr;
+    for (auto op : bb->getOps()) {
+      if (isTerminator(op)) {
+        term = op;
+        break;
+      }
     }
+    if (!term || term == bb->getLastOp())
+      continue;
+
+    std::vector<Op*> remove;
+    for (auto op = term->nextOp(); op != bb->getLastOp(); op = op->nextOp()) {
+      op->removeAllOperands();
+      remove.push_back(op);
+    }
+    bb->getLastOp()->removeAllOperands();
+
+    for (auto op : remove)
+      op->erase();
+    bb->getLastOp()->erase();
   }
 
   // Get a terminator for basic blocks.

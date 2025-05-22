@@ -124,6 +124,12 @@ void Op::moveToEnd(BasicBlock *block) {
   parent->insert(parent->end(), this);
 }
 
+void Op::moveToStart(BasicBlock *block) {
+  parent->remove(place);
+  parent = block;
+  parent->insert(parent->begin(), this);
+}
+
 void Op::removeAllOperands() {
   for (auto x : operands) {
     auto op = x.defining;

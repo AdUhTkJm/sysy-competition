@@ -91,7 +91,6 @@ void LoopRotate::runImpl(LoopInfo *info) {
 
   // Replace the branch at header with a goto.
   auto target = TARGET(term);
-  auto cond = term->getOperand();
   builder.replace<GotoOp>(term, { new TargetAttr(target) });
 
   // Replace the latch's terminator with a branch.

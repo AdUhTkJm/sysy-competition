@@ -17,16 +17,6 @@ public:
   void run();
 };
 
-// Adds an implicit return if that's not present.
-class ImplicitReturn : public Pass {
-public:
-  ImplicitReturn(ModuleOp *module): Pass(module) {}
-    
-  std::string name() { return "implicit-return"; };
-  std::map<std::string, int> stats() { return {}; };
-  void run();
-};
-
 // Dead code elimination. Deals with functions, basic blocks and variables.
 class DCE : public Pass {
   std::vector<Op*> removeable;

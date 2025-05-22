@@ -57,7 +57,6 @@ void DLE::runImpl(Region *region) {
   std::map<BasicBlock*, std::set<Op*>> liveIn;
   std::map<BasicBlock*, std::set<Op*>> liveOut;
 
-  auto entry = region->getFirstBlock();
   const auto &blocks = region->getBlocks();
   std::vector<BasicBlock*> worklist(blocks.begin(), blocks.end());
 

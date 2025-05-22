@@ -6,8 +6,6 @@ import hashlib;
 import pickle;
 import tempfile;
 import multiprocessing as mp;
-import functools as f;
-import threading as thread;
 from pathlib import Path;
 
 mp.set_start_method("fork")
@@ -40,7 +38,7 @@ BUILD_DIR = Path("build")
 FINAL_BINARY = BUILD_DIR / "sysc"
 COMPILER = "clang++"
 AR = "ar"
-CFLAGS = ["-c", "-std=c++17", "-O2", "-g"]
+CFLAGS = ["-c", "-std=c++17", "-O2", "-g", "-Wall", "-Wno-sign-compare", "-Wno-parentheses"]
 LDFLAGS = []
 CACHE_FILE = BUILD_DIR / ".build_cache.pkl"
 INCLUDE_CACHE_FILE = BUILD_DIR / ".include_cache.pkl"

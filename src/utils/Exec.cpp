@@ -12,7 +12,7 @@ Interpreter::Interpreter(ModuleOp *module) {
   auto region = module->getRegion();
   auto block = region->getFirstBlock();
   for (auto op : block->getOps()) {
-    if (auto glob = dyn_cast<GlobalOp>(op)) {
+    if (isa<GlobalOp>(op)) {
       const auto &name = NAME(op);
       int size = SIZE(op) / 4;
       
@@ -30,7 +30,7 @@ Interpreter::Interpreter(ModuleOp *module) {
       continue;
     }
 
-    if (auto fn = dyn_cast<FuncOp>(op)) {
+    if (isa<FuncOp>(op)) {
       fnMap[NAME(op)] = op;
       continue;
     }
@@ -264,7 +264,6 @@ Interpreter::Value Interpreter::execf(Region *region, const std::vector<Value> &
     // Note that we need the stack space to live long enough,
     // till we exit this interpreted function.
     case AllocaOp::id: {
-      bool fp = ip->has<FPAttr>();
       void *space = alloca(SIZE(ip));
       store(ip, (intptr_t) space);
       ip = ip->nextOp();

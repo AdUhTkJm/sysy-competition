@@ -3,6 +3,7 @@
 #include "../codegen/CodeGen.h"
 #include "../opt/PassManager.h"
 #include "../opt/Passes.h"
+#include "../opt/PrePasses.h"
 #include "../opt/LoopPasses.h"
 #include "../opt/CleanupPasses.h"
 #include "../opt/LowerPasses.h"
@@ -41,7 +42,6 @@ void initRvPipeline(sys::PassManager &pm) {
 
 void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::MoveAlloca>();
-  pm.addPass<sys::ImplicitReturn>();
 
   // ===== Structured control flow =====
 
@@ -49,6 +49,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::Localize>(/*beforeFlattenCFG=*/ true);
   pm.addPass<sys::EarlyConstFold>();
   pm.addPass<sys::Pureness>();
+  // pm.addPass<sys::TCO>();
   pm.addPass<sys::DCE>(/*elimBlocks=*/ false);
 
   // ===== Flattened CFG =====
@@ -107,7 +108,6 @@ void initPipeline(sys::PassManager &pm) {
 
 void initLessOptPipeline(sys::PassManager &pm) {
   pm.addPass<sys::MoveAlloca>();
-  pm.addPass<sys::ImplicitReturn>();
 
   // ===== Structured control flow =====
 

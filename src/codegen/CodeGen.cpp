@@ -201,6 +201,7 @@ Value CodeGen::emitUnary(UnaryNode *node) {
     else
       return builder.create<MinusOp>({ value });
   }
+  assert(false);
 }
 
 Value CodeGen::emitExpr(ASTNode *node) {
@@ -538,12 +539,12 @@ void CodeGen::emit(ASTNode *node) {
     return;
   }
   
-  if (auto br = dyn_cast<BreakNode>(node)) {
+  if (isa<BreakNode>(node)) {
     builder.create<BreakOp>();
     return;
   }
 
-  if (auto cont = dyn_cast<ContinueNode>(node)) {
+  if (isa<ContinueNode>(node)) {
     builder.create<ContinueOp>();
     return;
   }

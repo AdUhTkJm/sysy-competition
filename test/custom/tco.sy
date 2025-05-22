@@ -1,0 +1,11 @@
+int even_odd(int x, int result) {
+  if (x == 0)
+    return result;
+
+  return even_odd(x - 1, !result);
+}
+
+int main() {
+  putint(even_odd(5, 0));
+  return 0;
+}

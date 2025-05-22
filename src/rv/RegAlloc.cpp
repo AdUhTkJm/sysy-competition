@@ -592,9 +592,13 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   }
 
   // Remove placeholders inserted previously.
+  // We cannot directly erase that, otherwise `new`s might reuse the memory,
+  // so that a newly constructed op might accidentally fall in `spillOffset`;
+  // this means all ops must be erased at the end of the function.
+  std::vector<Op*> toRemove;
   auto holders = funcOp->findAll<PlaceHolderOp>();
   for (auto holder : holders)
-    holder->erase();
+    toRemove.push_back(holder);
 
   //   writereg %1, <reg = a0>
   // becomes
@@ -610,7 +614,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       mv->add<SpilledRsAttr> GET_SPILLED_ARGS(op->DEF(0));
     }
 
-    op->erase();
+    toRemove.push_back(op);
     return false;
   });
 
@@ -631,7 +635,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
     // We can't directly erase it because it might get used by phi's later.
     op->replaceAllUsesWith(mv);
-    op->erase();
+    toRemove.push_back(op);
     return false;
   });
 
@@ -827,7 +831,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     }
 
     for (auto mv : toErase)
-      mv->erase();
+      toRemove.push_back(mv);
 
     // Copy the local phis into `allPhis` for removal.
     std::copy(phis.begin(), phis.end(), std::back_inserter(allPhis));
@@ -842,7 +846,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     if (phi->getUses().size())
       module->dump();
     
-    phi->erase();
+    toRemove.push_back(phi);
   }
 
   for (auto bb : region->getBlocks()) {
@@ -924,6 +928,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       }
     }
   }
+
+  for (auto op : toRemove)
+    op->erase();
 }
 
 int RegAlloc::latePeephole(Op *funcOp) {

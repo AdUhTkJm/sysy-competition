@@ -80,7 +80,6 @@ void dumpOp(Op *op, std::ostream &os) {
   }
 
   if (isa<sys::rv::LoadOp>(op)) {
-    auto size = SIZE(op);
     if (!isFP(op->get<RdAttr>()->reg)) {
       auto size = SIZE(op);
       switch (size) {

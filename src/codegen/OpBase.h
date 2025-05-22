@@ -252,6 +252,7 @@ public:
   void moveBefore(Op *op);
   void moveAfter(Op *op);
   void moveToEnd(BasicBlock *block);
+  void moveToStart(BasicBlock *block);
 
   template<class T>
   bool has() {

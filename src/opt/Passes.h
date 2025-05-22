@@ -100,31 +100,6 @@ public:
   void run();
 };
 
-// Folds before flattening CFG.
-class EarlyConstFold : public Pass {
-  int foldedTotal = 0;
-
-  int foldImpl();
-public:
-  EarlyConstFold(ModuleOp *module): Pass(module) {}
-    
-  std::string name() { return "early-const-fold"; };
-  std::map<std::string, int> stats();
-  void run();
-};
-
-// Localizes global variables.
-class Localize : public Pass {
-  bool beforeFlatten;
-public:
-  Localize(ModuleOp *module, bool beforeFlatten):
-    Pass(module), beforeFlatten(beforeFlatten) {}
-    
-  std::string name() { return "localize"; };
-  std::map<std::string, int> stats() { return {}; }
-  void run();
-};
-
 // Globalizes local arrays.
 class Globalize : public Pass {
   void runImpl(Region *region);
