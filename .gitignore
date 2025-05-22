@@ -6,5 +6,5 @@ test/fuzz
 temp
 final_performance
 functional
-hidden_functional
+h_functional
 performance
