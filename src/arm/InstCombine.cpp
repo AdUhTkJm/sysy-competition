@@ -11,14 +11,22 @@ std::map<std::string, int> InstCombine::stats() {
 }
 
 static ArmRule rules[] = {
-  // Add
+  // ADD
   "(change (addw x (mov #a)) (!only-if (!inbit 12 #a) (addwi x #a)))",
   "(change (addx x (mov #a)) (!only-if (!inbit 12 #a) (addxi x #a)))",
 
   // CBZ
-  "(change (cbz (csetlt x) >ifso >ifnot) (blt x >ifso >ifnot))",
-  "(change (cbz (csetne x) >ifso >ifnot) (bne x >ifso >ifnot))",
-  "(change (cbz (cseteq x) >ifso >ifnot) (beq x >ifso >ifnot))",
+  "(change (cbz (csetlt x) >ifso >ifnot) (blt x >ifnot >ifso))",
+  "(change (cbz (csetne x) >ifso >ifnot) (beq x >ifso >ifnot))",
+  "(change (cbz (cseteq x) >ifso >ifnot) (bne x >ifso >ifnot))",
+
+  // CBNZ
+  "(change (cbnz (csetlt x) >ifso >ifnot) (blt x >ifso >ifnot))",
+  "(change (cbnz (csetne x) >ifso >ifnot) (bne x >ifso >ifnot))",
+  "(change (cbnz (cseteq x) >ifso >ifnot) (beq x >ifso >ifnot))",
+
+  // CMP
+  "(change (cmp x (mov #a)) (!only-if (!inbit 12 #a) (cmpi x #a)))",
 
   // Meaning: jump to `ifso` if x == 0.
   "(change (beq (tst x x) >ifso >ifnot) (cbz x >ifso >ifnot))",

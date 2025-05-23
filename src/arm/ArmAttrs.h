@@ -46,8 +46,9 @@ namespace arm {
   X(x29) \
   /* x30: ra */ \
   X(x30) \
-  /* x31: either sp or zero, based on context */ \
-  X(x31) \
+  /* x31: either sp or zero, based on context; we consider it as two separate ones */ \
+  X(sp) \
+  X(xzr) \
   /* v0 - v7: arguments */ \
   X(v0) \
   X(v1) \

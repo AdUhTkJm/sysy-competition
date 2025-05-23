@@ -89,8 +89,7 @@ public:
 
 // Canonicalize loops. Ensures:
 //   1) A single preheader;
-//   2) A single latch; (do I really need this?)
-//   3) In LCSSA.
+//   2) In LCSSA, if it's constructed with `lcssa = true`.
 class CanonicalizeLoop : public Pass {
   void canonicalize(LoopInfo *loop);
   void runImpl(Region *region, LoopForest forest);
@@ -147,6 +146,8 @@ public:
 
 class SCEV : public Pass {
   int expanded = 0;
+
+  void runImpl(LoopInfo *info);
 public:
   SCEV(ModuleOp *module): Pass(module) {}
 

@@ -257,7 +257,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
   // First of all, add 35 precolored placeholders before each call.
   // This denotes that a call clobbers those registers.
-  runRewriter(funcOp, [&](BrOp *op) {
+  runRewriter(funcOp, [&](BlOp *op) {
     builder.setBeforeOp(op);
     for (auto reg : callerSaved) {
       auto placeholder = builder.create<PlaceHolderOp>();
@@ -292,6 +292,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     getArgs[V(x)] = x;
 
   int fcnt = 0, cnt = 0;
+  auto entry = region->getFirstBlock();
   for (size_t i = 0; i < getArgs.size(); i++) {
     // A missing argument.
     if (!getArgs[i])
@@ -301,6 +302,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     auto ty = op->getResultType();
 
     if (ty == Value::f32 && fcnt < 8) {
+      op->moveToStart(entry);
       builder.setBeforeOp(op);
       builder.create<PlaceHolderOp>({ fargHolders[fcnt] });
       builder.replace<ReadFRegOp>(op, { new RegAttr(fargRegs[fcnt]) });
@@ -308,6 +310,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       continue;
     }
     if (ty != Value::f32 && cnt < 8) {
+      op->moveToStart(entry);
       builder.setBeforeOp(op);
       builder.create<PlaceHolderOp>({ argHolders[cnt] });
       builder.replace<ReadRegOp>(op, { new RegAttr(argRegs[cnt]) });
@@ -433,7 +436,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     std::set<Reg> bad;
     for (auto v : interf[op]) {
       // In the whole function, `sp` and `zero` are read-only.
-      if (assignment.count(v) && assignment[v] != Reg::x30 && assignment[v] != Reg::x31)
+      if (assignment.count(v) && assignment[v] != Reg::xzr && assignment[v] != Reg::sp)
         bad.insert(assignment[v]);
     }
 
@@ -560,6 +563,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(AsrXIOp, UNARY);
   LOWER(CbzOp, UNARY);
   LOWER(CbnzOp, UNARY);
+  LOWER(CmpIOp, UNARY);
 
   // Branches don't have operands; they rely on flags.
   LOWER(BltOp, NULLARY);
@@ -571,7 +575,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   // We can't remove all operands here.
   for (auto bb : region->getBlocks()) {
     for (auto op : bb->getOps()) {
-      if (isa<PlaceHolderOp>(op) || isa<BrOp>(op) || isa<RetOp>(op))
+      if (isa<PlaceHolderOp>(op) || isa<BlOp>(op) || isa<RetOp>(op))
         op->removeAllOperands();
     }
   }
@@ -839,9 +843,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         builder.setAfterOp(op);
         if (offset < 16384) {
           if (fp)
-            builder.create<StrFOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
+            builder.create<StrFOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
           else
-            builder.create<StrXOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
+            builder.create<StrXOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
         } else assert(false);
         op->add<RdAttr>(reg);
       }
@@ -854,9 +858,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         builder.setBeforeOp(op);
         if (offset < 16384) {
           if (fp)
-            builder.create<LdrFOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
+            builder.create<LdrFOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
           else
-            builder.create<LdrXOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
+            builder.create<LdrXOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
         } else assert(false);
         op->add<RsAttr>(reg);
       }
@@ -869,9 +873,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         builder.setBeforeOp(op);
         if (offset < 16384) {
           if (fp)
-            builder.create<LdrFOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
+            builder.create<LdrFOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
           else
-            builder.create<LdrXOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
+            builder.create<LdrXOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
         } else assert(false);
         op->add<Rs2Attr>(reg);
       }
@@ -884,9 +888,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         builder.setBeforeOp(op);
         if (offset < 16384) {
           if (fp)
-            builder.create<LdrFOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
+            builder.create<LdrFOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
           else
-            builder.create<LdrXOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
+            builder.create<LdrXOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
         } else assert(false);
         op->add<Rs2Attr>(reg);
       }
@@ -1019,9 +1023,9 @@ void save(Builder builder, const std::vector<Reg> &regs, int offset) {
     offset -= 8;
     bool fp = isFP(reg);
     if (fp)
-      builder.create<StrFOp>({ RSC(reg), RS2C(Reg::x31), new IntAttr(offset) });
+      builder.create<StrFOp>({ RSC(reg), RS2C(Reg::sp), new IntAttr(offset) });
     else
-      builder.create<StrXOp>({ RSC(reg), RS2C(Reg::x31), new IntAttr(offset) });
+      builder.create<StrXOp>({ RSC(reg), RS2C(Reg::sp), new IntAttr(offset) });
   }
 }
 
@@ -1030,9 +1034,9 @@ void load(Builder builder, const std::vector<Reg> &regs, int offset) {
     offset -= 8;
     bool fp = isFP(reg);
     if (fp)
-      builder.create<LdrFOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
+      builder.create<LdrFOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
     else
-      builder.create<LdrXOp>({ RDC(reg), RSC(Reg::x31), new IntAttr(offset) });
+      builder.create<LdrXOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
   }
 }
 
@@ -1114,9 +1118,9 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
     bool fp = isFP(RD(op));
 
     if (fp)
-      builder.replace<LdrFOp>(op, { RDC(RD(op)), RSC(Reg::x31), new IntAttr(myoffset) });
+      builder.replace<LdrFOp>(op, { RDC(RD(op)), RSC(Reg::sp), new IntAttr(myoffset) });
     else
-      builder.replace<LdrXOp>(op, { RDC(RD(op)), RSC(Reg::x31), new IntAttr(myoffset) });
+      builder.replace<LdrXOp>(op, { RDC(RD(op)), RSC(Reg::sp), new IntAttr(myoffset) });
     return false;
   });
 
@@ -1125,7 +1129,7 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
   //   addi <rd = sp> <rs = sp> <-4>
   runRewriter(funcOp, [&](SubSpOp *op) {
     int offset = V(op);
-    builder.replace<AddXIOp>(op, { RDC(Reg::x31), RSC(Reg::x31), new IntAttr(-offset) });
+    builder.replace<AddXIOp>(op, { RDC(Reg::sp), RSC(Reg::sp), new IntAttr(-offset) });
     return true;
   });
 }
@@ -1136,7 +1140,7 @@ void RegAlloc::run() {
   std::set<FuncOp*> leaves;
 
   for (auto func : funcs) {
-    auto calls = func->findAll<BrOp>();
+    auto calls = func->findAll<BlOp>();
     if (calls.size() == 0)
       leaves.insert(func);
     runImpl(func->getRegion(), calls.size() == 0);

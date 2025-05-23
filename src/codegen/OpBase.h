@@ -260,6 +260,9 @@ public:
   // This function must be called to actually call `operator delete`.
   static void release();
 
+  static Op *getPhiFrom(Op *phi, BasicBlock *bb);
+  static BasicBlock *getPhiFrom(Op *phi, Op *op);
+
   template<class T>
   bool has() {
     for (auto x : attrs)

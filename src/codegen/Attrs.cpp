@@ -225,3 +225,7 @@ bool AliasAttr::neverAlias(const AliasAttr *other) const {
 
   return true;
 }
+
+std::string IncreaseAttr::toString() {
+  return "<increase: todo>";
+}

@@ -217,6 +217,37 @@ public:
   VariantAttr *clone() { return new VariantAttr; }
 };
 
+class PositiveAttr : public AttrImpl<PositiveAttr, __LINE__> {
+public:
+  PositiveAttr() {}
+
+  std::string toString() { return "<+>"; }
+  PositiveAttr *clone() { return new PositiveAttr; }
+};
+
+class IncreaseAttr : public AttrImpl<IncreaseAttr, __LINE__> {
+public:
+  // A polynomial with increasing exponent.
+  // For example, amt = { 3, 2, 1 } means that
+  // the variable increases by 3 + 2 * i + i^2 every iteration.
+  std::vector<int> amt;
+
+  // After each increase there might be a modulo operation.
+  // If that's a constant than record it.
+  int mod;
+
+  IncreaseAttr(int amt): amt({ amt }) {}
+  IncreaseAttr(int amt, int mod): amt({ amt }), mod(mod) {}
+  IncreaseAttr(const std::vector<int> &vec): amt(vec) {}
+  IncreaseAttr(const std::vector<int> &vec, int mod): amt(vec), mod(mod) {}
+
+  bool isConstant() const { return amt.size() == 1; }
+  int getValue() const { return amt[0]; }
+
+  std::string toString();
+  IncreaseAttr *clone() { return new IncreaseAttr(amt, mod); }
+};
+
 }
 
 #define V(op) (op)->get<IntAttr>()->value
@@ -229,5 +260,6 @@ public:
 #define ALIAS(op) (op)->get<AliasAttr>()
 #define RANGE(op) (op)->get<RangeAttr>()->range
 #define FROM(attr) cast<FromAttr>(attr)->bb
+#define INCR(op) (op)->get<IncreaseAttr>()->amt
 
 #endif

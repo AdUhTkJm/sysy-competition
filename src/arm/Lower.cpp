@@ -32,7 +32,7 @@ static ArmRule rules[] = {
 
   "(change (not x) (cseteq (tst x x)))",
 
-  "(change (br x >ifso >ifnot) (cbz x >ifso >ifnot))",
+  "(change (br x >ifso >ifnot) (cbnz x >ifso >ifnot))",
 
   "(change 'a (mov 'a))",
 };
@@ -67,7 +67,7 @@ static void rewriteAlloca(FuncOp *func) {
   for (auto op : allocas) {
     // Translate itself into `sp + offset`.
     builder.setBeforeOp(op);
-    auto spValue = builder.create<ReadXRegOp>({ new RegAttr(Reg::x30) });
+    auto spValue = builder.create<ReadXRegOp>({ new RegAttr(Reg::sp) });
     auto offsetValue = builder.create<MovIOp>({ new IntAttr(offset) });
     auto add = builder.create<AddXOp>({ spValue, offsetValue });
     op->replaceAllUsesWith(add);
@@ -85,9 +85,7 @@ static void rewriteAlloca(FuncOp *func) {
 void Lower::run() {
   Builder builder;
 
-  REPLACE(ReturnOp, RetOp);
   REPLACE(GetGlobalOp, AdrOp);
-  REPLACE(CallOp, BrOp);
   REPLACE(AddIOp, AddWOp);
   REPLACE(AddLOp, AddXOp);
   REPLACE(SubIOp, SubWOp);
@@ -111,31 +109,31 @@ void Lower::run() {
 
   runRewriter([&](StoreOp *op) {
     if (op->getResultType() == Value::f32) {
-      builder.replace<StrFOp>(op, op->getOperands());
+      builder.replace<StrFOp>(op, op->getOperands(), { new IntAttr(0) });
       return false;
     }
 
     if (SIZE(op) == 8) {
-      builder.replace<StrXOp>(op, op->getOperands());
+      builder.replace<StrXOp>(op, op->getOperands(), { new IntAttr(0) });
       return false;
     }
 
-    builder.replace<StrWOp>(op, op->getOperands());
+    builder.replace<StrWOp>(op, op->getOperands(), { new IntAttr(0) });
     return false;
   });
 
   runRewriter([&](LoadOp *op) {
     if (op->getResultType() == Value::f32) {
-      builder.replace<LdrFOp>(op, op->getOperands());
+      builder.replace<LdrFOp>(op, op->getOperands(), { new IntAttr(0) });
       return false;
     }
 
     if (SIZE(op) == 8) {
-      builder.replace<LdrXOp>(op, op->getOperands());
+      builder.replace<LdrXOp>(op, op->getOperands(), { new IntAttr(0) });
       return false;
     }
 
-    builder.replace<LdrWOp>(op, op->getOperands());
+    builder.replace<LdrWOp>(op, op->getOperands(), { new IntAttr(0) });
     return false;
   });
 
@@ -181,11 +179,11 @@ void Lower::run() {
       builder.create<SubSpOp>({ new IntAttr(stackOffset) });
     
     for (int i = 0; i < spilled.size(); i++) {
-      auto sp = builder.create<ReadXRegOp>({ new RegAttr(Reg::x30) });
+      auto sp = builder.create<ReadXRegOp>({ new RegAttr(Reg::sp) });
       builder.create<StoreOp>({ spilled[i], sp }, { new SizeAttr(8), new IntAttr(i * 8) });
     }
 
-    builder.create<BrOp>(argsNew, { 
+    builder.create<BlOp>(argsNew, { 
       op->get<NameAttr>(),
       new ArgCountAttr(args.size())
     });

@@ -282,9 +282,13 @@ def run_test_case(sy_path: Path, in_path: Path, out_path: Path):
     exe_path = Path(tmpdir) / "a.out"
     
     # Step 1: Compile .sy to .s using sysc
+    commands = [f"{BUILD_DIR}/sysc", str(sy_path), "-o", str(asm_path)]
+    if args.arm:
+      commands.append("--arm")
+    
     try:
       proc.run(
-        [f"{BUILD_DIR}/sysc", str(sy_path), "-o", str(asm_path)],
+        commands,
         check=True,
         stdout=proc.PIPE,
         stderr=proc.STDOUT,

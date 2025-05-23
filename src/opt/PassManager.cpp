@@ -63,6 +63,7 @@ void PassManager::run() {
       inBackend = true;
 
     pass->run();
+    Op::release();
 
     if (opts.verbose || pass->name() == opts.printAfter) {
       std::cerr << "===== After " << pass->name() << " =====\n\n";

@@ -152,7 +152,7 @@ ARMOP(CbnzOp); // Compact branch if non-zero
 
 ARMOP(BOp); // Jump
 ARMOP(RetOp);
-ARMOP(BrOp); // Branch-and-link (jal in RISC-V), so just a call
+ARMOP(BlOp); // Branch-and-link (jal in RISC-V), so just a call
 
 ARMOPF(ScvtfOp); // i32 -> f32
 ARMOP(FcmpOp);
@@ -183,7 +183,7 @@ inline bool hasRd(Op *op) {
     isa<StrXOp>(op) ||
     isa<StrFOp>(op) ||
     isa<BOp>(op) ||
-    isa<BrOp>(op) ||
+    isa<BlOp>(op) ||
     isa<BeqOp>(op) ||
     isa<BneOp>(op) ||
     isa<BgtOp>(op) ||

@@ -6,30 +6,29 @@
 using namespace sys;
 using namespace sys::arm;
 
+#define DUMP_RD(lreg) << lreg(RD(op)) << ", "
+#define DUMP_I << ", " << V(op)
+
 #define TERNARY(Ty, name, lreg) \
   case Ty::id: \
-    os << name << ' ' << lreg(RD(op)) << ", " << lreg(RS(op)) << ", " << lreg(RS2(op)) << ", " << lreg(RS3(op)) << "\n"; \
+    os << name << ' ' DUMP_RD(lreg) << lreg(RS(op)) << ", " << lreg(RS2(op)) << ", " << lreg(RS3(op)) << "\n"; \
     break
 
-#define BINARY(Ty, name, lreg) \
+#define BINARY_BASE(Ty, name, lreg, X) \
   case Ty::id: \
-    os << name << ' ' << lreg(RD(op)) << ", " << lreg(RS(op)) << ", " << lreg(RS2(op)) << "\n"; \
+    os << name << ' ' X << lreg(RS(op)) << ", " << lreg(RS2(op)) << "\n"; \
     break
 
-#define BINARY_NO_RD(Ty, name, lreg) \
-  case Ty::id: \
-    os << name << ' ' << lreg(RS(op)) << ", " << lreg(RS2(op)) << "\n"; \
-    break
+#define BINARY(Ty, name, lreg) BINARY_BASE(Ty, name, lreg, DUMP_RD(lreg))
 
-#define UNARY_I(Ty, name, lreg) \
+#define UNARY_BASE(Ty, name, lreg, X, Y) \
   case Ty::id: \
-    os << name << ' ' << lreg(RD(op)) << ", " << lreg(RS(op)) << ", " << V(op) << "\n"; \
-    break
-
-#define UNARY(Ty, name, lreg) \
-  case Ty::id: \
-    os << name << ' ' << lreg(RD(op)) << ", " << lreg(RS(op)) << "\n"; \
+    os << name << ' ' X << lreg(RS(op)) Y << "\n"; \
     break  
+
+#define UNARY_I_NO_RD(Ty, name, lreg) UNARY_BASE(Ty, name, lreg,, DUMP_I)
+#define UNARY_I(Ty, name, lreg) UNARY_BASE(Ty, name, lreg, DUMP_RD(lreg), DUMP_I)
+#define UNARY(Ty, name, lreg) UNARY_BASE(Ty, name, lreg, DUMP_RD(lreg),)
 
 #define JMP(Ty, name) \
   case Ty::id: \
@@ -38,15 +37,17 @@ using namespace sys::arm;
 
 #define JMP_UNARY(Ty, name) \
   case Ty::id: \
-    os << name << ' ' << RS(op) << ", bb" << bbcnt(TARGET(op)) << "\n"; \
+    os << name << ' ' << wreg(RS(op)) << ", bb" << bbcnt(TARGET(op)) << "\n"; \
     break
 
 #define TERNARY_W(Ty, name) TERNARY(Ty, name, wreg)
 #define TERNARY_X(Ty, name) TERNARY(Ty, name, xreg)
 #define BINARY_W(Ty, name) BINARY(Ty, name, wreg)
 #define BINARY_X(Ty, name) BINARY(Ty, name, xreg)
-#define BINARY_NO_RD_W(Ty, name) BINARY_NO_RD(Ty, name, wreg)
-#define BINARY_NO_RD_X(Ty, name) BINARY_NO_RD(Ty, name, xreg)
+#define BINARY_NO_RD_W(Ty, name) BINARY_BASE(Ty, name, wreg,)
+#define BINARY_NO_RD_X(Ty, name) BINARY_BASE(Ty, name, xreg,)
+#define UNARY_I_NO_RD_W(Ty, name) UNARY_I_NO_RD(Ty, name, wreg)
+#define UNARY_I_NO_RD_X(Ty, name) UNARY_I_NO_RD(Ty, name, xreg)
 #define UNARY_I_W(Ty, name) UNARY_I(Ty, name, wreg)
 #define UNARY_I_X(Ty, name) UNARY_I(Ty, name, xreg)
 #define UNARY_W(Ty, name) UNARY(Ty, name, wreg)
@@ -69,7 +70,7 @@ std::string wreg(Reg reg) {
   return name;
 }
 
-std::string xreg(Reg reg) {
+std::string xreg(Reg reg, bool mem = false) {
   return showReg(reg);
 }
 
@@ -92,6 +93,8 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
 
   UNARY_I_W(AddWIOp, "add");
 
+  UNARY_I_NO_RD_W(CmpIOp, "cmp");
+
   UNARY_I_X(AddXIOp, "add");
 
   UNARY_X(MovROp, "mov");
@@ -107,11 +110,26 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   JMP_UNARY(CbzOp, "cbz");
   JMP_UNARY(CbnzOp, "cbnz");
 
+  case AdrOp::id:
+    os << "ldr " << xreg(RD(op)) << ", =" << NAME(op) << "\n";
+    break;
+  case BlOp::id:
+    os << "bl " << NAME(op) << "\n";
+    break;
+  case StrXOp::id:
+    os << "str " << xreg(RS(op)) << ", [" << xreg(RS2(op), true) << ", #" << V(op) << "]\n";
+    break;
+  case LdrXOp::id:
+    os << "ldr " << xreg(RD(op)) << ", [" << xreg(RS(op), true) << ", #" << V(op) << "]\n";
+    break;
+  case LdrWOp::id:
+    os << "ldr " << wreg(RD(op)) << ", [" << xreg(RS(op), true) << ", #" << V(op) << "]\n";
+    break;
   case RetOp::id:
     os << "ret \n";
     break;
   case MovIOp::id:
-    os << "mov " << RD(op) << ", " << V(op) << "\n";
+    os << "mov " << wreg(RD(op)) << ", " << V(op) << "\n";
     break;
   default:
     std::cerr << "unimplemented op: " << op;
@@ -138,6 +156,52 @@ void Dump::dump(std::ostream &os) {
     os << NAME(func) << ":\n";
     dumpBody(func->getRegion(), os);
     os << "\n\n";
+  }
+
+  auto globals = collectGlobals();
+  if (globals.empty())
+    return;
+
+  os << "\n\n.section .data\n.balign 16\n";
+  std::vector<Op*> bss;
+  for (auto global : globals) {
+    // Here `size` is the total number of bytes.
+    auto size = SIZE(global);
+    assert(size >= 1);
+
+    if (auto intArr = global->find<IntArrayAttr>()) {
+      if (intArr->allZero) {
+        bss.push_back(global);
+        continue;
+      }
+
+      os << NAME(global) << ":\n";
+      os << "  .word " << intArr->vi[0];
+      for (size_t i = 1; i < size / 4; i++)
+        os << ", " << intArr->vi[i];
+      os << "\n";
+    }
+
+    // .float for FloatArray
+    if (auto fArr = global->find<FloatArrayAttr>()) {
+      if (fArr->allZero) {
+        bss.push_back(global);
+        continue;
+      }
+
+      os << NAME(global) << ":\n";
+      os << "  .float " << fArr->vf[0];
+      for (size_t i = 1; i < size / 4; i++)
+        os << ", " << fArr->vf[i];
+      os << "\n";
+    }
+  }
+
+  if (bss.size()) {
+    os << "\n\n.section .bss\n.balign 16\n";
+    for (auto global : bss) {
+      os << NAME(global) << ":\n  .skip " << SIZE(global) << "\n";
+    }
   }
 }
 

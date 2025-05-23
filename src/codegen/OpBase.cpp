@@ -230,6 +230,7 @@ void Op::release() {
     }
     delete op;
   }
+  toDelete.clear();
 }
 
 BasicBlock *Op::createFirstBlock() {
@@ -248,6 +249,26 @@ void Op::replaceAllUsesWith(Op *other) {
     }
   }
   uses.clear();
+}
+
+Op *Op::getPhiFrom(Op *phi, BasicBlock *bb) {
+  const auto &ops = phi->operands;
+  const auto &attrs = phi->attrs;
+  for (int i = 0; i < ops.size(); i++) {
+    if (FROM(attrs[i]) == bb)
+      return phi->DEF(i);
+  }
+  assert(false);
+}
+
+BasicBlock *Op::getPhiFrom(Op *phi, Op *op) {
+  const auto &ops = phi->operands;
+  const auto &attrs = phi->attrs;
+  for (int i = 0; i < ops.size(); i++) {
+    if (ops[i].defining == op)
+      return FROM(attrs[i]);
+  }
+  assert(false);
 }
 
 static std::map<Op*, int> valueName = {};
