@@ -205,6 +205,8 @@ protected:
   // This is for ease of writing macro.
   void setName(std::string name);
   void removeOperandUse(Op *op);
+
+  static std::vector<Op*> toDelete;
 public:
   int getID() const { return id; }
   const std::string &getName() { return opname; }
@@ -253,6 +255,10 @@ public:
   void moveAfter(Op *op);
   void moveToEnd(BasicBlock *block);
   void moveToStart(BasicBlock *block);
+
+  // erase() will delay its deletion.
+  // This function must be called to actually call `operator delete`.
+  static void release();
 
   template<class T>
   bool has() {

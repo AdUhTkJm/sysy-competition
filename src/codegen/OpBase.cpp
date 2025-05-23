@@ -217,11 +217,19 @@ void Op::erase() {
   for (auto region : regions)
     region->erase();
   
-  for (auto attr : attrs) {
-    if (!--attr->refcnt)
-      delete attr;
+  toDelete.push_back(this);
+}
+
+std::vector<Op*> Op::toDelete;
+
+void Op::release() {
+  for (auto op : toDelete) {
+    for (auto attr : op->attrs) {
+      if (!--attr->refcnt)
+        delete attr;
+    }
+    delete op;
   }
-  delete this;
 }
 
 BasicBlock *Op::createFirstBlock() {

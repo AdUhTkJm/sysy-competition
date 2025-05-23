@@ -49,7 +49,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::Localize>(/*beforeFlattenCFG=*/ true);
   pm.addPass<sys::EarlyConstFold>();
   pm.addPass<sys::Pureness>();
-  // pm.addPass<sys::TCO>();
+  pm.addPass<sys::TCO>();
   pm.addPass<sys::DCE>(/*elimBlocks=*/ false);
 
   // ===== Flattened CFG =====

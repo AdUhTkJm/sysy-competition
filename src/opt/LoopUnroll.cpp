@@ -16,7 +16,6 @@ BasicBlock *ConstLoopUnroll::copyLoop(LoopInfo *loop, BasicBlock *bb, int unroll
   BasicBlock *latch = loop->getLatch();
   BasicBlock *lastLatch = loop->getLatch();
   BasicBlock *header = loop->getHeader();
-  BasicBlock *preheader = loop->getPreheader();
   BasicBlock *exit = *loop->getExits().begin();
   BasicBlock *latchRewire = nullptr;
   auto region = lastLatch->getParent();
@@ -299,7 +298,6 @@ void ConstLoopUnroll::run() {
         break;
 
       // We want to unroll small loops first.
-      const auto &loops = forest.getLoops();
       std::vector<LoopInfo*> order;
       for (auto loop : forest.getLoops()) {
         if (!loop->getParent())
