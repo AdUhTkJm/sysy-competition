@@ -47,8 +47,9 @@ void initPipeline(sys::PassManager &pm) {
 
   pm.addPass<sys::AtMostOnce>();
   pm.addPass<sys::Localize>(/*beforeFlattenCFG=*/ true);
-  pm.addPass<sys::EarlyConstFold>();
+  pm.addPass<sys::EarlyConstFold>(/*beforePureness=*/ true);
   pm.addPass<sys::Pureness>();
+  pm.addPass<sys::EarlyConstFold>(/*beforePureness=*/ false);
   pm.addPass<sys::TCO>();
   pm.addPass<sys::DCE>(/*elimBlocks=*/ false);
 
@@ -80,7 +81,6 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DSE>();
   pm.addPass<sys::DLE>();
   pm.addPass<sys::RegularFold>();
-  pm.addPass<sys::HoistConstArray>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GCM>();
   pm.addPass<sys::GVN>();
@@ -97,48 +97,6 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::GCM>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::InstSchedule>();
-  pm.addPass<sys::Verify>();
-
-  if (opts.arm)
-    initArmPipeline(pm);
-
-  if (opts.rv)
-    initRvPipeline(pm);
-}
-
-void initLessOptPipeline(sys::PassManager &pm) {
-  pm.addPass<sys::MoveAlloca>();
-
-  // ===== Structured control flow =====
-
-  pm.addPass<sys::AtMostOnce>();
-  pm.addPass<sys::Localize>(/*beforeFlattenCFG=*/ true);
-  pm.addPass<sys::EarlyConstFold>();
-  pm.addPass<sys::Pureness>();
-  pm.addPass<sys::DCE>(/*elimBlocks=*/ false);
-
-  // ===== Flattened CFG =====
-
-  pm.addPass<sys::FlattenCFG>();
-  pm.addPass<sys::GVN>();
-  pm.addPass<sys::DCE>();
-  pm.addPass<sys::Inline>(/*inlineThreshold=*/ 200);
-  pm.addPass<sys::DCE>();
-  pm.addPass<sys::Localize>(/*beforeFlattenCFG=*/ false);
-  pm.addPass<sys::Globalize>();
-  pm.addPass<sys::Mem2Reg>();
-  pm.addPass<sys::RegularFold>();
-  pm.addPass<sys::DCE>();
-  pm.addPass<sys::GVN>();
-  pm.addPass<sys::SimplifyCFG>();
-  pm.addPass<sys::Alias>();
-  pm.addPass<sys::DAE>();
-  pm.addPass<sys::DSE>();
-  pm.addPass<sys::DLE>();
-  pm.addPass<sys::RegularFold>();
-  pm.addPass<sys::DCE>();
-  pm.addPass<sys::GVN>();
-  pm.addPass<sys::GCM>();
   pm.addPass<sys::Verify>();
 
   if (opts.arm)

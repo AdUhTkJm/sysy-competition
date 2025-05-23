@@ -10,10 +10,11 @@ namespace sys {
 // Folds before flattening CFG.
 class EarlyConstFold : public Pass {
   int foldedTotal = 0;
+  bool beforePureness;
 
   int foldImpl();
 public:
-  EarlyConstFold(ModuleOp *module): Pass(module) {}
+  EarlyConstFold(ModuleOp *module, bool beforePureness): Pass(module), beforePureness(beforePureness) {}
     
   std::string name() { return "early-const-fold"; };
   std::map<std::string, int> stats();

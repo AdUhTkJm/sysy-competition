@@ -105,6 +105,7 @@ namespace sys {
 }
 
 void Interpreter::exec(Op *op) {
+  op->dump();
   switch (op->getID()) {
   case IntOp::id:
     store(op, (intptr_t) V(op));
@@ -170,7 +171,7 @@ void Interpreter::exec(Op *op) {
       }
     }
     if (!success)
-      sys_unreachable("undef phi: coming from " << bbmap[prev]);
+      sys_unreachable("undef phi: coming from " << bbmap[prev] << ", current place is " << bbmap[op->getParent()]);
     break;
   }
   case GetGlobalOp::id: {

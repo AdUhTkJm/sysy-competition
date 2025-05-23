@@ -13,7 +13,6 @@ class Pureness : public Pass {
   // Maps a function to all functions that it might call.
   std::map<FuncOp*, std::set<FuncOp*>> callGraph;
 
-  void predetermineImpure(FuncOp *func);
 public:
   Pureness(ModuleOp *module): Pass(module) {}
     

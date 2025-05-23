@@ -22,6 +22,14 @@ static bool pinned(Op *op) {
 
 static bool noAlias(Op *load, const std::vector<Op*> stores) {
   auto addr = load->DEF();
+  while (isa<PhiOp>(addr)) {
+    // Conservatively assume alias.
+    if (addr->getOperandCount() >= 2)
+      return false;
+
+    addr = addr->DEF();
+  }
+
   auto alias = ALIAS(addr);
   for (auto store : stores) {
     if (ALIAS(store)->mayAlias(alias))

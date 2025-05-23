@@ -5,7 +5,6 @@ using namespace sys;
 
 #define INT(op) isa<IntOp>(op)
 
-// Defined in Pureness.cpp.
 static bool hasStoresTo(Op *op) {
   for (auto use : op->getUses()) {
     // This checks both the case when the address is stored elsewhere,
@@ -86,12 +85,23 @@ void EarlyConstFold::run() {
   // Find all constant globals.
   auto getglobs = module->findAll<GetGlobalOp>();
   auto gMap = getGlobalMap();
+  auto fMap = getFunctionMap();
   std::set<GlobalOp*> nonConst;
 
-  for (auto get : getglobs) {
-    if (hasStoresTo(get)) {
-      const auto &name = NAME(get);
+  for (auto op : getglobs) {
+    const auto &name = NAME(op);
+    if (hasStoresTo(op)) {
       nonConst.insert(gMap[name]);
+      continue;
+    }
+
+    for (auto use : op->getUses()) {
+      // If we do this before Pureness, we must assume all calls are impure.
+      // Moreover, we haven't marked ImpureAttr for CallOps yet, so check the FuncOp instead.
+      if (isa<CallOp>(use) && (beforePureness || isExtern(NAME(use)) || fMap[NAME(use)]->has<ImpureAttr>())) {
+        nonConst.insert(gMap[name]);
+        break;
+      }
     }
   }
 
@@ -147,7 +157,7 @@ void EarlyConstFold::run() {
     folded = foldImpl();
 
     // Next we fold access to constant globals.
-    // We do not erase any GetGlobalOp, so it's safe to reuse the vector.
+    getglobs = module->findAll<GetGlobalOp>();
     for (auto get : getglobs) {
       const auto &name = NAME(get);
       auto global = gMap[name];
@@ -204,6 +214,13 @@ void EarlyConstFold::run() {
           }
         }
       }
+    }
+
+    // Clean up unused get globals.
+    // Don't delay it to DCE, as it will affect Pureness.
+    for (auto op : getglobs) {
+      if (!op->getUses().size())
+        op->erase();
     }
 
     foldedTotal += folded;

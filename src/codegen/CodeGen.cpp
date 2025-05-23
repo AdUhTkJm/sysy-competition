@@ -345,6 +345,9 @@ void CodeGen::emit(ASTNode *node) {
       // Get the value of the argument and create a temp variable for it.
       Value::Type ty = isa<FloatType>(argTy) ? Value::f32 : Value::i32;
       auto arg = builder.create<GetArgOp>(ty, { new IntAttr(i) });
+      if (isa<ArrayType>(argTy) || isa<PointerType>(argTy))
+        funcOp->add<ImpureAttr>();
+
       auto addr = builder.create<AllocaOp>({ new SizeAttr(size) });
       builder.create<StoreOp>({ arg, addr }, { new SizeAttr(size) });
       // Mark address as floating point if necessary.

@@ -88,7 +88,10 @@ void Alias::run() {
 
   // Now do a dataflow analysis on call graph.
   auto fnMap = getFunctionMap();
-  std::vector<FuncOp*> worklist { fnMap["main"] };
+  std::vector<FuncOp*> worklist;
+  for (auto [_, v] : fnMap)
+    worklist.push_back(v);
+
   while (!worklist.empty()) {
     auto func = worklist.back();
     worklist.pop_back();

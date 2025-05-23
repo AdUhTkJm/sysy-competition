@@ -87,8 +87,10 @@ void LateInline::run() {
         op->removeAllOperands();
         for (auto operand : operands) {
           auto def = operand.defining;
-          if (!cloneMap.count(def)) op->dump(std::cerr), def->dump(std::cerr);
-          assert(cloneMap.count(def));
+          if (!cloneMap.count(def)) {
+            std::cerr << module << op << def;
+            assert(false);
+          }
           op->pushOperand(cloneMap[def]);
         }
       }
@@ -122,21 +124,23 @@ void LateInline::run() {
 
       if (isa<GetArgOp>(v)) {
         auto i = V(v);
-        auto def = call->getOperand(i).defining;
+        auto def = call->DEF(i);
         v->replaceAllUsesWith(def);
         v->erase();
         continue;
       }
+    }
 
+    for (auto [_, v] : cloneMap) {
       if (isa<ReturnOp>(v)) {
         if (v->getOperands().size() == 0) {
           builder.replace<GotoOp>(v, { new TargetAttr(end) });
           continue;
         }
 
-        auto ret = v->getOperand().defining;
+        auto retval = v->DEF();
         builder.setBeforeOp(v);
-        returns.push_back({ ret, v->getParent() });
+        returns.push_back({ retval, v->getParent() });
         builder.replace<GotoOp>(v, { new TargetAttr(end) });
         continue;
       }
@@ -172,6 +176,10 @@ void LateInline::run() {
         }
       }
     }
+
+    // This is necessary, because we might inline two calls in the same block.
+    // We need to update preds so that the second call sees correct CFG.
+    bb->getParent()->updatePreds();
     return true;
   });
 

@@ -2,67 +2,8 @@
 
 using namespace sys;
 
-// Find all stores to an address.
-// An address might be loaded, stored or added by some offset.
-static bool accesses(Op *op) {
-  for (auto use : op->getUses()) {
-    // This checks both the case when the address is stored elsewhere,
-    // and the value at the address is mutated.
-    // (Same for loads.)
-    if (isa<StoreOp>(use) || isa<LoadOp>(use))
-      return true;
-
-    // It's a new address. Find all stores there.
-    if (isa<AddIOp>(use) || isa<AddLOp>(use)) {
-      if (accesses(use))
-        return true;
-      continue;
-    }
-
-    // If something else happens, then it isn't an address.
-    return false;
-  }
-
-  return false;
-}
-
-// A function is impure if one of the following holds:
-//   1) it reads/stores to one of its (array-typed) arguments;
-//   2) it reads/writes a global variable;
-//   3) it calls another impure function.
-// We determine 1) here.
-void Pureness::predetermineImpure(FuncOp *func) {
-  auto args = func->findAll<GetArgOp>();
-  for (auto arg : args) {
-    // The only use of GetArgOp should be to store it into some Alloca.
-    assert(arg->getUses().size() == 1);
-    auto store = *arg->getUses().begin();
-    auto addr = store->getOperand(1).defining;
-
-    // The addr can only be loaded or stored.
-    // The language does not allow offsetting this pointer or storing it elsewhere.
-    for (auto use : addr->getUses()) {
-      if (!isa<LoadOp>(use)) {
-        assert(isa<StoreOp>(use));
-        continue;
-      }
-
-      // This is a load, retrieving the underlying argument, which is an address.
-      // If anything stores to the address then the function is impure.
-      if (accesses(use) && !func->has<ImpureAttr>()) {
-        func->add<ImpureAttr>();
-        return;
-      }
-    }
-  }
-}
-
 void Pureness::run() {
   auto funcs = collectFuncs();
-
-  // Note that predetermineImpure() assumes to operate **before** Mem2Reg,
-  // and any further transformation should preserve function pureness.
-  // For pureness of individual functions, do it in DCE.
 
   // Construct a call graph.
   auto fnMap = getFunctionMap();
@@ -76,11 +17,6 @@ void Pureness::run() {
       // External functions are impure.
       func->add<ImpureAttr>();
   }
-
-  // Predetermine all other factors that make a function impure,
-  // expect the criterion of "calling another impure function".
-  for (auto func : funcs)
-    predetermineImpure(func);
 
   // Every function that accesses globals is impure.
   for (auto func : funcs) {
