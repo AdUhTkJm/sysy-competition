@@ -306,6 +306,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     getArgs[V(x)] = x;
 
   int fcnt = 0, cnt = 0;
+  BasicBlock *entry = region->getFirstBlock();
   for (size_t i = 0; i < getArgs.size(); i++) {
     // A missing argument.
     if (!getArgs[i])
@@ -314,7 +315,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     Op *op = getArgs[i];
     auto ty = op->getResultType();
 
+    // It is necessary to put those GetArgs to the front.
     if (ty == Value::f32 && fcnt < 8) {
+      op->moveToStart(entry);
       builder.setBeforeOp(op);
       builder.create<PlaceHolderOp>({ fargHolders[fcnt] });
       builder.replace<ReadRegOp>(op, Value::f32, { new RegAttr(fargRegs[fcnt]) });
@@ -322,6 +325,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       continue;
     }
     if (ty != Value::f32 && cnt < 8) {
+      op->moveToStart(entry);
       builder.setBeforeOp(op);
       builder.create<PlaceHolderOp>({ argHolders[cnt] });
       builder.replace<ReadRegOp>(op, Value::i32, { new RegAttr(argRegs[cnt]) });
@@ -1028,6 +1032,19 @@ int RegAlloc::latePeephole(Op *funcOp) {
       op->erase();
       return true;
     }
+
+    // mv  a0, a1    <-- op
+    // mv  a1, a0    <-- mv2
+    // We can delete the second operation, `mv2`.
+    if (op != op->getParent()->getLastOp()) {
+      auto mv2 = op->nextOp();
+      if (isa<MvOp>(mv2) && RD(op) == RS(mv2) && RS(op) == RD(mv2)) {
+        // We can't erase `mv2` because it might be explored afterwards.
+        // We need to change the content of mv2 and erase this one.
+        op->erase();
+        std::swap(RD(mv2), RS(mv2));
+      }
+    }
     return false;
   });
 
@@ -1124,9 +1141,9 @@ void save(Builder builder, const std::vector<Reg> &regs, int offset) {
         /*size=*/new SizeAttr(8)
       });
     } else {
-      // li t6, offset
+      // li   t6, offset
       // addi t6, t6, sp
-      // sd reg, 0(t6)
+      // sd   reg, 0(t6)
       // (Because reg might be `s11`)
       builder.create<LiOp>({
         new RdAttr(spillReg2),
@@ -1160,9 +1177,9 @@ void load(Builder builder, const std::vector<Reg> &regs, int offset) {
         /*size=*/new SizeAttr(8)
       });
     } else {
-      // li s11, offset
+      // li   s11, offset
       // addi s11, s11, sp
-      // ld reg, 0(s11)
+      // ld   reg, 0(s11)
       builder.create<LiOp>({
         new RdAttr(spillReg),
         new IntAttr(offset)

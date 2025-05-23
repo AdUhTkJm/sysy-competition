@@ -19,12 +19,12 @@ Interpreter::Interpreter(ModuleOp *module) {
       if (auto intArr = op->find<IntArrayAttr>()) {
         int *vp = new int[size];
         memcpy(vp, intArr->vi, size * 4);
-        globalMap[name] = Value { .vi = (int64_t) vp };
+        globalMap[name] = Value { .vi = (intptr_t) vp };
       }
       if (auto fpArr = op->find<FloatArrayAttr>()) {
         float *vfp = new float[size];
         memcpy(vfp, fpArr->vf, size * 4);
-        globalMap[name] = Value { .vi = (int64_t) vfp };
+        globalMap[name] = Value { .vi = (intptr_t) vfp };
         fpGlobals.insert(name);
       }
       continue;
@@ -227,6 +227,16 @@ Interpreter::Value Interpreter::applyExtern(const std::string &name, const std::
   if (name == "getfloat") {
     float x; inbuf >> x;
     return Value { .vf = x };
+  }
+  if (name == "getarray") {
+    int n; inbuf >> n;
+    std::cerr << n << "\n";
+    // See 03_sort1.in. They provided data that exceed range of int.
+    // They're too irresponsible.
+    unsigned *ptr = (unsigned*) args[0].vi;
+    for (int i = 0; i < n; i++)
+      inbuf >> ptr[i];
+    return Value { .vi = (intptr_t) ptr };
   }
   if (name == "putint") {
     intptr_t v = args[0].vi;

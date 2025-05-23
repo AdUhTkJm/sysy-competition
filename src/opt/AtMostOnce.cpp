@@ -19,7 +19,7 @@ void AtMostOnce::run() {
       continue;
     }
 
-    if (callers.size() > 2)
+    if (callers.size() >= 2)
       continue;
 
     FuncOp *caller = fnMap[callers[0]];

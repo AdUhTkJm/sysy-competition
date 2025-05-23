@@ -41,7 +41,6 @@ void TCO::runImpl(FuncOp *func) {
     }
 
     // Not tail recursive. Return.
-    std::cerr << "unwanted: " << def;
     return;
   }
 

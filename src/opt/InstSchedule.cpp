@@ -88,16 +88,15 @@ void InstSchedule::runImpl(BasicBlock *bb) {
 
     // Emit loads early.
     if (isa<LoadOp>(op))
-      result += 6;
+      result += 8;
     
     // If the instruction is too far from its operands, then emit it early.
     // This is to lower the amount of live-range conflicts.
-    int prepared = 0;
     for (auto operand : op->getOperands()) {
       auto def = operand.defining;
       // If the operand is live-in, then no need.
       if (time[def])
-        result = std::max(result, index - time[def]);
+        result = std::max(result, (index - time[def]) / 3);
     }
     return result;
   };
