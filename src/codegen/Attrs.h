@@ -236,9 +236,9 @@ public:
   // If that's a constant than record it.
   int mod;
 
-  IncreaseAttr(int amt): amt({ amt }) {}
-  IncreaseAttr(int amt, int mod): amt({ amt }), mod(mod) {}
-  IncreaseAttr(const std::vector<int> &vec): amt(vec) {}
+  IncreaseAttr(int vec): amt({vec}), mod(-1) {}
+  IncreaseAttr(int vec, int mod): amt({vec}), mod(mod) {}
+  IncreaseAttr(const std::vector<int> &vec): amt(vec), mod(-1) {}
   IncreaseAttr(const std::vector<int> &vec, int mod): amt(vec), mod(mod) {}
 
   bool isConstant() const { return amt.size() == 1; }
@@ -247,6 +247,12 @@ public:
   std::string toString();
   IncreaseAttr *clone() { return new IncreaseAttr(amt, mod); }
 };
+
+
+
+bool mustAlias(Op *a, Op *b);
+bool neverAlias(Op *a, Op *b);
+bool mayAlias(Op *a, Op *b);
 
 }
 
@@ -260,6 +266,6 @@ public:
 #define ALIAS(op) (op)->get<AliasAttr>()
 #define RANGE(op) (op)->get<RangeAttr>()->range
 #define FROM(attr) cast<FromAttr>(attr)->bb
-#define INCR(op) (op)->get<IncreaseAttr>()->amt
+#define INCR(op) (op)->get<IncreaseAttr>()
 
 #endif

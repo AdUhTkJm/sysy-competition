@@ -2,8 +2,8 @@
 
 using namespace sys;
 
-#define ALIAS_STORE(op) ALIAS((op)->getOperand(1).defining)
-#define ALIAS_LOAD(op)  ALIAS((op)->getOperand().defining)
+#define STORE_ADDR(op) op->DEF(1)
+#define LOAD_ADDR(op)  op->DEF()
 
 std::map<std::string, int> DLE::stats() {
   return {
@@ -23,7 +23,7 @@ void DLE::runImpl(Region *region) {
       if (isa<StoreOp>(op)) {
         std::vector<Op*> newStore { op };
         for (auto x : liveStore) {
-          if (ALIAS_STORE(x)->neverAlias(ALIAS_STORE(op)))
+          if (neverAlias(STORE_ADDR(x), STORE_ADDR(op)))
             newStore.push_back(x);
         }
         liveStore = std::move(newStore);
@@ -43,7 +43,7 @@ void DLE::runImpl(Region *region) {
           auto init = x->getOperand(0).defining;
           auto storeAddr = x->getOperand(1).defining;
           auto loadAddr = op->getOperand().defining;
-          if (ALIAS_LOAD(op)->mustAlias(ALIAS_STORE(x)) || storeAddr == loadAddr) {
+          if (mustAlias(LOAD_ADDR(op), STORE_ADDR(x)) || storeAddr == loadAddr) {
             op->replaceAllUsesWith(init);
             op->erase();
             elim++;
@@ -93,12 +93,12 @@ void DLE::runImpl(Region *region) {
     for (auto op : ops) {
       if (isa<StoreOp>(op)) {
         // Kill all loads in `live` that might alias with the store.
-        AliasAttr *store = ALIAS_STORE(op);
+        Op *storeAddr = STORE_ADDR(op);
 
         for (auto it = live.begin(); it != live.end(); ) {
           Op *load = *it;
-          AliasAttr *loadAlias = ALIAS_LOAD(load);
-          if (store->mayAlias(loadAlias))
+          Op *loadAddr = LOAD_ADDR(load);
+          if (mayAlias(storeAddr, loadAddr))
             it = live.erase(it);
           else
             ++it;
@@ -108,15 +108,13 @@ void DLE::runImpl(Region *region) {
       // Note that there might be some redundancy, but it doesn't matter.
       // Also, we're pulling `load` in `live` rather than the address. That makes it easier for rewriting.
       if (isa<LoadOp>(op)) {
-        auto addr = op->getOperand().defining;
-
         // Check if something is exactly the value of `addr`, or must alias with it.
         // Note that the value might not `mustAlias` with itself; 
         // for example it might have `<alloca %1, -1>` which doesn't mustAlias with anything.
-        AliasAttr *alias = ALIAS_LOAD(op);
+        Op *addr = LOAD_ADDR(op);
         bool replaced = false;
         for (auto load : live) {
-          if (ALIAS_LOAD(load)->mustAlias(alias) || load->getOperand().defining == addr) {
+          if (mustAlias(LOAD_ADDR(load), addr) || load->getOperand().defining == addr) {
             op->replaceAllUsesWith(load);
             op->erase();
             elim++;

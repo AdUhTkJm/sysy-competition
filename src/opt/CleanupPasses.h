@@ -40,6 +40,19 @@ public:
   void run();
 };
 
+// Assume every operation is dead unless proved otherwise.
+class AggressiveDCE : public Pass {
+  int elim = 0;
+
+  void runImpl(FuncOp *fn);
+public:
+  AggressiveDCE(ModuleOp *module): Pass(module) {}
+
+  std::string name() { return "aggressive-dce"; };
+  std::map<std::string, int> stats();
+  void run();
+};
+
 // Dead (actually, redundant) load elimination.
 class DLE : public Pass {
   int elim = 0;

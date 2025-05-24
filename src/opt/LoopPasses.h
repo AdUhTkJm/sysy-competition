@@ -147,6 +147,16 @@ public:
 class SCEV : public Pass {
   int expanded = 0;
 
+  // All addresses stored inside current loop.
+  // We need this because we need to find variants as well,
+  // but it's slightly different from what LICM requires.
+  std::vector<Op*> stores;
+  std::unordered_map<Op*, Op*> start;
+
+  DomTree domtree;
+  bool impure;
+
+  void rewrite(BasicBlock *bb, LoopInfo *info);
   void runImpl(LoopInfo *info);
 public:
   SCEV(ModuleOp *module): Pass(module) {}

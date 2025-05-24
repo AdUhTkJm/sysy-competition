@@ -15,13 +15,10 @@ void InstSchedule::runImpl(BasicBlock *bb) {
   // First, we need to build a dependence graph between loads/stores.
   std::vector<Op*> stores, loads;
   for (auto op : bb->getOps()) {
-
     // Check against store, but no need to check loads.
     if (isa<LoadOp>(op)) {
-      auto addr = ALIAS(op->DEF());
       for (auto store : stores) {
-        auto alias = ALIAS(store->DEF(1));
-        if (addr->mayAlias(alias))
+        if (mayAlias(op->DEF(), store->DEF(1)))
           op->pushOperand(store);
       }
 
@@ -30,17 +27,13 @@ void InstSchedule::runImpl(BasicBlock *bb) {
 
     // Check both stores and loads.
     if (isa<StoreOp>(op)) {
-      auto addr = ALIAS(op->DEF(1));
-
       for (auto store : stores) {
-        auto alias = ALIAS(store->DEF(1));
-        if (addr->mayAlias(alias))
+        if (mayAlias(op->DEF(1), store->DEF(1)))
           op->pushOperand(store);
       }
 
       for (auto load : loads) {
-        auto alias = ALIAS(load->DEF());
-        if (addr->mayAlias(alias))
+        if (mayAlias(op->DEF(1), load->DEF()))
           op->pushOperand(load);
       }
 

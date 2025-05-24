@@ -105,7 +105,6 @@ namespace sys {
 }
 
 void Interpreter::exec(Op *op) {
-  op->dump();
   switch (op->getID()) {
   case IntOp::id:
     store(op, (intptr_t) V(op));
@@ -231,7 +230,6 @@ Interpreter::Value Interpreter::applyExtern(const std::string &name, const std::
   }
   if (name == "getarray") {
     int n; inbuf >> n;
-    std::cerr << n << "\n";
     // See 03_sort1.in. They provided data that exceed range of int.
     // They're too irresponsible.
     unsigned *ptr = (unsigned*) args[0].vi;

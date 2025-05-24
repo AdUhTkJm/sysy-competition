@@ -66,11 +66,13 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::Alias>();
   pm.addPass<sys::RegularFold>();
   pm.addPass<sys::DCE>();
+  pm.addPass<sys::DAE>();
   pm.addPass<sys::CanonicalizeLoop>(/*lcssa=*/ true);
   pm.addPass<sys::LoopRotate>();
   pm.addPass<sys::CanonicalizeLoop>(/*lcssa=*/ false);
   pm.addPass<sys::LICM>();
-  pm.addPass<sys::ConstLoopUnroll>();
+  //pm.addPass<sys::ConstLoopUnroll>();
+  //pm.addPass<sys::SCEV>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::RegularFold>();
   pm.addPass<sys::DCE>();
@@ -84,6 +86,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GCM>();
   pm.addPass<sys::GVN>();
+  pm.addPass<sys::AggressiveDCE>();
 
   // ===== Late Inline =====
 
@@ -96,6 +99,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GCM>();
   pm.addPass<sys::GVN>();
+  pm.addPass<sys::AggressiveDCE>();
   pm.addPass<sys::InstSchedule>();
   pm.addPass<sys::Verify>();
 

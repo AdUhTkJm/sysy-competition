@@ -1,7 +1,5 @@
 #include <iostream>
 #include <fstream>
-#include <sstream>
-#include <iomanip>
 
 #include "ArmPasses.h"
 
@@ -82,13 +80,6 @@ std::string freg(Reg reg) {
   auto name = showReg(reg);
   name[0] = 's';
   return name;
-}
-
-// Returns the exact decimal of `f`.
-std::string exact_f(float f) {
-  std::stringstream ss;
-  ss << std::setprecision(9) << std::defaultfloat << f;
-  return ss.str();
 }
 
 }

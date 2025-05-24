@@ -227,5 +227,30 @@ bool AliasAttr::neverAlias(const AliasAttr *other) const {
 }
 
 std::string IncreaseAttr::toString() {
-  return "<increase: todo>";
+  std::stringstream ss;
+  ss << "<increase = ";
+  if (amt.size() > 0)
+    ss << amt[0];
+  for (int i = 1; i < amt.size(); i++)
+    ss << ", " << amt[i];
+  if (mod != -1)
+    ss << ", mod = " << mod;
+  ss << ">";
+  return ss.str();
+}
+
+bool sys::mustAlias(Op *a, Op *b) {
+  if (a->has<AliasAttr>() && b->has<AliasAttr>())
+    return ALIAS(a)->mustAlias(ALIAS(b));
+  return false;
+}
+
+bool sys::neverAlias(Op *a, Op *b) {
+  if (a->has<AliasAttr>() && b->has<AliasAttr>())
+    return ALIAS(a)->neverAlias(ALIAS(b));
+  return false;
+}
+
+bool sys::mayAlias(Op *a, Op *b) {
+  return !neverAlias(a, b);
 }

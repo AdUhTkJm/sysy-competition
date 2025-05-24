@@ -444,6 +444,16 @@ bool Rule::rewrite(Op *op) {
   if (!matchExpr(matcher, op))
     return false;
 
+  // It would only worth it if all referred operations are used only once,
+  // except constants (Int/Float).
+  for (auto [_, v] : binding) {
+    if (isa<IntOp>(v) || isa<FloatOp>(v))
+      continue;
+
+    if (v->getUses().size() != 1)
+      return false;
+  }
+
   builder.setBeforeOp(op);
   Op *opnew = buildExpr(rewriter);
   if (!opnew || failed)

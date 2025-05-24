@@ -20,7 +20,7 @@ static bool pinned(Op *op) {
     PINNED(AllocaOp);
 }
 
-static bool noAlias(Op *load, const std::vector<Op*> stores) {
+bool noAlias(Op *load, const std::vector<Op*> stores) {
   auto addr = load->DEF();
   while (isa<PhiOp>(addr)) {
     // Conservatively assume alias.
@@ -30,9 +30,8 @@ static bool noAlias(Op *load, const std::vector<Op*> stores) {
     addr = addr->DEF();
   }
 
-  auto alias = ALIAS(addr);
   for (auto store : stores) {
-    if (ALIAS(store)->mayAlias(alias))
+    if (mayAlias(addr, store))
       return false;
   }
   return true;

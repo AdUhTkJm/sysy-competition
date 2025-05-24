@@ -373,9 +373,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       }
 
       if (isa<PhiOp>(op)) {
-        priority[op] = 2;
+        priority[op] = 3;
         for (auto x : op->getOperands()) {
-          priority[x.defining] = 1;
+          priority[x.defining] = 2;
           prefer[x.defining] = op;
         }
       }
