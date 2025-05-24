@@ -3,10 +3,7 @@
 #include "RvOps.h"
 #include "../codegen/CodeGen.h"
 #include "../codegen/Attrs.h"
-#include <algorithm>
-#include <iostream>
-#include <iterator>
-#include <vector>
+#include <unordered_set>
 
 using namespace sys;
 using namespace sys::rv;
@@ -138,7 +135,7 @@ std::map<std::string, int> RegAlloc::stats() {
 std::string getValueNumber(Value value);
 
 // For debug purposes
-void dumpInterf(Region *region, const std::map<Op*, std::set<Op*>> &interf) {
+void dumpInterf(Region *region, const std::unordered_map<Op*, std::set<Op*>> &interf) {
   region->dump(std::cerr, /*depth=*/1);
   std::cerr << "\n\n===== interference graph =====\n\n";
   for (auto [k, v] : interf) {
@@ -149,7 +146,7 @@ void dumpInterf(Region *region, const std::map<Op*, std::set<Op*>> &interf) {
   }
 }
 
-void dumpAssignment(Region *region, const std::map<Op*, Reg> &assignment) {
+void dumpAssignment(Region *region, const std::unordered_map<Op*, Reg> &assignment) {
   region->dump(std::cerr, /*depth=*/1);
   std::cerr << "\n\n===== assignment =====\n\n";
   for (auto [k, v] : assignment) {
@@ -338,16 +335,17 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   region->updateLiveness();
 
   // Interference graph.
-  std::map<Op*, std::set<Op*>> interf;
+  std::unordered_map<Op*, std::set<Op*>> interf;
 
   // Values of readreg, or operands of writereg, or phis (mvs), are prioritzed.
-  std::map<Op*, int> priority;
+  std::unordered_map<Op*, int> priority;
   // The `key` is preferred to have the same value as `value`.
-  std::map<Op*, Op*> prefer;
+  std::unordered_map<Op*, Op*> prefer;
 
+  int currentPriority = 2;
   for (auto bb : region->getBlocks()) {
     // Scan through the block and see the place where the value's last used.
-    std::map<Op*, int> lastUsed, defined;
+    std::unordered_map<Op*, int> lastUsed, defined;
     const auto &ops = bb->getOps();
     auto it = ops.end();
     for (int i = (int) ops.size() - 1; i >= 0; i--) {
@@ -373,11 +371,12 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       }
 
       if (isa<PhiOp>(op)) {
-        priority[op] = 3;
+        priority[op] = currentPriority + 1;
         for (auto x : op->getOperands()) {
-          priority[x.defining] = 2;
+          priority[x.defining] = currentPriority;
           prefer[x.defining] = op;
         }
+        currentPriority += 2;
       }
     }
 
@@ -403,7 +402,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       return a.timestamp == b.timestamp ? (!a.start && b.start) : a.timestamp < b.timestamp;
     });
 
-    std::set<Op*> active;
+    std::unordered_set<Op*> active;
     for (const auto& event : events) {
       auto op = event.op;
       // Jumps will never interfere.
@@ -449,7 +448,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     if (assignment.count(op))
       continue;
 
-    std::set<Reg> bad;
+    std::unordered_set<Reg> bad;
     for (auto v : interf[op]) {
       // In the whole function, `sp` and `zero` are read-only.
       if (assignment.count(v) && assignment[v] != Reg::sp && assignment[v] != Reg::zero)
@@ -503,7 +502,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     spilled++;
     // Spilled. Try to see all spill offsets of conflicting ops.
     int desired = currentOffset;
-    std::set<int> conflict;
+    std::unordered_set<int> conflict;
     for (auto v : interf[op]) {
       if (!spillOffset.count(v))
         continue;
@@ -721,22 +720,12 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     }
   }
 
+#define SOFFSET(op, Ty) ((Reg) -(op)->get<Spilled##Ty##Attr>()->offset)
+#define SPILLABLE(op, Ty) (op->has<Ty##Attr>() ? op->get<Ty##Attr>()->reg : SOFFSET(op, Ty))
 
-#define SPILLABLE(op, Ty) (op->has<Ty##Attr>() ? op->get<Ty##Attr>()->reg : (Reg) -op->get<Spilled##Ty##Attr>()->offset)
-#define CREATE_SPILLABLE_MV(fp, rd, rs) \
-  if (fp) \
-    builder.create<FmvOp>({ \
-      new ImpureAttr, /* An unused marker to let C++ distinguish between ambiguous calls */ \
-      (int) rd < 0 ? (Attr*) new SpilledRdAttr(true, -(int) rd) : new RdAttr((rd)), \
-      (int) rs < 0 ? (Attr*) new SpilledRsAttr(true, -(int) rd) : new RsAttr((rs)), \
-    }); \
-  else \
-    builder.create<MvOp>({ \
-      new ImpureAttr, \
-      (int) rd < 0 ? (Attr*) new SpilledRdAttr(false, -(int) rd) : new RdAttr((rd)), \
-      (int) rs < 0 ? (Attr*) new SpilledRsAttr(false, -(int) rd) : new RsAttr((rs)), \
-    });
-
+  // Detect circular copies and calculate a correct order.
+  std::unordered_map<BasicBlock*, std::vector<std::pair<Reg, Reg>>> moveMap;
+  std::unordered_map<BasicBlock*, std::map<std::pair<Reg, Reg>, Op*>> revMap;
   for (auto bb : bbs) {
     auto phis = bb->getPhis();
 
@@ -745,103 +734,147 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       auto &ops = phi->getOperands();
       auto &attrs = phi->getAttrs();
       for (size_t i = 0; i < ops.size(); i++) {
-        auto bb = cast<FromAttr>(attrs[i])->bb;
-        auto terminator = *--bb->getOps().end();
-        builder.setBeforeOp(terminator);
+        auto bb = FROM(attrs[i]);
+        auto term = bb->getLastOp();
+        builder.setBeforeOp(term);
         auto def = ops[i].defining;
         Op *mv;
         if (phi->getResultType() == Value::f32) {
           mv = builder.create<FmvOp>({
             new ImpureAttr,
-            spillOffset.count(phi) ? (Attr*) new SpilledRdAttr GET_SPILLED_ARGS(phi) : new RdAttr(getReg(phi)),
-            spillOffset.count(def) ? (Attr*) new SpilledRsAttr GET_SPILLED_ARGS(def) : new RsAttr(getReg(def))
+            spillOffset.count(phi) ? (Attr*) new SpilledRdAttr GET_SPILLED_ARGS(phi) : RDC(getReg(phi)),
+            spillOffset.count(def) ? (Attr*) new SpilledRsAttr GET_SPILLED_ARGS(def) : RSC(getReg(def))
           });
         } else {
           mv = builder.create<MvOp>({
             new ImpureAttr,
-            spillOffset.count(phi) ? (Attr*) new SpilledRdAttr GET_SPILLED_ARGS(phi) : new RdAttr(getReg(phi)),
-            spillOffset.count(def) ? (Attr*) new SpilledRsAttr GET_SPILLED_ARGS(def) : new RsAttr(getReg(def))
+            spillOffset.count(phi) ? (Attr*) new SpilledRdAttr GET_SPILLED_ARGS(phi) : RDC(getReg(phi)),
+            spillOffset.count(def) ? (Attr*) new SpilledRsAttr GET_SPILLED_ARGS(def) : RSC(getReg(def))
           });
         }
         moves.push_back(mv);
       }
     }
 
-    // Detect circular copies.
-    std::map<Reg, Reg> moveMap;
-    std::map<std::pair<Reg, Reg>, Op*> moveOpMap;
-    std::set<Reg> srcs;
-    std::set<Reg> dsts;
+    std::copy(phis.begin(), phis.end(), std::back_inserter(allPhis));
 
     for (auto mv : moves) {
-      auto src = SPILLABLE(mv, Rd);
-      auto dst = SPILLABLE(mv, Rs);
-      moveMap[src] = dst;
-      moveOpMap[std::pair {src, dst}] = mv;
-      srcs.insert(src);
-      dsts.insert(dst);
-    }
-
-    // Registers that currently hold valid values.
-    std::set<Reg> valid = srcs;
-
-    std::set<Reg> visited;
-    // Unwanted moves.
-    std::vector<Op*> toErase;
-
-    // Detect cycles.
-    for (auto mv : moves) {
-      auto src = mv->has<RdAttr>() ? RD(mv) : (Reg) -mv->get<SpilledRdAttr>()->offset;
-      auto dst = mv->has<RsAttr>() ? RS(mv) : (Reg) -mv->get<SpilledRsAttr>()->offset;
-      if (visited.count(src))
+      auto dst = SPILLABLE(mv, Rd);
+      auto src = SPILLABLE(mv, Rs);
+      if (src == dst) {
+        mv->erase();
         continue;
-
-      std::vector<Reg> chain;
-      std::vector<Op*> ops;
-
-      Reg cur = src;
-
-      // Walk the chain of copying.
-      while (moveMap.count(cur) && !visited.count(cur)) {
-        visited.insert(cur);
-        chain.push_back(cur);
-        ops.push_back(moveOpMap[std::pair { cur, moveMap[cur] }]);
-        cur = moveMap[cur];
       }
 
-      if (chain.size() <= 1 || cur != chain.front())
-        continue;
-
-      // The chain is actually a cycle.
-      // It has to have at least 2 arguments (as self-loop is not acceptable).
-      std::cerr << "remark: cycle detected\n";
-
-      // Break cycle using a temp register, say the spill register s11.
-      Reg first = chain.front();
-      builder.setBeforeOp(mv);
-      bool fp = isFP(first);
-
-      auto spill = fp ? fspillReg : spillReg;
-      CREATE_SPILLABLE_MV(fp, spill, first);
-
-      for (size_t i = 1; i < chain.size(); ++i)
-        CREATE_SPILLABLE_MV(fp, chain[i - 1], chain[i]);
-
-      CREATE_SPILLABLE_MV(fp, chain.back(), spill);
-
-      // The original moves are now for removal.
-      std::copy(ops.begin(), ops.end(), std::back_inserter(toErase));
+      auto parent = mv->getParent();
+      moveMap[parent].emplace_back(dst, src);
+      revMap[parent][{ dst, src }] = mv;
     }
-
-    for (auto mv : toErase)
-      mv->erase();
-
-    // Copy the local phis into `allPhis` for removal.
-    std::copy(phis.begin(), phis.end(), std::back_inserter(allPhis));
   }
 
-  // Erase all phi's properly. There might be cross-reference across blocks.
-  // So we need to remove all operands first.
+  for (const auto &[bb, mvs] : moveMap) {
+    std::unordered_map<Reg, Reg> moveGraph;
+    for (auto [dst, src] : mvs)
+      moveGraph[dst] = src;
+
+    // Detect cycles.
+    std::set<Reg> visited, visiting;
+    std::vector<std::pair<Reg, Reg>> sorted;
+    // Cycle headers.
+    std::vector<Reg> headers;
+    // All members in the cycle under a certain header.
+    std::unordered_map<Reg, std::vector<Reg>> members;
+    // All nodes that are in a certain cycle.
+    std::unordered_set<Reg> inCycle;
+
+    // Do a topological sort; it will decide whether there's a cycle.
+    std::function<void(Reg)> dfs = [&](Reg node) {
+      visiting.insert(node);
+      Reg src = moveGraph[node];
+
+      if (visiting.count(src))
+        // A node is visited twice. Here's a cycle.
+        headers.push_back(node);
+      else if (!visited.count(src) && moveGraph.count(src))
+        dfs(src);
+    
+      visiting.erase(node);
+      visited.insert(node);
+      sorted.emplace_back(node, src);
+    };
+
+    for (auto [dst, src] : mvs) {
+      if (!visited.count(dst))
+        dfs(dst);
+    }
+
+    std::reverse(sorted.begin(), sorted.end());
+
+    // Fill in record of cycles.
+    for (auto header : headers) {
+      Reg runner = header;
+      do {
+        members[header].push_back(runner);
+        runner = moveGraph[runner];
+      } while (runner != header);
+
+      for (auto member : members[header])
+        inCycle.insert(member);
+    }
+
+    // Move sorted phis so that they're in the correct order.
+    Op* term = bb->getLastOp();
+
+    std::unordered_set<Reg> emitted;
+
+    for (auto [dst, src] : sorted) {
+      if (dst == src || emitted.count(dst) || inCycle.count(dst))
+        continue;
+
+      revMap[bb][{ dst, src }]->moveBefore(term);
+      emitted.insert(dst);
+    }
+
+    if (members.empty())
+      continue;
+
+    // Looks like still buggy? No idea why.
+    std::cerr << "remark: cycle detected\n";
+
+    // Now emit all cycles.
+    builder.setBeforeOp(term);
+
+    const auto createMv = [&](Reg dst, Reg src) {
+      bool fp = isFP(dst);
+
+      Attr *rd = int(dst) >= 0 ? (Attr*) RDC(dst) : new SpilledRdAttr(fp, -int(dst));
+      Attr *rs = int(src) >= 0 ? (Attr*) RSC(src) : new SpilledRsAttr(fp, -int(src));
+      Op *mv;
+      if (fp)
+        mv = builder.create<FmvOp>({ new ImpureAttr, rd, rs });
+      else
+        mv = builder.create<MvOp>({ new ImpureAttr, rd, rs });
+      return mv;
+    };
+
+    for (const auto &[header, members] : members) {
+      // If the phi is spilled we can't use s11,
+      // because it will be used for load/store instead.
+      Reg tmp = isFP(header) ? fspillReg2 : spillReg2;
+
+      createMv(tmp, header);
+      for (int i = 1; i < members.size(); i++) 
+        createMv(members[i - 1], members[i]);
+      createMv(members.back(), tmp);
+
+      // The old mv's must get erased.
+      for (auto dst : members)
+        revMap[bb][{ dst, moveGraph[dst] }]->erase();
+    }
+  }
+
+  // Erase all phi's properly. There might be cross-reference across blocks,
+  // so we need to remove all operands first.
   for (auto phi : allPhis)
     phi->removeAllOperands();
 
@@ -989,8 +1022,8 @@ int RegAlloc::latePeephole(Op *funcOp) {
 
         auto offset = V(op);
         builder.replace<StoreOp>(op, {
-          new RsAttr(Reg::zero),
-          new Rs2Attr(Reg::sp),
+          RSC(Reg::zero),
+          RS2C(Reg::sp),
           new IntAttr(offset),
           new SizeAttr(8),
         });
@@ -1014,8 +1047,8 @@ int RegAlloc::latePeephole(Op *funcOp) {
 
         auto offset = V(op);
         builder.replace<StoreOp>(op, {
-          new RsAttr(Reg::zero),
-          new Rs2Attr(Reg::sp),
+          RSC(Reg::zero),
+          RS2C(Reg::sp),
           new IntAttr(offset - 4),
           new SizeAttr(8),
         });
@@ -1131,70 +1164,40 @@ void RegAlloc::tidyup(Region *region) {
 }
 
 void save(Builder builder, const std::vector<Reg> &regs, int offset) {
+  using sys::rv::StoreOp;
+
   for (auto reg : regs) {
     offset -= 8;
-    if (offset < 2048) {
-      builder.create<sys::rv::StoreOp>({
-        /*value=*/new RsAttr(reg),
-        /*addr=*/new Rs2Attr(Reg::sp),
-        /*offset=*/new IntAttr(offset),
-        /*size=*/new SizeAttr(8)
-      });
-    } else {
+    if (offset < 2048)
+      builder.create<StoreOp>({ RSC(reg), RS2C(Reg::sp), new IntAttr(offset), new SizeAttr(8) });
+    else {
       // li   t6, offset
       // addi t6, t6, sp
       // sd   reg, 0(t6)
       // (Because reg might be `s11`)
-      builder.create<LiOp>({
-        new RdAttr(spillReg2),
-        new IntAttr(offset)
-      });
-      builder.create<AddOp>({
-        new RdAttr(spillReg2),
-        new RsAttr(spillReg2),
-        new Rs2Attr(Reg::sp)
-      });
-      builder.create<sys::rv::StoreOp>({
-        new RsAttr(reg),
-        new Rs2Attr(spillReg2),
-        new IntAttr(0),
-        new SizeAttr(8)
-      });
+      builder.create<LiOp>({ RDC(spillReg2), new IntAttr(offset) });
+      builder.create<AddOp>({ RDC(spillReg2), RSC(spillReg2), RS2C(Reg::sp) });
+      builder.create<StoreOp>({ RSC(reg), RS2C(spillReg2), new IntAttr(0), new SizeAttr(8) });
     }
   }
 }
 
 void load(Builder builder, const std::vector<Reg> &regs, int offset) {
+  using sys::rv::LoadOp;
+
   for (auto reg : regs) {
     offset -= 8;
     auto isFloat = isFP(reg);
     Value::Type ty = isFloat ? Value::f32 : Value::i64;
-    if (offset < 2048) {
-      builder.create<sys::rv::LoadOp>(ty, {
-        /*value=*/new RdAttr(reg),
-        /*addr=*/new RsAttr(Reg::sp),
-        /*offset=*/new IntAttr(offset),
-        /*size=*/new SizeAttr(8)
-      });
-    } else {
+    if (offset < 2048)
+      builder.create<LoadOp>(ty, { RDC(reg), RSC(Reg::sp), new IntAttr(offset), new SizeAttr(8) });
+    else {
       // li   s11, offset
       // addi s11, s11, sp
       // ld   reg, 0(s11)
-      builder.create<LiOp>({
-        new RdAttr(spillReg),
-        new IntAttr(offset)
-      });
-      builder.create<AddOp>({
-        new RdAttr(spillReg),
-        new RsAttr(spillReg),
-        new Rs2Attr(Reg::sp)
-      });
-      builder.create<sys::rv::LoadOp>(ty, {
-        new RdAttr(reg),
-        new RsAttr(spillReg),
-        new IntAttr(0),
-        new SizeAttr(8)
-      });
+      builder.create<LiOp>({ RDC(spillReg), new IntAttr(offset) });
+      builder.create<AddOp>({ RDC(spillReg), RSC(spillReg), RS2C(Reg::sp) });
+      builder.create<LoadOp>(ty, { RDC(reg), RSC(spillReg), new IntAttr(0), new SizeAttr(8) });
     }
   }
 }
@@ -1275,8 +1278,8 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
     int myoffset = offset + argOffsets[op];
     builder.setBeforeOp(op);
     builder.replace<LoadOp>(op, isFP(RD(op)) ? Value::f32 : Value::i64, {
-      new RdAttr(RD(op)),
-      new RsAttr(Reg::sp),
+      RDC(RD(op)),
+      RSC(Reg::sp),
       new IntAttr(myoffset),
       new SizeAttr(8)
     });
@@ -1288,22 +1291,18 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
   //   addi <rd = sp> <rs = sp> <-4>
   runRewriter(funcOp, [&](SubSpOp *op) {
     int offset = V(op);
-    if (offset <= 2048 && offset > -2048) {
-      builder.replace<AddiOp>(op, {
-        new RdAttr(Reg::sp),
-        new RsAttr(Reg::sp),
-        new IntAttr(-offset)
-      });
-    } else {
+    if (offset <= 2048 && offset > -2048)
+      builder.replace<AddiOp>(op, { RDC(Reg::sp), RSC(Reg::sp), new IntAttr(-offset) });
+    else {
       builder.setBeforeOp(op);
       builder.create<LiOp>({
-        new RdAttr(Reg::t0),
+        RDC(Reg::t0),
         new IntAttr(offset)
       });
       builder.replace<SubOp>(op, {
-        new RdAttr(Reg::sp),
-        new RsAttr(Reg::sp),
-        new Rs2Attr(Reg::t0)
+        RDC(Reg::sp),
+        RSC(Reg::sp),
+        RS2C(Reg::t0)
       });
     }
     return true;

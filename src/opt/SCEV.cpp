@@ -1,5 +1,6 @@
 #include "LoopPasses.h"
 #include "../utils/Matcher.h"
+#include <unordered_set>
 
 using namespace sys;
 
@@ -103,14 +104,25 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
     if (isa<PhiOp>(op) || !op->has<IncreaseAttr>())
       continue;
 
+    if (nochange.count(op))
+      continue;
+
+    bool good = true;
+    for (auto operand : op->getOperands()) {
+      if (!start.count(operand.defining)) {
+        good = false;
+        break;
+      }
+    }
+    // This is probably the (i + 1) in `i = i + 1`.
+    // We cannot rewrite it.
+    if (!good)
+      continue;
+
     auto clone = builder.copy(op);
     clone->removeAllOperands();
     for (auto operand : op->getOperands()) {
       auto def = operand.defining;
-      if (!start.count(def)) {
-        std::cerr << module << op << def;
-        assert(false);
-      }
       clone->pushOperand(start[def]);
     }
     start[op] = clone;
@@ -160,11 +172,11 @@ void SCEV::runImpl(LoopInfo *info) {
   if (!isa<BranchOp>(latch->getLastOp()))
     return;
 
-  start.clear();
   auto phis = header->getPhis();
   auto preheader = info->getPreheader();
 
   // Inspect phis to find the amount by which something increases.
+  start.clear();
   for (auto phi : phis) {
     auto latchval = Op::getPhiFrom(phi, latch);
     // Try to match (add (x 'a)).
@@ -186,9 +198,26 @@ void SCEV::runImpl(LoopInfo *info) {
     }
   }
 
+  // Don't rewrite operands of phi.
+  // We don't need to introduce an extra phi for that - we've already got one.
+  nochange.clear();
+  for (auto bb : info->getBlocks()) {
+    auto phis = bb->getPhis();
+    for (auto phi : phis) {
+      for (auto operand : phi->getOperands())
+        nochange.insert(operand.defining);
+    }
+  }
+
   // Update IncreaseAttr according to op.
   // Do it in dominance-order, so that every def comes before use.
   rewrite(header, info);
+
+  // Remove IncreaseAttr for other loops to analyze.
+  for (auto bb : info->getBlocks()) {
+    for (auto op : bb->getOps())
+      op->remove<IncreaseAttr>();
+  }
 }
 
 void SCEV::run() {
@@ -214,9 +243,6 @@ void SCEV::run() {
   
     for (auto bb : region->getBlocks()) {
       for (auto op : bb->getOps()) {
-        if (isa<PhiOp>(op))
-          op->remove<IncreaseAttr>();
-
         op->remove<VariantAttr>();
       }
     }

@@ -183,16 +183,6 @@ void GVN::run() {
       op->erase();
       return true;
     }
-
-    // In case a phi references itself, we remove that operand.
-    const auto &ops = op->getOperands();
-    for (size_t i = 0; i < ops.size(); i++) {
-      if (ops[i].defining == op) {
-        op->removeOperand(i);
-        op->removeAttribute(i);
-        return true;
-      }
-    }
     return false;
   });
 }

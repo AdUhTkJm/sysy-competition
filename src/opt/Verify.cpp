@@ -45,9 +45,5 @@ void Verify::run() {
         assert(false);
       }
     }
-    
-    // Check phi doesn't reference itself.
-    for (auto operand : phi->getOperands())
-      assert(operand.defining != phi);
   }
 }

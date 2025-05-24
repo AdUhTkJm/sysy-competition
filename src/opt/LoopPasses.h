@@ -5,8 +5,8 @@
 #include "../codegen/CodeGen.h"
 #include "../codegen/Attrs.h"
 
+#include <unordered_set>
 #include <set>
-#include <vector>
 
 // The whole content of this file should be run after Mem2Reg.
 namespace sys {
@@ -152,6 +152,7 @@ class SCEV : public Pass {
   // but it's slightly different from what LICM requires.
   std::vector<Op*> stores;
   std::unordered_map<Op*, Op*> start;
+  std::unordered_set<Op*> nochange;
 
   DomTree domtree;
   bool impure;

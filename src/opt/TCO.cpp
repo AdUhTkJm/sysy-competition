@@ -134,6 +134,11 @@ void TCO::run() {
     if (std::find(callers.begin(), callers.end(), NAME(func)) == callers.end())
       continue;
 
+    // This will result in a lot of spilled registers.
+    // Don't do that - keep them inside a function might be a better idea.
+    if (func->get<ArgCountAttr>()->count >= 16)
+      continue;
+
     runImpl(func);  
   }
 }
