@@ -21,7 +21,6 @@ class ArmRule {
   Expr *parse();
 
   bool matchExpr(Expr *expr, Op *op);
-  bool matchExprForLower(Expr *expr, Op *op);
   int evalExpr(Expr *expr);
   Op *buildExpr(Expr *expr);
 
@@ -29,7 +28,6 @@ class ArmRule {
 public:
   ArmRule(const char *text);
   bool rewrite(Op *op);
-  bool rewriteForLower(Op *op);
 
   void dump(std::ostream &os);
 };

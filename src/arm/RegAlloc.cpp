@@ -305,7 +305,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       op->moveToStart(entry);
       builder.setBeforeOp(op);
       builder.create<PlaceHolderOp>({ fargHolders[fcnt] });
-      builder.replace<ReadFRegOp>(op, { new RegAttr(fargRegs[fcnt]) });
+      builder.replace<ReadRegOp>(op, { new RegAttr(fargRegs[fcnt]) });
       fcnt++;
       continue;
     }
@@ -542,9 +542,10 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(AsrXOp, BINARY);
   LOWER(CmpOp, BINARY);
   LOWER(TstOp, BINARY);
-  LOWER(StrWOp, BINARY);
-  LOWER(StrXOp, BINARY);
-  LOWER(StrFOp, BINARY);
+  LOWER(FaddOp, BINARY);
+  LOWER(FsubOp, BINARY);
+  LOWER(FmulOp, BINARY);
+  LOWER(FdivOp, BINARY);
   
   LOWER(LdrWOp, UNARY);
   LOWER(LdrXOp, UNARY);
@@ -564,12 +565,20 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(CbzOp, UNARY);
   LOWER(CbnzOp, UNARY);
   LOWER(CmpIOp, UNARY);
+  LOWER(ScvtfOp, UNARY);
+  LOWER(FcvtzsOp, UNARY);
+  LOWER(FmovWOp, UNARY);
 
   // Branches don't have operands; they rely on flags.
   LOWER(BltOp, NULLARY);
   LOWER(BleOp, NULLARY);
   LOWER(BeqOp, NULLARY);
   LOWER(BneOp, NULLARY);
+  // Same applies for cset operations.
+  LOWER(CsetLeOp, NULLARY);
+  LOWER(CsetLtOp, NULLARY);
+  LOWER(CsetNeOp, NULLARY);
+  LOWER(CsetEqOp, NULLARY);
 
   // Note that some ops are dealt with later.
   // We can't remove all operands here.

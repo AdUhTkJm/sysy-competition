@@ -55,6 +55,8 @@ ARMOP(MovkOp); // Keep the immediate and load 16 bytes. Allows a shift amount.
 ARMOP(MovnOp); // Load `not immediate`.
 ARMOP(MovROp); // To distinguish from loading immediates, an `R` is for moving between registers.
 
+ARMOPF(FmovWOp); // Move from a 32-bit w-register to a fp register.
+
 ARMOPL(AdrOp); // The ADR instruction only allows 1 MB range. We use pseudo-instr `ldr x0, =label` when Dumping.
 
 ARMOP(AddWOp);
@@ -165,8 +167,6 @@ ARMOPF(FdivOp);
 
 // ==== Pseudo Ops ====
 ARMOP(ReadRegOp);
-ARMOPF(ReadFRegOp);
-ARMOPL(ReadXRegOp);
 ARMOP(WriteRegOp);
 ARMOP(PlaceHolderOp);
 ARMOP(ReloadOp);
@@ -193,6 +193,7 @@ inline bool hasRd(Op *op) {
     isa<CbnzOp>(op) ||
     isa<RetOp>(op) ||
     isa<CmpOp>(op) ||
+    isa<TstOp>(op) ||
     isa<WriteRegOp>(op) ||
     isa<SpillOp>(op) ||
     isa<SpillFOp>(op) ||

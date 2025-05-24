@@ -1,5 +1,7 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
+#include <iomanip>
 
 #include "ArmPasses.h"
 
@@ -44,6 +46,7 @@ using namespace sys::arm;
 #define TERNARY_X(Ty, name) TERNARY(Ty, name, xreg)
 #define BINARY_W(Ty, name) BINARY(Ty, name, wreg)
 #define BINARY_X(Ty, name) BINARY(Ty, name, xreg)
+#define BINARY_F(Ty, name) BINARY(Ty, name, freg)
 #define BINARY_NO_RD_W(Ty, name) BINARY_BASE(Ty, name, wreg,)
 #define BINARY_NO_RD_X(Ty, name) BINARY_BASE(Ty, name, xreg,)
 #define UNARY_I_NO_RD_W(Ty, name) UNARY_I_NO_RD(Ty, name, wreg)
@@ -52,6 +55,7 @@ using namespace sys::arm;
 #define UNARY_I_X(Ty, name) UNARY_I(Ty, name, xreg)
 #define UNARY_W(Ty, name) UNARY(Ty, name, wreg)
 #define UNARY_X(Ty, name) UNARY(Ty, name, xreg)
+#define UNARY_F(Ty, name) UNARY(Ty, name, freg)
 
 namespace {
 
@@ -70,8 +74,21 @@ std::string wreg(Reg reg) {
   return name;
 }
 
-std::string xreg(Reg reg, bool mem = false) {
+std::string xreg(Reg reg) {
   return showReg(reg);
+}
+
+std::string freg(Reg reg) {
+  auto name = showReg(reg);
+  name[0] = 's';
+  return name;
+}
+
+// Returns the exact decimal of `f`.
+std::string exact_f(float f) {
+  std::stringstream ss;
+  ss << std::setprecision(9) << std::defaultfloat << f;
+  return ss.str();
 }
 
 }
@@ -86,7 +103,13 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   BINARY_W(MulWOp, "mul");
   BINARY_W(SdivWOp, "sdiv");
 
+  BINARY_F(FaddOp, "fadd");
+  BINARY_F(FsubOp, "fsub");
+  BINARY_F(FmulOp, "fmul");
+  BINARY_F(FdivOp, "fdiv");
+
   BINARY_NO_RD_W(CmpOp, "cmp");
+  BINARY_NO_RD_W(TstOp, "tst");
 
   BINARY_X(AddXOp, "add");
   BINARY_X(MulXOp, "mul");
@@ -98,6 +121,10 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   UNARY_I_X(AddXIOp, "add");
 
   UNARY_X(MovROp, "mov");
+
+  UNARY_W(ScvtfOp, "scvtf");
+
+  UNARY_F(FcvtzsOp, "fcvtzs");
 
   JMP(BOp, "b");
   JMP(BneOp, "bne");
@@ -113,17 +140,41 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   case AdrOp::id:
     os << "ldr " << xreg(RD(op)) << ", =" << NAME(op) << "\n";
     break;
+  case FmovWOp::id:
+    os << "ldr " << freg(RD(op)) << ", =" << wreg(RS(op)) << "\n";
+    break;
   case BlOp::id:
     os << "bl " << NAME(op) << "\n";
     break;
   case StrXOp::id:
-    os << "str " << xreg(RS(op)) << ", [" << xreg(RS2(op), true) << ", #" << V(op) << "]\n";
+    os << "str " << xreg(RS(op)) << ", [" << xreg(RS2(op)) << ", #" << V(op) << "]\n";
+    break;
+  case StrWOp::id:
+    os << "str " << xreg(RS(op)) << ", [" << xreg(RS2(op)) << ", #" << V(op) << "]\n";
+    break;
+  case StrFOp::id:
+    os << "str " << freg(RS(op)) << ", [" << xreg(RS2(op)) << ", #" << V(op) << "]\n";
     break;
   case LdrXOp::id:
-    os << "ldr " << xreg(RD(op)) << ", [" << xreg(RS(op), true) << ", #" << V(op) << "]\n";
+    os << "ldr " << xreg(RD(op)) << ", [" << xreg(RS(op)) << ", #" << V(op) << "]\n";
     break;
   case LdrWOp::id:
-    os << "ldr " << wreg(RD(op)) << ", [" << xreg(RS(op), true) << ", #" << V(op) << "]\n";
+    os << "ldr " << wreg(RD(op)) << ", [" << xreg(RS(op)) << ", #" << V(op) << "]\n";
+    break;
+  case LdrFOp::id:
+    os << "ldr " << freg(RD(op)) << ", [" << xreg(RS(op)) << ", #" << V(op) << "]\n";
+    break;
+  case CsetLtOp::id:
+    os << "cset " << wreg(RD(op)) << ", lt\n";
+    break;
+  case CsetLeOp::id:
+    os << "cset " << wreg(RD(op)) << ", le\n";
+    break;
+  case CsetNeOp::id:
+    os << "cset " << wreg(RD(op)) << ", ne\n";
+    break;
+  case CsetEqOp::id:
+    os << "cset " << wreg(RD(op)) << ", eq\n";
     break;
   case RetOp::id:
     os << "ret \n";

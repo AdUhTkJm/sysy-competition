@@ -1,41 +1,7 @@
 #include "ArmPasses.h"
-#include "ArmMatcher.h"
 
 using namespace sys;
 using namespace sys::arm;
-
-// First we only do lower, without any optimizations.
-// More folds are in InstCombine.
-static ArmRule rules[] = {
-  "(change (add x y) (addw x y))",
-  "(change (addl x y) (addx x y))",
-
-  "(change (sub x y) (subw x y))",
-
-  "(change (mul x y) (mulw x y))",
-  "(change (mull x y) (mulx x y))",
-
-  "(change (div x y) (sdivw x y))",
-
-  "(change (shl x #a) (lsli x #a))",
-  "(change (shr x #a) (asrwi x #a))",
-  "(change (shrl x #a) (asrxi x #a))",
-  
-  "(change (and x y) (and x y))",
-
-  "(change (j >bb) (b >bb))",
-
-  "(change (ne x y) (csetne (cmp x y)))",
-  "(change (lt x y) (csetlt (cmp x y)))",
-  "(change (le x y) (csetle (cmp x y)))",
-  "(change (eq x y) (cseteq (cmp x y)))",
-
-  "(change (not x) (cseteq (tst x x)))",
-
-  "(change (br x >ifso >ifnot) (cbnz x >ifso >ifnot))",
-
-  "(change 'a (mov 'a))",
-};
 
 #define REPLACE(BeforeTy, AfterTy) \
   runRewriter([&](BeforeTy *op) { \
@@ -67,7 +33,7 @@ static void rewriteAlloca(FuncOp *func) {
   for (auto op : allocas) {
     // Translate itself into `sp + offset`.
     builder.setBeforeOp(op);
-    auto spValue = builder.create<ReadXRegOp>({ new RegAttr(Reg::sp) });
+    auto spValue = builder.create<ReadRegOp>({ new RegAttr(Reg::sp) });
     auto offsetValue = builder.create<MovIOp>({ new IntAttr(offset) });
     auto add = builder.create<AddXOp>({ spValue, offsetValue });
     op->replaceAllUsesWith(add);
@@ -96,6 +62,77 @@ void Lower::run() {
   REPLACE(LShiftOp, LslWOp);
   REPLACE(RShiftLOp, AsrXIOp);
   REPLACE(RShiftOp, AsrWIOp);
+  REPLACE(AndIOp, AndOp);
+  REPLACE(OrIOp, OrOp);
+  REPLACE(XorIOp, EorOp);
+  REPLACE(GotoOp, BOp);
+  REPLACE(BranchOp, CbnzOp);
+  REPLACE(IntOp, MovIOp);
+  REPLACE(F2IOp, FcvtzsOp);
+  REPLACE(I2FOp, ScvtfOp);
+  REPLACE(AddFOp, FaddOp);
+  REPLACE(SubFOp, FsubOp);
+  REPLACE(MulFOp, FmulOp);
+  REPLACE(DivFOp, FdivOp);
+
+  runRewriter([&](FloatOp *op) {
+    float value = F(op);
+    
+    builder.setBeforeOp(op);
+    // Strict aliasing? Don't know.
+    auto li = builder.create<MovIOp>({ new IntAttr(*(int*) &value) });
+    builder.replace<FmovWOp>(op, { li });
+    return true;
+  });
+
+  runRewriter([&](NotOp *op) {
+    Value def = op->getOperand();
+
+    builder.setBeforeOp(op);
+    Value tst = builder.create<TstOp>({ def, def });
+    builder.replace<CsetEqOp>(op, { tst });
+    return false;
+  });
+
+  runRewriter([&](EqOp *op) {
+    Value x = op->getOperand(0);
+    Value y = op->getOperand(1);
+
+    builder.setBeforeOp(op);
+    Value tst = builder.create<CmpOp>({ x, y });
+    builder.replace<CsetEqOp>(op, { tst });
+    return false;
+  });
+
+  runRewriter([&](NeOp *op) {
+    Value x = op->getOperand(0);
+    Value y = op->getOperand(1);
+
+    builder.setBeforeOp(op);
+    Value tst = builder.create<CmpOp>({ x, y });
+    builder.replace<CsetNeOp>(op, { tst });
+    return false;
+  });
+
+  runRewriter([&](LtOp *op) {
+    Value x = op->getOperand(0);
+    Value y = op->getOperand(1);
+
+    builder.setBeforeOp(op);
+    Value tst = builder.create<CmpOp>({ x, y });
+    builder.replace<CsetLtOp>(op, { tst });
+    return false;
+  });
+
+  runRewriter([&](LeOp *op) {
+    Value x = op->getOperand(0);
+    Value y = op->getOperand(1);
+
+    builder.setBeforeOp(op);
+    Value tst = builder.create<CmpOp>({ x, y });
+    builder.replace<CsetLeOp>(op, { tst });
+    return false;
+  });
 
   runRewriter([&](ModIOp *op) {
     auto x = op->getOperand(0);
@@ -108,7 +145,7 @@ void Lower::run() {
   });
 
   runRewriter([&](StoreOp *op) {
-    if (op->getResultType() == Value::f32) {
+    if (op->DEF(0)->getResultType() == Value::f32) {
       builder.replace<StrFOp>(op, op->getOperands(), { new IntAttr(0) });
       return false;
     }
@@ -179,7 +216,7 @@ void Lower::run() {
       builder.create<SubSpOp>({ new IntAttr(stackOffset) });
     
     for (int i = 0; i < spilled.size(); i++) {
-      auto sp = builder.create<ReadXRegOp>({ new RegAttr(Reg::sp) });
+      auto sp = builder.create<ReadRegOp>({ new RegAttr(Reg::sp) });
       builder.create<StoreOp>({ spilled[i], sp }, { new SizeAttr(8), new IntAttr(i * 8) });
     }
 
@@ -194,7 +231,7 @@ void Lower::run() {
 
     // Read result from a0.
     if (op->getResultType() == Value::f32)
-      builder.replace<ReadFRegOp>(op, { new RegAttr(Reg::v0) });
+      builder.replace<ReadRegOp>(op, { new RegAttr(Reg::v0) });
     else
       builder.replace<ReadRegOp>(op, { new RegAttr(Reg::x0) });
     return true;
@@ -216,23 +253,15 @@ void Lower::run() {
     return true;
   });
 
+  // Finally, convert all `mov x, 0` to reading from xzr.
+  runRewriter([&](MovIOp *op) {
+    if (V(op) == 0)
+      builder.replace<ReadRegOp>(op, { new RegAttr(Reg::xzr) });
+    
+    return false;
+  });
+
   auto funcs = collectFuncs();
-  // No need to iterate to fixed point. All Ops are guaranteed to transform.
-  for (auto func : funcs) {
-    auto region = func->getRegion();
-
-    for (auto bb : region->getBlocks()) {
-      auto ops = bb->getOps();
-
-      for (auto op : ops) {
-        for (auto rule : rules) {
-          bool success = rule.rewriteForLower(op);
-          if (success)
-            break;
-        }
-      }
-    }
-
+  for (auto func : funcs) 
     rewriteAlloca(func);
-  }
 }
