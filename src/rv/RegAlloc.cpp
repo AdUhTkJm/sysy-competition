@@ -370,10 +370,6 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       }
       if (isa<ReadRegOp>(op))
         priority[op] = 1;
-      
-      // Put constants to the last minute.
-      if (isa<IntOp>(op))
-        priority[op] = -1;
 
       if (isa<PhiOp>(op)) {
         priority[op] = currentPriority + 1;

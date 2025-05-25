@@ -141,20 +141,25 @@ bool AliasAttr::add(Op *base, int offset) {
       location[base] = { -1 };
       return true;
     }
-    auto &set = location[base];
-    if (set.size() == 1 && set[0] == -1)
+    auto &vec = location[base];
+    if (vec.size() == 1 && vec[0] == -1)
       return false;
-    set = { -1 };
+    vec = { -1 };
     return true;
   }
 
   // Both known base and known offset.
-  auto &set = location[base];
-  for (auto value : set) {
+  auto &vec = location[base];
+
+  // Adding a known offset into an unknown offset.
+  if (vec.size() == 1 && vec[0] == -1)
+    return false;
+  
+  for (auto value : vec) {
     if (value == offset)
       return false;
   }
-  set.push_back(offset);
+  vec.push_back(offset);
   return true;
 }
 

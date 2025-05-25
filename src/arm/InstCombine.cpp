@@ -20,11 +20,13 @@ static ArmRule rules[] = {
 
   // CBZ
   "(change (cbz (csetlt x) >ifso >ifnot) (blt x >ifnot >ifso))",
+  "(change (cbz (csetle x) >ifso >ifnot) (ble x >ifnot >ifso))",
   "(change (cbz (csetne x) >ifso >ifnot) (beq x >ifso >ifnot))",
   "(change (cbz (cseteq x) >ifso >ifnot) (bne x >ifso >ifnot))",
 
   // CBNZ
   "(change (cbnz (csetlt x) >ifso >ifnot) (blt x >ifso >ifnot))",
+  "(change (cbnz (csetlt x) >ifso >ifnot) (ble x >ifso >ifnot))",
   "(change (cbnz (csetne x) >ifso >ifnot) (bne x >ifso >ifnot))",
   "(change (cbnz (cseteq x) >ifso >ifnot) (beq x >ifso >ifnot))",
 

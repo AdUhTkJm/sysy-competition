@@ -47,12 +47,24 @@ void InstSchedule::runImpl(BasicBlock *bb) {
   std::unordered_map<Op*, int> degree;
   std::unordered_map<Op*, int> time;
   int index = 0;
+
+  auto phis = bb->getPhis();
+  std::unordered_set<Op*> operands;
+  for (auto phi : phis) {
+    for (auto operand : phi->getOperands())
+      operands.insert(operand.defining);
+  }
+
   auto goodness = [&](Op *op) -> int {
     int result = 0;
 
     // Delay constants whenever possible.
     if (isa<IntOp>(op) || isa<FloatOp>(op) || isa<GetGlobalOp>(op))
       return -3000;
+
+    // If this is a phi's operand of this block, then delay it as far as possible.
+    if (operands.count(op))
+      return -5000;
 
     // The numbers are somewhat arbitrary; we don't have a good understanding of BOOM.
     for (int i = 0; i < op->getOperandCount(); i++) {

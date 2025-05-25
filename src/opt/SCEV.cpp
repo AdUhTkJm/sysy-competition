@@ -10,31 +10,12 @@ std::map<std::string, int> SCEV::stats() {
   };
 }
 
-// Defined in LICM.cpp.
-bool noAlias(Op *load, const std::vector<Op*> stores);
-
 static Rule constIncr("(add x 'a)");
 
 void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
   auto preheader = info->getPreheader();
   auto header = info->getHeader();
   auto latch = info->getLatch();
-
-  for (auto op : bb->getOps()) {
-    if (op->has<VariantAttr>())
-      continue;
-
-    if ((isa<PhiOp>(op) && !op->has<IncreaseAttr>())
-      || (isa<LoadOp>(op) && (!noAlias(op, stores) || impure)))
-      op->add<VariantAttr>();
-    else for (auto operand : op->getOperands()) {
-      auto def = operand.defining;
-      if (def->has<VariantAttr>()) {
-        op->add<VariantAttr>();
-        break;
-      }
-    }
-  }
 
   for (auto op : bb->getOps()) {
     if (isa<AddIOp>(op) || isa<AddLOp>(op)) {
@@ -48,7 +29,7 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
       }
 
       // Case 1. x + <invariant>
-      if (!y->has<VariantAttr>() && !isa<PhiOp>(y)) {
+      if (y->getParent()->dominates(preheader)) {
         start[y] = y;
         op->add<IncreaseAttr>(INCR(x)->amt);
         continue;
@@ -114,6 +95,7 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
 
       if (!start.count(def)) {
         assert(nochange.count(def));
+        nochange.insert(op);
         good = false;
         break;
       }
@@ -167,6 +149,9 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
 }
 
 void SCEV::runImpl(LoopInfo *info) {
+  for (auto subloop : info->getSubloops())
+    runImpl(subloop);
+
   if (info->getLatches().size() > 1)
     return;
 
@@ -230,25 +215,26 @@ void SCEV::run() {
   auto forests = analysis.getResult();
 
   auto funcs = collectFuncs();
+
+  runRewriter([&](PhiOp *op) {
+    // Discard trivial phis.
+    if (op->getOperands().size() == 1) {
+      auto def = op->getOperand().defining;
+      op->replaceAllUsesWith(def);
+      op->erase();
+      return true;
+    }
+    return false;
+  });
+  
   for (auto func : funcs) {
     const auto &forest = forests[func];
     auto region = func->getRegion();
     domtree = getDomTree(region);
 
-    for (auto loop : forest.getLoops())
-      runImpl(loop);
-  }
-
-  // Erase all IncreaseAttr from phis.
-  // Phi rely on subscript to find FromAttr,
-  // so no other attributes are allowed for them.
-  for (auto func : funcs) {
-    auto region = func->getRegion();
-  
-    for (auto bb : region->getBlocks()) {
-      for (auto op : bb->getOps()) {
-        op->remove<VariantAttr>();
-      }
+    for (auto loop : forest.getLoops()) {
+      if (!loop->getParent())
+        runImpl(loop);
     }
   }
 }

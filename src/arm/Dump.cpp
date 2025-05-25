@@ -141,7 +141,7 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     os << "str " << xreg(RS(op)) << ", [" << xreg(RS2(op)) << ", #" << V(op) << "]\n";
     break;
   case StrWOp::id:
-    os << "str " << xreg(RS(op)) << ", [" << xreg(RS2(op)) << ", #" << V(op) << "]\n";
+    os << "str " << wreg(RS(op)) << ", [" << xreg(RS2(op)) << ", #" << V(op) << "]\n";
     break;
   case StrFOp::id:
     os << "str " << freg(RS(op)) << ", [" << xreg(RS2(op)) << ", #" << V(op) << "]\n";
@@ -172,6 +172,9 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     break;
   case MovIOp::id:
     os << "mov " << wreg(RD(op)) << ", " << V(op) << "\n";
+    break;
+  case MovkOp::id:
+    os << "movk " << wreg(RD(op)) << ", " << V(op) << ", lsl " << LSL(op) << "\n";
     break;
   default:
     std::cerr << "unimplemented op: " << op;

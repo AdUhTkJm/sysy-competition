@@ -121,6 +121,16 @@ public:
   StackOffsetAttr *clone() { return new StackOffsetAttr(offset); }
 };
 
+class LslAttr : public AttrImpl<LslAttr, ARMLINE> {
+public:
+  int vi;
+
+  LslAttr(int vi): vi(vi) {}
+  
+  std::string toString() { return "<lsl = " + std::to_string(vi) + ">"; }
+  LslAttr *clone() { return new LslAttr(vi); }
+};
+
 #define RATTR(Ty, name) \
   class Ty : public AttrImpl<Ty, ARMLINE> { \
   public: \
@@ -150,5 +160,6 @@ RATTR(Rs3Attr, "rs3 = ");
 #define RSC(x) new RsAttr(x)
 #define RS2C(x) new Rs2Attr(x)
 #define RS3C(x) new Rs3Attr(x)
+#define LSL(op) (op)->get<LslAttr>()->vi
 
 #endif
