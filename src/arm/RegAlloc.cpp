@@ -324,7 +324,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   region->updateLiveness();
 
   // Interference graph.
-  std::map<Op*, std::set<Op*>> interf;
+  std::map<Op*, std::set<Op*>> interf, spillInterf;
 
   // Values of readreg, or operands of writereg, or phis (mvs), are prioritzed.
   std::map<Op*, int> priority;
@@ -401,8 +401,12 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       if (event.start) {
         for (Op* activeOp : active) {
           // FP and int are using different registers.
-          if (activeOp->getResultType() == Value::f32 ^ op->getResultType() == Value::f32)
+          // However, they use the same stack frame.
+          if (activeOp->getResultType() == Value::f32 ^ op->getResultType() == Value::f32) {
+            spillInterf[op].insert(activeOp);
+            spillInterf[activeOp].insert(op);
             continue;
+          }
 
           interf[op].insert(activeOp);
           interf[activeOp].insert(op);
@@ -515,6 +519,12 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     int desired = currentOffset;
     std::unordered_set<int> conflict;
     for (auto v : interf[op]) {
+      if (!spillOffset.count(v))
+        continue;
+
+      conflict.insert(spillOffset[v]);
+    }
+    for (auto v : spillInterf[op]) {
       if (!spillOffset.count(v))
         continue;
 

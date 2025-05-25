@@ -17,7 +17,7 @@ public:
 
   SpilledRdAttr(bool fp, int offset): fp(fp), offset(offset) {}
 
-  std::string toString() { return "<rd = " + std::to_string(offset) + (fp ? "f" : "") + ">"; }
+  std::string toString() { return "<rd-spilled = " + std::to_string(offset) + (fp ? "f" : "") + ">"; }
   SpilledRdAttr *clone() { return new SpilledRdAttr(fp, offset); }
 };
 
@@ -28,7 +28,7 @@ public:
 
   SpilledRsAttr(bool fp, int offset): fp(fp), offset(offset) {}
 
-  std::string toString() { return "<rd = " + std::to_string(offset) + (fp ? "f" : "") + ">"; }
+  std::string toString() { return "<rs-spilled = " + std::to_string(offset) + (fp ? "f" : "") + ">"; }
   SpilledRsAttr *clone() { return new SpilledRsAttr(fp, offset); }
 };
 
@@ -39,7 +39,7 @@ public:
 
   SpilledRs2Attr(bool fp, int offset): fp(fp), offset(offset) {}
 
-  std::string toString() { return "<rd = " + std::to_string(offset) + + (fp ? "f" : "") + ">"; }
+  std::string toString() { return "<rs2-spilled = " + std::to_string(offset) + + (fp ? "f" : "") + ">"; }
   SpilledRs2Attr *clone() { return new SpilledRs2Attr(fp, offset); }
 };
 
@@ -335,7 +335,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   region->updateLiveness();
 
   // Interference graph.
-  std::unordered_map<Op*, std::set<Op*>> interf;
+  std::unordered_map<Op*, std::set<Op*>> interf, spillInterf;
 
   // Values of readreg, or operands of writereg, or phis (mvs), are prioritzed.
   std::unordered_map<Op*, int> priority;
@@ -368,9 +368,12 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         assignment[op] = REG(op);
         priority[op] = 1;
       }
-      if (isa<ReadRegOp>(op)) {
+      if (isa<ReadRegOp>(op))
         priority[op] = 1;
-      }
+      
+      // Put constants to the last minute.
+      if (isa<IntOp>(op))
+        priority[op] = -1;
 
       if (isa<PhiOp>(op)) {
         priority[op] = currentPriority + 1;
@@ -415,8 +418,13 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       if (event.start) {
         for (Op* activeOp : active) {
           // FP and int are using different registers.
-          if (activeOp->getResultType() == Value::f32 ^ op->getResultType() == Value::f32)
+          // However, they are using the same stack,
+          // so that must be taken into account when spilling.
+          if (activeOp->getResultType() == Value::f32 ^ op->getResultType() == Value::f32) {
+            spillInterf[op].insert(activeOp);
+            spillInterf[activeOp].insert(op);
             continue;
+          }
 
           interf[op].insert(activeOp);
           interf[activeOp].insert(op);
@@ -528,7 +536,16 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     // Spilled. Try to see all spill offsets of conflicting ops.
     int desired = currentOffset;
     std::unordered_set<int> conflict;
+
+    // Consider both `interf` (of the same register type)
+    // and `spillInterf` (of different register type).
     for (auto v : interf[op]) {
+      if (!spillOffset.count(v))
+        continue;
+
+      conflict.insert(spillOffset[v]);
+    }
+    for (auto v : spillInterf[op]) {
       if (!spillOffset.count(v))
         continue;
 
@@ -544,6 +561,13 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     // Update `highest`, which will indicate the size allocated.
     if (desired > highest)
       highest = desired;
+  }
+
+  // Only a single register is spilled. Let's use s11.
+  if (highest == currentOffset) {
+    for (auto [op, _] : spillOffset)
+      assignment[op] = op->getResultType() == Value::f32 ? fspillReg : spillReg;
+    spillOffset.clear();
   }
 
   // Allocate more stack space for it.
@@ -1320,10 +1344,7 @@ void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
       builder.replace<AddiOp>(op, { RDC(Reg::sp), RSC(Reg::sp), new IntAttr(-offset) });
     else {
       builder.setBeforeOp(op);
-      builder.create<LiOp>({
-        RDC(Reg::t0),
-        new IntAttr(offset)
-      });
+      builder.create<LiOp>({ RDC(Reg::t0), new IntAttr(offset) });
       builder.replace<SubOp>(op, {
         RDC(Reg::sp),
         RSC(Reg::sp),

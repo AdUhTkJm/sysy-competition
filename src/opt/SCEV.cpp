@@ -24,7 +24,8 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
     if (op->has<VariantAttr>())
       continue;
 
-    if (isa<LoadOp>(op) && (!noAlias(op, stores) || impure))
+    if ((isa<PhiOp>(op) && !op->has<IncreaseAttr>())
+      || (isa<LoadOp>(op) && (!noAlias(op, stores) || impure)))
       op->add<VariantAttr>();
     else for (auto operand : op->getOperands()) {
       auto def = operand.defining;
@@ -109,7 +110,10 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
 
     bool good = true;
     for (auto operand : op->getOperands()) {
-      if (!start.count(operand.defining)) {
+      auto def = operand.defining;
+
+      if (!start.count(def)) {
+        assert(nochange.count(def));
         good = false;
         break;
       }

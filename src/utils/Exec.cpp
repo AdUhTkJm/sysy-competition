@@ -99,6 +99,11 @@ void Interpreter::store(Op *op, float v) {
     store(op, (intptr_t) (sign eval(op->DEF()))); \
     break
 
+#define EXEC_UNARY_F(Ty, sign) \
+  case Ty::id: \
+    store(op, sign evalf(op->DEF())); \
+    break
+
 // Defined in Pass.cpp
 namespace sys {
   bool isExtern(const std::string &name);
@@ -148,6 +153,8 @@ void Interpreter::exec(Op *op) {
   EXEC_UNARY(NotOp, !);
   EXEC_UNARY(SetNotZeroOp, !!);
   EXEC_UNARY(MinusOp, -);
+
+  EXEC_UNARY_F(MinusFOp, -);
   case RShiftOp::id: {
     auto x = eval(op->DEF(0));
     auto y = eval(op->DEF(1));
