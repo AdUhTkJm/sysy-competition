@@ -341,6 +341,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   std::unordered_map<Op*, int> priority;
   // The `key` is preferred to have the same value as `value`.
   std::unordered_map<Op*, Op*> prefer;
+  // Maps a phi to its operands.
+  std::unordered_map<Op*, std::vector<Op*>> phiOperand;
 
   int currentPriority = 2;
   for (auto bb : region->getBlocks()) {
@@ -375,6 +377,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         for (auto x : op->getOperands()) {
           priority[x.defining] = currentPriority;
           prefer[x.defining] = op;
+          phiOperand[op].push_back(x.defining);
         }
         currentPriority += 2;
       }
@@ -448,11 +451,23 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     if (assignment.count(op))
       continue;
 
-    std::unordered_set<Reg> bad;
+    std::unordered_set<Reg> bad, unpreferred;
+
     for (auto v : interf[op]) {
       // In the whole function, `sp` and `zero` are read-only.
       if (assignment.count(v) && assignment[v] != Reg::sp && assignment[v] != Reg::zero)
         bad.insert(assignment[v]);
+    }
+
+    if (isa<PhiOp>(op)) {
+      // Dislike everything that might interfere with phi's operands.
+      const auto &operands = phiOperand[op];
+      for (auto x : operands) {
+        for (auto v : interf[x]) {
+          if (assignment.count(v) && assignment[v] != Reg::sp && assignment[v] != Reg::zero)
+            unpreferred.insert(assignment[v]);
+        }
+      }
     }
 
     if (prefer.count(op)) {
@@ -490,9 +505,19 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     auto rorder = op->getResultType() != Value::f32 ? order : orderf;
 
     for (int i = 0; i < rcnt; i++) {
-      if (!bad.count(rorder[i])) {
+      if (!bad.count(rorder[i]) && !unpreferred.count(rorder[i])) {
         assignment[op] = rorder[i];
         break;
+      }
+    }
+
+    // We have excluded too much. Try it again.
+    if (!assignment.count(op) && unpreferred.size()) {
+      for (int i = 0; i < rcnt; i++) {
+        if (!bad.count(rorder[i])) {
+          assignment[op] = rorder[i];
+          break;
+        }
       }
     }
 

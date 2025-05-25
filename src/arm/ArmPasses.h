@@ -70,6 +70,15 @@ public:
   void run();
 };
 
+class LateLegalize : public Pass {
+public:
+  LateLegalize(ModuleOp *module): Pass(module) {}
+
+  std::string name() { return "arm-late-legalize"; };
+  std::map<std::string, int> stats() { return {}; }
+  void run();
+};
+
 // Dumps the output.
 class Dump : public Pass {
   std::string out;

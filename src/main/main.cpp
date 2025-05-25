@@ -26,6 +26,7 @@ void initArmPipeline(sys::PassManager &pm) {
   pm.addPass<InstCombine>();
   pm.addPass<ArmDCE>();
   pm.addPass<RegAlloc>();
+  pm.addPass<LateLegalize>();
   pm.addPass<Dump>(opts.outputFile);
 }
 

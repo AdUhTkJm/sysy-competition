@@ -6,6 +6,13 @@
 using namespace sys;
 using namespace sys::arm;
 
+#define MATCH_TERNARY(opcode, Ty) \
+  if (opname == opcode && isa<Ty>(op)) { \
+    return matchExpr(list->elements[1], op->getOperand(0).defining) && \
+           matchExpr(list->elements[2], op->getOperand(1).defining) && \
+           matchExpr(list->elements[3], op->getOperand(2).defining); \
+  }
+
 #define MATCH_BINARY(opcode, Ty) \
   if (opname == opcode && isa<Ty>(op)) { \
     return matchExpr(list->elements[1], op->getOperand(0).defining) && \
@@ -15,6 +22,20 @@ using namespace sys::arm;
 #define MATCH_UNARY(opcode, Ty) \
   if (opname == opcode && isa<Ty>(op)) { \
     return matchExpr(list->elements[1], op->getOperand(0).defining); \
+  }
+
+#define MATCH_BINARY_IMM(opcode, Ty) \
+  if (opname == opcode && isa<Ty>(op)) { \
+    if (!matchExpr(list->elements[1], op->getOperand(0).defining) || \
+        !matchExpr(list->elements[2], op->getOperand(1).defining)) \
+      return false;\
+    int imm = V(op); \
+    auto var = cast<Atom>(list->elements[3])->value; \
+    assert(var[0] == '#'); \
+    if (imms.count(var)) \
+      return imms[var] == imm; \
+    imms[var] = imm; \
+    return true; \
   }
 
 #define MATCH_UNARY_IMM(opcode, Ty) \
@@ -92,6 +113,14 @@ using namespace sys::arm;
   if (opname == opcode) { \
     Value a = buildExpr(list->elements[1]); \
     return builder.create<Ty>({ a }); \
+  }
+
+#define BUILD_BINARY_IMM(opcode, Ty) \
+  if (opname == opcode) { \
+    Value a = buildExpr(list->elements[1]); \
+    Value b = buildExpr(list->elements[2]); \
+    int c = evalExpr(list->elements[3]); \
+    return builder.create<Ty>({ a, b }, { new IntAttr(c) }); \
   }
 
 #define BUILD_UNARY_IMM(opcode, Ty) \
@@ -206,7 +235,7 @@ bool ArmRule::matchExpr(Expr *expr, Op* op) {
 
   std::string_view opname = head->value;
 
-  MATCH_BINARY("mla", MlaOp);
+  MATCH_TERNARY("mla", MlaOp);
 
   MATCH_BINARY("addw", AddWOp);
   MATCH_BINARY("addx", AddXOp);
@@ -221,6 +250,10 @@ bool ArmRule::matchExpr(Expr *expr, Op* op) {
   MATCH_BINARY("eor", EorOp);
   MATCH_BINARY("tst", TstOp);
   MATCH_BINARY("cmp", CmpOp);
+
+  MATCH_BINARY_IMM("strw", StrWOp);
+  MATCH_BINARY_IMM("strf", StrFOp);
+  MATCH_BINARY_IMM("strx", StrXOp);
 
   MATCH_UNARY_IMM("addwi", AddWIOp);
   MATCH_UNARY_IMM("addxi", AddXIOp);
@@ -377,6 +410,10 @@ Op *ArmRule::buildExpr(Expr *expr) {
   BUILD_BINARY("tst", TstOp);
   BUILD_BINARY("cmp", CmpOp);
 
+  BUILD_BINARY_IMM("strw", StrWOp);
+  BUILD_BINARY_IMM("strf", StrFOp);
+  BUILD_BINARY_IMM("strx", StrXOp);
+
   BUILD_UNARY_IMM("addwi", AddWIOp);
   BUILD_UNARY_IMM("addxi", AddXIOp);
   BUILD_UNARY_IMM("subwi", SubWIOp);
@@ -424,6 +461,8 @@ bool ArmRule::rewrite(Op *op) {
   loc = 0;
   failed = false;
   binding.clear();
+  blockBinding.clear();
+  imms.clear();
   
   auto list = cast<List>(pattern);
   assert(cast<Atom>(list->elements[0])->value == "change");

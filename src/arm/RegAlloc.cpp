@@ -1,4 +1,5 @@
 #include "ArmPasses.h"
+#include <unordered_set>
 
 using namespace sys;
 using namespace sys::arm;
@@ -329,6 +330,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   std::map<Op*, int> priority;
   // The `key` is preferred to have the same value as `value`.
   std::map<Op*, Op*> prefer;
+  // Maps a phi to its operands.
+  std::unordered_map<Op*, std::vector<Op*>> phiOperand;
 
   for (auto bb : region->getBlocks()) {
     // Scan through the block and see the place where the value's last used.
@@ -361,6 +364,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         for (auto x : op->getOperands()) {
           priority[x.defining] = 1;
           prefer[x.defining] = op;
+          phiOperand[op].push_back(x.defining);
         }
       }
     }
@@ -433,11 +437,23 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     if (assignment.count(op))
       continue;
 
-    std::set<Reg> bad;
+    std::unordered_set<Reg> bad, unpreferred;
+
     for (auto v : interf[op]) {
       // In the whole function, `sp` and `zero` are read-only.
-      if (assignment.count(v) && assignment[v] != Reg::xzr && assignment[v] != Reg::sp)
+      if (assignment.count(v) && assignment[v] != Reg::sp && assignment[v] != Reg::xzr)
         bad.insert(assignment[v]);
+    }
+
+    if (isa<PhiOp>(op)) {
+      // Dislike everything that might interfere with phi's operands.
+      const auto &operands = phiOperand[op];
+      for (auto x : operands) {
+        for (auto v : interf[x]) {
+          if (assignment.count(v) && assignment[v] != Reg::sp && assignment[v] != Reg::xzr)
+            unpreferred.insert(assignment[v]);
+        }
+      }
     }
 
     if (prefer.count(op)) {
@@ -475,9 +491,19 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     auto rorder = op->getResultType() != Value::f32 ? order : orderf;
 
     for (int i = 0; i < rcnt; i++) {
-      if (!bad.count(rorder[i])) {
+      if (!bad.count(rorder[i]) && !unpreferred.count(rorder[i])) {
         assignment[op] = rorder[i];
         break;
+      }
+    }
+
+    // We have excluded too much. Try it again.
+    if (!assignment.count(op) && unpreferred.size()) {
+      for (int i = 0; i < rcnt; i++) {
+        if (!bad.count(rorder[i])) {
+          assignment[op] = rorder[i];
+          break;
+        }
       }
     }
 
@@ -487,7 +513,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     spilled++;
     // Spilled. Try to see all spill offsets of conflicting ops.
     int desired = currentOffset;
-    std::set<int> conflict;
+    std::unordered_set<int> conflict;
     for (auto v : interf[op]) {
       if (!spillOffset.count(v))
         continue;
@@ -712,9 +738,12 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     }
   }
 
+#define SOFFSET(op, Ty) ((Reg) -(op)->get<Spilled##Ty##Attr>()->offset)
+#define SPILLABLE(op, Ty) (op->has<Ty##Attr>() ? op->get<Ty##Attr>()->reg : SOFFSET(op, Ty))
 
-#define SPILLABLE(op, Ty) (op->has<Ty##Attr>() ? op->get<Ty##Attr>()->reg : (Reg) -op->get<Spilled##Ty##Attr>()->offset)
-
+  // Detect circular copies and calculate a correct order.
+  std::unordered_map<BasicBlock*, std::vector<std::pair<Reg, Reg>>> moveMap;
+  std::unordered_map<BasicBlock*, std::map<std::pair<Reg, Reg>, Op*>> revMap;
   for (auto bb : bbs) {
     auto phis = bb->getPhis();
 
@@ -723,9 +752,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       auto &ops = phi->getOperands();
       auto &attrs = phi->getAttrs();
       for (size_t i = 0; i < ops.size(); i++) {
-        auto bb = cast<FromAttr>(attrs[i])->bb;
-        auto terminator = *--bb->getOps().end();
-        builder.setBeforeOp(terminator);
+        auto bb = FROM(attrs[i]);
+        auto term = bb->getLastOp();
+        builder.setBeforeOp(term);
         auto def = ops[i].defining;
         Op *mv;
         if (phi->getResultType() == Value::f32) {
@@ -745,63 +774,121 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       }
     }
 
-    // Detect circular copies.
-    std::map<Reg, Reg> moveMap;
-    std::map<std::pair<Reg, Reg>, Op*> moveOpMap;
-    std::set<Reg> srcs;
-    std::set<Reg> dsts;
+    std::copy(phis.begin(), phis.end(), std::back_inserter(allPhis));
 
     for (auto mv : moves) {
-      auto src = SPILLABLE(mv, Rd);
-      auto dst = SPILLABLE(mv, Rs);
-      moveMap[src] = dst;
-      moveOpMap[std::pair {src, dst}] = mv;
-      srcs.insert(src);
-      dsts.insert(dst);
-    }
-
-    // Registers that currently hold valid values.
-    std::set<Reg> valid = srcs;
-
-    std::set<Reg> visited;
-    // Unwanted moves.
-    std::vector<Op*> toErase;
-
-    // Detect cycles.
-    for (auto mv : moves) {
-      auto src = mv->has<RdAttr>() ? RD(mv) : (Reg) -mv->get<SpilledRdAttr>()->offset;
-      auto dst = mv->has<RsAttr>() ? RS(mv) : (Reg) -mv->get<SpilledRsAttr>()->offset;
-      if (visited.count(src))
+      auto dst = SPILLABLE(mv, Rd);
+      auto src = SPILLABLE(mv, Rs);
+      if (src == dst) {
+        mv->erase();
         continue;
-
-      std::vector<Reg> chain;
-      std::vector<Op*> ops;
-
-      Reg cur = src;
-
-      // Walk the chain of copying.
-      while (moveMap.count(cur) && !visited.count(cur)) {
-        visited.insert(cur);
-        chain.push_back(cur);
-        ops.push_back(moveOpMap[std::pair { cur, moveMap[cur] }]);
-        cur = moveMap[cur];
       }
 
-      if (chain.size() <= 1 || cur != chain.front())
-        continue;
+      auto parent = mv->getParent();
+      moveMap[parent].emplace_back(dst, src);
+      revMap[parent][{ dst, src }] = mv;
+    }
+  }
 
-      // The chain is actually a cycle.
-      // It has to have at least 2 arguments (as self-loop is not acceptable).
-      std::cerr << "remark: cycle detected\n";
-      // Unhandled yet.
-      assert(false);
+  for (const auto &[bb, mvs] : moveMap) {
+    std::unordered_map<Reg, Reg> moveGraph;
+    for (auto [dst, src] : mvs)
+      moveGraph[dst] = src;
+
+    // Detect cycles.
+    std::set<Reg> visited, visiting;
+    std::vector<std::pair<Reg, Reg>> sorted;
+    // Cycle headers.
+    std::vector<Reg> headers;
+    // All members in the cycle under a certain header.
+    std::unordered_map<Reg, std::vector<Reg>> members;
+    // All nodes that are in a certain cycle.
+    std::unordered_set<Reg> inCycle;
+
+    // Do a topological sort; it will decide whether there's a cycle.
+    std::function<void(Reg)> dfs = [&](Reg node) {
+      visiting.insert(node);
+      Reg src = moveGraph[node];
+
+      if (visiting.count(src))
+        // A node is visited twice. Here's a cycle.
+        headers.push_back(node);
+      else if (!visited.count(src) && moveGraph.count(src))
+        dfs(src);
+    
+      visiting.erase(node);
+      visited.insert(node);
+      sorted.emplace_back(node, src);
+    };
+
+    for (auto [dst, src] : mvs) {
+      if (!visited.count(dst))
+        dfs(dst);
     }
 
-    for (auto mv : toErase)
-      mv->erase();
+    std::reverse(sorted.begin(), sorted.end());
 
-    // Copy the local phis into `allPhis` for removal.
-    std::copy(phis.begin(), phis.end(), std::back_inserter(allPhis));
+    // Fill in record of cycles.
+    for (auto header : headers) {
+      Reg runner = header;
+      do {
+        members[header].push_back(runner);
+        runner = moveGraph[runner];
+      } while (runner != header);
+
+      for (auto member : members[header])
+        inCycle.insert(member);
+    }
+
+    // Move sorted phis so that they're in the correct order.
+    Op* term = bb->getLastOp();
+
+    std::unordered_set<Reg> emitted;
+
+    for (auto [dst, src] : sorted) {
+      if (dst == src || emitted.count(dst) || inCycle.count(dst))
+        continue;
+
+      revMap[bb][{ dst, src }]->moveBefore(term);
+      emitted.insert(dst);
+    }
+
+    if (members.empty())
+      continue;
+
+    // Looks like still buggy? No idea why.
+    std::cerr << "remark: cycle detected\n";
+
+    // Now emit all cycles.
+    builder.setBeforeOp(term);
+
+    const auto createMv = [&](Reg dst, Reg src) {
+      bool fp = isFP(dst);
+
+      Attr *rd = int(dst) >= 0 ? (Attr*) RDC(dst) : new SpilledRdAttr(fp, -int(dst));
+      Attr *rs = int(src) >= 0 ? (Attr*) RSC(src) : new SpilledRsAttr(fp, -int(src));
+      Op *mv;
+      if (fp)
+        mv = builder.create<FmovOp>({ new ImpureAttr, rd, rs });
+      else
+        mv = builder.create<MovROp>({ new ImpureAttr, rd, rs });
+      return mv;
+    };
+
+    for (const auto &[header, members] : members) {
+      // If the phi is spilled we can't use s11,
+      // because it will be used for load/store instead.
+      Reg tmp = isFP(header) ? fspillReg2 : spillReg2;
+
+      createMv(tmp, header);
+      for (int i = 1; i < members.size(); i++) 
+        createMv(members[i - 1], members[i]);
+      createMv(members.back(), tmp);
+
+      // The old mv's must get erased.
+      for (auto dst : members)
+        revMap[bb][{ dst, moveGraph[dst] }]->erase();
+    }
   }
 
   // Erase all phi's properly. There might be cross-reference across blocks.
@@ -852,9 +939,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         builder.setAfterOp(op);
         if (offset < 16384) {
           if (fp)
-            builder.create<StrFOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
+            builder.create<StrFOp>({ RSC(reg), RS2C(Reg::sp), new IntAttr(offset) });
           else
-            builder.create<StrXOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
+            builder.create<StrXOp>({ RSC(reg), RS2C(Reg::sp), new IntAttr(offset) });
         } else assert(false);
         op->add<RdAttr>(reg);
       }
@@ -901,7 +988,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
           else
             builder.create<LdrXOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
         } else assert(false);
-        op->add<Rs2Attr>(reg);
+        op->add<Rs3Attr>(reg);
       }
     }
   }

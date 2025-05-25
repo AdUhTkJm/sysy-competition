@@ -31,6 +31,14 @@ static ArmRule rules[] = {
   // CMP
   "(change (cmp x (mov #a)) (!only-if (!inbit 12 #a) (cmpi x #a)))",
 
+  // LDR
+  "(change (ldrw (addxi x #a) #b) (!only-if (!inbit 12 (!add #a #b)) (ldrw x (!add #a #b))))",
+  "(change (ldrx (addxi x #a) #b) (!only-if (!inbit 12 (!add #a #b)) (ldrx x (!add #a #b))))",
+
+  // STR
+  "(change (strw y (addxi x #a) #b) (!only-if (!inbit 12 (!add #a #b)) (strw y x (!add #a #b))))",
+  "(change (strx y (addxi x #a) #b) (!only-if (!inbit 12 (!add #a #b)) (strx y x (!add #a #b))))",
+
   // Meaning: jump to `ifso` if x == 0.
   "(change (beq (tst x x) >ifso >ifnot) (cbz x >ifso >ifnot))",
 };

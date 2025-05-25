@@ -22,6 +22,11 @@ static Rule rules[] = {
   "(change (add (add x x) x) (mul x 3))",
   "(change (add x (add x x)) (mul x 3))",
 
+  // Addition (64-bit)
+  "(change (addl x 0) x)",
+  "(change (addl 'a x) (addl x 'a))",
+  "(change (addl (addl x 'a) 'b) (addl x (!add 'a 'b)))",
+
   // FP Addition
   "(change (fadd *a *b) (?add *a *b))",
   "(change (fadd x *0) x)",

@@ -375,6 +375,8 @@ Op *Rule::buildExpr(Expr *expr) {
   BUILD_BINARY("sub", SubIOp);
   BUILD_BINARY("mul", MulIOp);
   BUILD_BINARY("div", DivIOp);
+  BUILD_BINARY("addl", AddLOp);
+  BUILD_BINARY("mull", MulLOp);
   BUILD_BINARY("fadd", AddFOp);
   BUILD_BINARY("fsub", SubFOp);
   BUILD_BINARY("fmul", MulFOp);

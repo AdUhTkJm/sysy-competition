@@ -94,6 +94,15 @@ void Lower::run() {
     return false;
   });
 
+  runRewriter([&](SetNotZeroOp *op) {
+    Value def = op->getOperand();
+
+    builder.setBeforeOp(op);
+    Value tst = builder.create<TstOp>({ def, def });
+    builder.replace<CsetNeOp>(op, { tst });
+    return false;
+  });
+
   runRewriter([&](EqOp *op) {
     Value x = op->getOperand(0);
     Value y = op->getOperand(1);
