@@ -604,7 +604,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(ScvtfOp, UNARY);
   LOWER(FcvtzsOp, UNARY);
   LOWER(FmovWOp, UNARY);
-
+  LOWER(NegOp, UNARY);
+  LOWER(FnegOp, UNARY);
+  
   // Branches don't have operands; they rely on flags.
   LOWER(BltOp, NULLARY);
   LOWER(BleOp, NULLARY);

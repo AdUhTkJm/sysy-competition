@@ -113,9 +113,10 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
 
   UNARY_X(MovROp, "mov");
 
-  UNARY_W(ScvtfOp, "scvtf");
+  UNARY_W(NegOp, "neg");
 
-  UNARY_F(FcvtzsOp, "fcvtzs");
+  UNARY_F(FnegOp, "fneg");
+  UNARY_F(FmovOp, "fmov");
 
   JMP(BOp, "b");
   JMP(BneOp, "bne");
@@ -132,7 +133,7 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     os << "ldr " << xreg(RD(op)) << ", =" << NAME(op) << "\n";
     break;
   case FmovWOp::id:
-    os << "ldr " << freg(RD(op)) << ", =" << wreg(RS(op)) << "\n";
+    os << "fmov " << freg(RD(op)) << ", " << wreg(RS(op)) << "\n";
     break;
   case BlOp::id:
     os << "bl " << NAME(op) << "\n";
@@ -170,6 +171,12 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   case RetOp::id:
     os << "ret \n";
     break;
+  case ScvtfOp::id:
+    os << "scvtf " << freg(RD(op)) << ", " << wreg(RS(op)) << "\n";
+    break;
+  case FcvtzsOp::id:
+    os << "fcvtzs " << wreg(RD(op)) << ", " << freg(RS(op)) << "\n";
+    break;
   case MovIOp::id:
     os << "mov " << wreg(RD(op)) << ", " << V(op) << "\n";
     break;
@@ -199,7 +206,9 @@ void Dump::dump(std::ostream &os) {
   auto funcs = collectFuncs();
   for (auto func : funcs) {
     os << NAME(func) << ":\n";
-    dumpBody(func->getRegion(), os);
+
+    auto region = func->getRegion();
+    dumpBody(region, os);
     os << "\n\n";
   }
 

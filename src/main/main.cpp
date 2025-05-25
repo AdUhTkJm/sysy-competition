@@ -74,7 +74,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::CanonicalizeLoop>(/*lcssa=*/ false);
   pm.addPass<sys::LICM>();
   pm.addPass<sys::ConstLoopUnroll>();
-  pm.addPass<sys::SCEV>();
+  // pm.addPass<sys::SCEV>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::RegularFold>();
   pm.addPass<sys::DCE>();

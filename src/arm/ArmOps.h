@@ -56,6 +56,7 @@ ARMOP(MovnOp); // Load `not immediate`.
 ARMOP(MovROp); // To distinguish from loading immediates, an `R` is for moving between registers.
 
 ARMOPF(FmovWOp); // Move from a 32-bit w-register to a fp register.
+ARMOPF(FmovFOp); // Move a floating point immediate to a fp register.
 
 ARMOPL(AdrOp); // The ADR instruction only allows 1 MB range. We use pseudo-instr `ldr x0, =label` when Dumping.
 
@@ -80,6 +81,7 @@ ARMOP(UdivWOp);
 ARMOP(MlaOp);
 ARMOP(MsubWOp); // Multiply-sub: rs3 - rs2 * rs
 ARMOP(NegOp);
+ARMOPF(FnegOp);
 
 ARMOPL(SmulhOp);
 ARMOPL(UmulhOp);
@@ -158,7 +160,7 @@ ARMOP(BlOp); // Branch-and-link (jal in RISC-V), so just a call
 
 ARMOPF(ScvtfOp); // i32 -> f32
 ARMOP(FcmpOp);
-ARMOP(FmovOp); // Note this is NOT moving between floats; it's fmv.w.x in RISC-V
+ARMOP(FmovOp);
 ARMOP(FcvtzsOp); // f32 -> i32, rounding to zero
 ARMOPF(FaddOp);
 ARMOPF(FsubOp);
