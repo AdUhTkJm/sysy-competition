@@ -244,6 +244,9 @@ struct Event {
   Op *op;
 };
 
+// Defined in rv/RegAlloc.cpp.
+void dumpInterf(Region *region, const std::unordered_map<Op*, std::set<Op*>> &interf);
+
 void RegAlloc::runImpl(Region *region, bool isLeaf) {
   const Reg *order = isLeaf ? leafOrder : normalOrder;
   const Reg *orderf = isLeaf ? leafOrderf : normalOrderf;
@@ -321,18 +324,26 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     // Spilled to stack; don't do anything.
   }
 
+  // Don't forget to update the types of ReadRegOp.
+  runRewriter(funcOp, [&](ReadRegOp *op) {
+    if (isFP(REG(op)))
+      op->setResultType(Value::f32);
+    return false;
+  });
+
   region->updateLiveness();
 
   // Interference graph.
-  std::map<Op*, std::set<Op*>> interf, spillInterf;
+  std::unordered_map<Op*, std::set<Op*>> interf, spillInterf;
 
   // Values of readreg, or operands of writereg, or phis (mvs), are prioritzed.
-  std::map<Op*, int> priority;
+  std::unordered_map<Op*, int> priority;
   // The `key` is preferred to have the same value as `value`.
-  std::map<Op*, Op*> prefer;
+  std::unordered_map<Op*, Op*> prefer;
   // Maps a phi to its operands.
   std::unordered_map<Op*, std::vector<Op*>> phiOperand;
 
+  int currentPriority = 2;
   for (auto bb : region->getBlocks()) {
     // Scan through the block and see the place where the value's last used.
     std::map<Op*, int> lastUsed, defined;
@@ -360,12 +371,13 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         priority[op] = 1;
       
       if (isa<PhiOp>(op)) {
-        priority[op] = 2;
+        priority[op] = currentPriority + 1;
         for (auto x : op->getOperands()) {
-          priority[x.defining] = 1;
+          priority[x.defining] = currentPriority;
           prefer[x.defining] = op;
           phiOperand[op].push_back(x.defining);
         }
+        currentPriority += 2;
       }
     }
 
@@ -678,31 +690,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   std::vector<Op*> allPhis;
   auto bbs = region->getBlocks();
 
-  // Split edges.
+  // Split critical edges.
   for (auto bb : bbs) {
-    // If a block has multiple successors with phi, then we split the edges. As an example:
-    // 
-    // bb0:
-    //   %0 = ...
-    //   %1 = ...
-    //   br %1 <bb1> <bb2>
-    // bb1:
-    //   phi %2, %0, ...
-    // bb2:
-    //   phi %3, %0, ...
-    //
-    // If we naively create a move at the end of bb0, then it's wrong.
-    // We need to rewrite it into
-    //
-    // bb0:
-    //   br %1 <bb3> <bb4>
-    // bb3:
-    //   j bb1
-    // bb4:
-    //   j bb2
-    // ...
-    //
-    // To actually make it work.
     if (bb->getSuccs().size() <= 1)
       continue;
 
@@ -1108,6 +1097,7 @@ void RegAlloc::tidyup(Region *region) {
   // Now branches are still having both TargetAttr and ElseAttr.
   // Replace them (perform split when necessary), so that they only have one target.
   REPLACE_BRANCH(BltOp, BgeOp,);
+  REPLACE_BRANCH(BleOp, BgtOp,);
   REPLACE_BRANCH(BeqOp, BneOp,);
   REPLACE_BRANCH(CbzOp, CbnzOp, RSC(RS(op)));
 

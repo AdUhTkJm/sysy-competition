@@ -287,6 +287,7 @@ bool ArmRule::matchExpr(Expr *expr, Op* op) {
   MATCH_BRANCH("blt", BltOp);
   MATCH_BRANCH("bgt", BgtOp);
   MATCH_BRANCH("ble", BleOp);
+  MATCH_BRANCH("bge", BgeOp);
 
   if (opname == "j" && isa<GotoOp>(op)) {
     auto target = TARGET(op);

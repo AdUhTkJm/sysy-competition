@@ -27,8 +27,7 @@ void LateLegalize::run() {
       int v = V(op);
 
       builder.setBeforeOp(op);
-      if (v & 0xffff)
-        builder.create<MovIOp>({ RDC(RD(op)), new IntAttr(v & 0xffff) });
+      builder.create<MovIOp>({ RDC(RD(op)), new IntAttr(v & 0xffff) });
       builder.replace<MovkOp>(op, { RDC(RD(op)), new IntAttr(((unsigned) v) >> 16), new LslAttr(16) });
     }
     return false;
