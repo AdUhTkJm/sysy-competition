@@ -78,10 +78,7 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
   Builder builder;
   builder.setBeforeOp(term);
 
-  // Try to find all operands in `start`.
-  // Then create a `clone` which would be the starting value.
-  std::vector<Op*> produced;
-
+  std::vector<Op*> candidates;
   for (auto op : bb->getOps()) {
     if (isa<PhiOp>(op) || !op->has<IncreaseAttr>())
       continue;
@@ -89,6 +86,25 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
     if (nochange.count(op))
       continue;
 
+    candidates.push_back(op);
+  }
+
+  // Const-unroll might introduce a lot of new increasing things,
+  // if the unrolled loop have a surrounding loop.
+  // We don't want to assign a phi to each of them.
+  // We use a threshold to guard against this.
+  if (candidates.size() >= 6) {
+    std::cerr << module << candidates.size();
+    for (auto op : candidates)
+      nochange.insert(op);
+    candidates.clear();
+  }
+
+  // Try to find all operands in `start`.
+  // Then create a `clone` which would be the starting value.
+  std::vector<Op*> produced;
+
+  for (auto op : candidates) {
     bool good = true;
     for (auto operand : op->getOperands()) {
       auto def = operand.defining;

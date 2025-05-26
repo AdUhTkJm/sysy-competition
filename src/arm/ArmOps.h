@@ -160,6 +160,7 @@ ARMOP(BlOp); // Branch-and-link (jal in RISC-V), so just a call
 
 ARMOPF(ScvtfOp); // i32 -> f32
 ARMOP(FcmpOp);
+ARMOP(FcmpZOp); // Compare with 0
 ARMOP(FmovOp);
 ARMOP(FcvtzsOp); // f32 -> i32, rounding to zero
 ARMOPF(FaddOp);
@@ -171,12 +172,6 @@ ARMOPF(FdivOp);
 ARMOP(ReadRegOp);
 ARMOP(WriteRegOp);
 ARMOP(PlaceHolderOp);
-ARMOP(ReloadOp);
-ARMOPF(ReloadFOp);
-ARMOPL(ReloadLOp);
-ARMOP(SpillOp);
-ARMOP(SpillFOp);
-ARMOP(SpillLOp);
 ARMOP(SubSpOp);
 
 inline bool hasRd(Op *op) {
@@ -195,11 +190,9 @@ inline bool hasRd(Op *op) {
     isa<CbnzOp>(op) ||
     isa<RetOp>(op) ||
     isa<CmpOp>(op) ||
+    isa<FcmpOp>(op) ||
     isa<TstOp>(op) ||
     isa<WriteRegOp>(op) ||
-    isa<SpillOp>(op) ||
-    isa<SpillFOp>(op) ||
-    isa<SpillLOp>(op) ||
     isa<SubSpOp>(op)
   );
 }

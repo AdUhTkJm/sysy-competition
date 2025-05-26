@@ -91,7 +91,11 @@ void Lower::run() {
     Value def = op->getOperand();
 
     builder.setBeforeOp(op);
-    Value tst = builder.create<TstOp>({ def, def });
+    Value tst;
+    if (def.defining->getResultType() == Value::f32)
+      tst = builder.create<FcmpZOp>({ def });
+    else
+      tst = builder.create<TstOp>({ def, def });
     builder.replace<CsetEqOp>(op, { tst });
     return false;
   });
@@ -100,7 +104,11 @@ void Lower::run() {
     Value def = op->getOperand();
 
     builder.setBeforeOp(op);
-    Value tst = builder.create<TstOp>({ def, def });
+    Value tst;
+    if (def.defining->getResultType() == Value::f32)
+      tst = builder.create<FcmpZOp>({ def });
+    else
+      tst = builder.create<TstOp>({ def, def });
     builder.replace<CsetNeOp>(op, { tst });
     return false;
   });
@@ -141,6 +149,46 @@ void Lower::run() {
 
     builder.setBeforeOp(op);
     Value tst = builder.create<CmpOp>({ x, y });
+    builder.replace<CsetLeOp>(op, { tst });
+    return false;
+  });
+
+  runRewriter([&](EqFOp *op) {
+    Value x = op->getOperand(0);
+    Value y = op->getOperand(1);
+
+    builder.setBeforeOp(op);
+    Value tst = builder.create<FcmpOp>({ x, y });
+    builder.replace<CsetEqOp>(op, { tst });
+    return false;
+  });
+
+  runRewriter([&](NeFOp *op) {
+    Value x = op->getOperand(0);
+    Value y = op->getOperand(1);
+
+    builder.setBeforeOp(op);
+    Value tst = builder.create<FcmpOp>({ x, y });
+    builder.replace<CsetNeOp>(op, { tst });
+    return false;
+  });
+
+  runRewriter([&](LtFOp *op) {
+    Value x = op->getOperand(0);
+    Value y = op->getOperand(1);
+
+    builder.setBeforeOp(op);
+    Value tst = builder.create<FcmpOp>({ x, y });
+    builder.replace<CsetLtOp>(op, { tst });
+    return false;
+  });
+
+  runRewriter([&](LeFOp *op) {
+    Value x = op->getOperand(0);
+    Value y = op->getOperand(1);
+
+    builder.setBeforeOp(op);
+    Value tst = builder.create<FcmpOp>({ x, y });
     builder.replace<CsetLeOp>(op, { tst });
     return false;
   });

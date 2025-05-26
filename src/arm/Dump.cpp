@@ -47,6 +47,7 @@ using namespace sys::arm;
 #define BINARY_F(Ty, name) BINARY(Ty, name, freg)
 #define BINARY_NO_RD_W(Ty, name) BINARY_BASE(Ty, name, wreg,)
 #define BINARY_NO_RD_X(Ty, name) BINARY_BASE(Ty, name, xreg,)
+#define BINARY_NO_RD_F(Ty, name) BINARY_BASE(Ty, name, freg,)
 #define UNARY_I_NO_RD_W(Ty, name) UNARY_I_NO_RD(Ty, name, wreg)
 #define UNARY_I_NO_RD_X(Ty, name) UNARY_I_NO_RD(Ty, name, xreg)
 #define UNARY_I_W(Ty, name) UNARY_I(Ty, name, wreg)
@@ -101,6 +102,7 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
 
   BINARY_NO_RD_W(CmpOp, "cmp");
   BINARY_NO_RD_W(TstOp, "tst");
+  BINARY_NO_RD_F(FcmpOp, "tst");
 
   BINARY_X(AddXOp, "add");
   BINARY_X(MulXOp, "mul");
@@ -112,7 +114,6 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   UNARY_I_X(AddXIOp, "add");
 
   UNARY_X(MovROp, "mov");
-
   UNARY_W(NegOp, "neg");
 
   UNARY_F(FnegOp, "fneg");
@@ -129,6 +130,9 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   JMP_UNARY(CbzOp, "cbz");
   JMP_UNARY(CbnzOp, "cbnz");
 
+  case FcmpZOp::id:
+    os << "fcmp " << freg(RD(op)) << ", #0.0\n";
+    break;
   case AdrOp::id:
     os << "ldr " << xreg(RD(op)) << ", =" << NAME(op) << "\n";
     break;

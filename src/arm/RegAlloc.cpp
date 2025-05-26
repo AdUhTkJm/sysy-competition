@@ -196,6 +196,7 @@ static const Reg leafOrderf[] = {
 };
 // Order for non-leaf functions.
 static const Reg normalOrderf[] = {
+  Reg::v16, Reg::v17, Reg::v18,
   Reg::v19, Reg::v20, Reg::v21, Reg::v22,
   Reg::v23, Reg::v24, Reg::v25, Reg::v26,
   Reg::v27, Reg::v28, Reg::v29,
@@ -589,6 +590,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(AsrWOp, BINARY);
   LOWER(AsrXOp, BINARY);
   LOWER(CmpOp, BINARY);
+  LOWER(FcmpOp, BINARY);
   LOWER(TstOp, BINARY);
   LOWER(FaddOp, BINARY);
   LOWER(FsubOp, BINARY);
@@ -618,6 +620,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(FmovWOp, UNARY);
   LOWER(NegOp, UNARY);
   LOWER(FnegOp, UNARY);
+  LOWER(FcmpZOp, UNARY);
   
   // Branches don't have operands; they rely on flags.
   LOWER(BltOp, NULLARY);
