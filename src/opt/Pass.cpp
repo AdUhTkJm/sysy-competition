@@ -79,3 +79,22 @@ DomTree Pass::getDomTree(Region *region) {
   }
   return tree;
 }
+
+void Pass::cleanup() {
+  Op::release();
+  
+  // Put phi's types right.
+  runRewriter([&](PhiOp *op) {
+    if (op->getResultType() == Value::f32)
+      return false;
+
+    for (auto operand : op->getOperands()) {
+      if (operand.defining->getResultType() == Value::f32) {
+        op->setResultType(Value::f32);
+        return true;
+      }
+    }
+
+    return false;
+  });
+}

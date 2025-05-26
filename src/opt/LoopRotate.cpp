@@ -112,10 +112,9 @@ void LoopRotate::runImpl(LoopInfo *info) {
         from = latch;
         if (valueMap.count(def))
           phi->setOperand(i, valueMap[def]);
-        if (initMap.count(def)) {
-          phi->pushOperand(initMap[def]);
-          phi->add<FromAttr>(preheader);
-        }
+        
+        phi->pushOperand(initMap.count(def) ? initMap[def] : def);
+        phi->add<FromAttr>(preheader);
         break;
       }
     }

@@ -63,7 +63,7 @@ void PassManager::run() {
       inBackend = true;
 
     pass->run();
-    Op::release();
+    pass->cleanup();
 
     if (opts.verbose || pass->name() == opts.printAfter) {
       std::cerr << "===== After " << pass->name() << " =====\n\n";
@@ -73,12 +73,15 @@ void PassManager::run() {
 
     // Before mem2reg, we don't have phis.
     // Verify pass only checks phis; so no point running it before that.
-    if (opts.verify && pastMem2Reg)
+    if (opts.verify && pastMem2Reg) {
+      std::cerr << "checking " << pass->name() << "\n";
       Verify(module).run();
+    }
 
     // We can't simulate for backend.
     // Technically we have the capacity, but it's too much work.
     if (opts.compareWith.size() && pastFlatten && !inBackend) {
+      std::cerr << "checking " << pass->name() << "\n";
       exec::Interpreter itp(module);
       std::stringstream buffer(input);
       itp.run(buffer);

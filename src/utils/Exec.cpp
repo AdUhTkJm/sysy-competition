@@ -62,7 +62,7 @@ float Interpreter::evalf(Op *op) {
     sys_unreachable("undefined op" << op);
   if (op->getResultType() != sys::Value::f32)
     sys_unreachable("op of non-float type: " << op);
-  return value[op].vi;
+  return value[op].vf;
 }
 
 void Interpreter::store(Op *op, intptr_t v) {
@@ -232,8 +232,8 @@ Interpreter::Value Interpreter::applyExtern(const std::string &name, const std::
     return Value { .vi = x };
   }
   if (name == "getfloat") {
-    float x; inbuf >> x;
-    return Value { .vf = x };
+    std::string x; inbuf >> x;
+    return Value { .vf = strtof(x.c_str(), nullptr) };
   }
   if (name == "getarray") {
     int n; inbuf >> n;
@@ -242,7 +242,17 @@ Interpreter::Value Interpreter::applyExtern(const std::string &name, const std::
     unsigned *ptr = (unsigned*) args[0].vi;
     for (int i = 0; i < n; i++)
       inbuf >> ptr[i];
-    return Value { .vi = (intptr_t) ptr };
+    return Value { .vi = n };
+  }
+  if (name == "getfarray") {
+    int n; inbuf >> n;
+    float *ptr = (float*) args[0].vi;
+    std::string x;
+    for (int i = 0; i < n; i++) {
+      inbuf >> x;
+      ptr[i] = strtof(x.c_str(), nullptr);
+    }
+    return Value { .vi = n };
   }
   if (name == "putint") {
     intptr_t v = args[0].vi;
@@ -252,6 +262,20 @@ Interpreter::Value Interpreter::applyExtern(const std::string &name, const std::
   }
   if (name == "putch") {
     outbuf << (char) args[0].vi;
+    return Value();
+  }
+  if (name == "putfloat") {
+    outbuf << args[0].vf;
+    return Value();
+  }
+  if (name == "putfarray") {
+    int n = args[0].vi;
+    float *ptr = (float*) args[1].vi;
+    outbuf << n << ":";
+    for (int i = 0; i < n; i++) {
+      outbuf << " " << ptr[i];
+    }
+    outbuf << "\n";
     return Value();
   }
   if (name == "_sysy_starttime" || name == "_sysy_stoptime")
@@ -292,7 +316,6 @@ Interpreter::Value Interpreter::execf(Region *region, const std::vector<Value> &
       args.reserve(operands.size());
       for (auto operand : operands)
         args.push_back(value[operand.defining]);
-
       if (isExtern(name)) {
         value[ip] = applyExtern(name, args);
         ip = ip->nextOp();
@@ -329,7 +352,8 @@ Interpreter::Value Interpreter::execf(Region *region, const std::vector<Value> &
 }
 
 void Interpreter::run(std::istream &input) {
-  inbuf << input.rdbuf();
+  inbuf << std::hexfloat << input.rdbuf();
+  outbuf << std::hexfloat;
   auto exit = execf(fnMap["main"]->getRegion(), {});
   retcode = exit.vi;
 }

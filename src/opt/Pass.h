@@ -58,6 +58,7 @@ protected:
   DomTree getDomTree(Region *region);
 public:
   Pass(ModuleOp *module): module(module) {}
+  void cleanup();
   virtual ~Pass() {}
   virtual std::string name() = 0;
   virtual std::map<std::string, int> stats() = 0;

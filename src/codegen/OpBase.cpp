@@ -188,15 +188,22 @@ void Op::removeOperand(int i) {
   removeOperandUse(def);
 }
 
-void Op::replaceOperand(Op *before, Value v) {
+int Op::replaceOperand(Op *before, Value v) {
   for (int i = 0; i < operands.size(); i++) {
     auto def = operands[i].defining;
     if (def == before) {
       setOperand(i, v);
-      return;
+      return i;
     }
   }
   assert(false);
+}
+
+void Op::setAttribute(int i, Attr *attr) {
+  attr->refcnt++;
+  if (!--attrs[i]->refcnt)
+    delete attrs[i];
+  attrs[i] = attr;
 }
 
 void Op::erase() {

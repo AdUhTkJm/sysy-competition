@@ -289,6 +289,8 @@ def run_test_case(sy_path: Path, in_path: Path, out_path: Path):
     commands = [f"{BUILD_DIR}/sysc", str(sy_path), "-o", str(asm_path)]
     if args.arm:
       commands.append("--arm")
+    if args.verify:
+      commands.append("--verify")
     
     try:
       proc.run(

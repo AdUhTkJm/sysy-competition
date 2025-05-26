@@ -16,6 +16,7 @@ BasicBlock *ConstLoopUnroll::copyLoop(LoopInfo *loop, BasicBlock *bb, int unroll
   BasicBlock *latch = loop->getLatch();
   BasicBlock *lastLatch = loop->getLatch();
   BasicBlock *header = loop->getHeader();
+  BasicBlock *preheader = loop->getPreheader();
   BasicBlock *exit = *loop->getExits().begin();
   BasicBlock *latchRewire = nullptr;
   auto region = lastLatch->getParent();
@@ -67,16 +68,9 @@ BasicBlock *ConstLoopUnroll::copyLoop(LoopInfo *loop, BasicBlock *bb, int unroll
     // We shouldn't change the original latch for side-loop; otherwise all future copies will break.
     auto term = lastLatch->getLastOp();
     auto rewired = rewireMap[header];
-    if (lastLatch != latch) {
-      if (false)
-        builder.replace<GotoOp>(term, { new TargetAttr(rewired) });
-      else {
-        if (TARGET(term) == header)
-          TARGET(term) = rewired;
-        if (ELSE(term) == header)
-          ELSE(term) = rewired;
-      }
-    } else
+    if (lastLatch != latch)
+      builder.replace<GotoOp>(term, { new TargetAttr(rewired) });
+    else
       latchRewire = rewired;
 
     // The new latch now branches to either the rewire header or exit.
@@ -91,18 +85,6 @@ BasicBlock *ConstLoopUnroll::copyLoop(LoopInfo *loop, BasicBlock *bb, int unroll
 
     // Update the current latch.
     lastLatch = curLatch;
-
-    // Fix exit phis.
-    // A new predecessor is added to exit, so we need to add another operand.
-    for (auto [k, v] : exitlatch) {
-      // The value doesn't come from the loop. It shouldn't be changed.
-      if (!cloneMap.count(v))
-        continue;
-      
-      auto operand = cloneMap[v];
-      k->pushOperand(operand);
-      k->add<FromAttr>(curLatch);
-    }
     
     // Replace phis at header.
     // All phis come from either the preheader or the latch.
@@ -147,14 +129,19 @@ BasicBlock *ConstLoopUnroll::copyLoop(LoopInfo *loop, BasicBlock *bb, int unroll
 
   // Rewire the old (first) latch now. It should go to `latchRewire`.
   auto term = latch->getLastOp();
-  if (TARGET(term) == header)
-    TARGET(term) = latchRewire;
-  if (ELSE(term) == header)
-    ELSE(term) = latchRewire;
+  builder.replace<GotoOp>(term, { new TargetAttr(latchRewire) });
 
   // Also, the last latch can only get to exit. There's no chance of returning to header.
   auto final = lastLatch->getLastOp();
   builder.replace<GotoOp>(final, { new TargetAttr(exit) });
+
+  // The exit can only receive operand from the latest latch.
+  for (auto [k, v] : exitlatch) {
+    Op *def = cloneMap.count(v) ? cloneMap[v] : v;
+    
+    int index = k->replaceOperand(v, def);
+    k->setAttribute(index, new FromAttr(lastLatch));
+  }
 
   // Phis at the header should also now point to the new latch.
   auto phis = header->getPhis();
@@ -259,14 +246,8 @@ bool ConstLoopUnroll::runImpl(LoopInfo *loop) {
   // It can be from something that passes through all the loop, for example.
   auto exitphis = exit->getPhis();
   exitlatch.clear();
-  for (auto phi : exitphis) {
-    const auto &ops = phi->getOperands();
-    const auto &attrs = phi->getAttrs();
-    for (int i = 0; i < ops.size(); i++) {
-      if (FROM(attrs[i]) == latch)
-        exitlatch[phi] = ops[i].defining;
-    }
-  }
+  for (auto phi : exitphis) 
+    exitlatch[phi] = Op::getPhiFrom(phi, latch);
 
   // We construct a side-loop with checks in it. The code is roughly the same.
   // Note that preheader won't change if it's used, because it's only used when `true`.
