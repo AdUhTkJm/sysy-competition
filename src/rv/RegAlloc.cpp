@@ -14,33 +14,36 @@ class SpilledRdAttr : public AttrImpl<SpilledRdAttr, RVLINE + 2097152> {
 public:
   bool fp;
   int offset;
+  Op *ref;
 
-  SpilledRdAttr(bool fp, int offset): fp(fp), offset(offset) {}
+  SpilledRdAttr(bool fp, int offset, Op *ref): fp(fp), offset(offset), ref(ref) {}
 
   std::string toString() override { return "<rd-spilled = " + std::to_string(offset) + (fp ? "f" : "") + ">"; }
-  SpilledRdAttr *clone() override { return new SpilledRdAttr(fp, offset); }
+  SpilledRdAttr *clone() override { return new SpilledRdAttr(fp, offset, ref); }
 };
 
 class SpilledRsAttr : public AttrImpl<SpilledRsAttr, RVLINE + 2097152> {
 public:
   bool fp;
   int offset;
+  Op *ref;
 
-  SpilledRsAttr(bool fp, int offset): fp(fp), offset(offset) {}
+  SpilledRsAttr(bool fp, int offset, Op *ref): fp(fp), offset(offset), ref(ref) {}
 
   std::string toString() override { return "<rs-spilled = " + std::to_string(offset) + (fp ? "f" : "") + ">"; }
-  SpilledRsAttr *clone() override { return new SpilledRsAttr(fp, offset); }
+  SpilledRsAttr *clone() override { return new SpilledRsAttr(fp, offset, ref); }
 };
 
 class SpilledRs2Attr : public AttrImpl<SpilledRs2Attr, RVLINE + 2097152> {
 public:
   bool fp;
   int offset;
+  Op *ref;
 
-  SpilledRs2Attr(bool fp, int offset): fp(fp), offset(offset) {}
+  SpilledRs2Attr(bool fp, int offset, Op *ref): fp(fp), offset(offset), ref(ref) {}
 
   std::string toString() override { return "<rs2-spilled = " + std::to_string(offset) + + (fp ? "f" : "") + ">"; }
-  SpilledRs2Attr *clone() override { return new SpilledRs2Attr(fp, offset); }
+  SpilledRs2Attr *clone() override { return new SpilledRs2Attr(fp, offset, ref); }
 };
 
 }
@@ -69,10 +72,10 @@ std::map<std::string, int> RegAlloc::stats() {
   if (!spillOffset.count(v##Index)) \
     op->add<AttrTy>(getReg(v##Index)); \
   else \
-    op->add<Spilled##AttrTy>(v##Index->getResultType() == Value::f32, spillOffset[v##Index]);
+    op->add<Spilled##AttrTy> GET_SPILLED_ARGS(v##Index);
 
 #define GET_SPILLED_ARGS(op) \
-  (op->getResultType() == Value::f32, spillOffset[op])
+  (op->getResultType() == Value::f32, spillOffset[op], op)
 
 #define BINARY ADD_ATTR(0, RsAttr) ADD_ATTR(1, Rs2Attr)
 #define UNARY ADD_ATTR(0, RsAttr)
@@ -370,6 +373,14 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       }
       if (isa<ReadRegOp>(op))
         priority[op] = 1;
+      
+      if (isa<LiOp>(op)) {
+        if (V(op) <= 2047 && V(op) >= -2048)
+          priority[op] = -2;
+        priority[op] = -1;
+      }
+      if (isa<LaOp>(op))
+        priority[op] = -1;
 
       if (isa<PhiOp>(op)) {
         priority[op] = currentPriority + 1;
@@ -884,38 +895,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       continue;
 
     // Looks like still buggy? No idea why.
+    // Anyway, disable it for now.
     std::cerr << "remark: cycle detected\n";
-
-    // Now emit all cycles.
-    builder.setBeforeOp(term);
-
-    const auto createMv = [&](Reg dst, Reg src) {
-      bool fp = isFP(dst);
-
-      Attr *rd = int(dst) >= 0 ? (Attr*) RDC(dst) : new SpilledRdAttr(fp, -int(dst));
-      Attr *rs = int(src) >= 0 ? (Attr*) RSC(src) : new SpilledRsAttr(fp, -int(src));
-      Op *mv;
-      if (fp)
-        mv = builder.create<FmvOp>({ new ImpureAttr, rd, rs });
-      else
-        mv = builder.create<MvOp>({ new ImpureAttr, rd, rs });
-      return mv;
-    };
-
-    for (const auto &[header, members] : members) {
-      // If the phi is spilled we can't use s11,
-      // because it will be used for load/store instead.
-      Reg tmp = isFP(header) ? fspillReg2 : spillReg2;
-
-      createMv(tmp, header);
-      for (int i = 1; i < members.size(); i++) 
-        createMv(members[i - 1], members[i]);
-      createMv(members.back(), tmp);
-
-      // The old mv's must get erased.
-      for (auto dst : members)
-        revMap[bb][{ dst, moveGraph[dst] }]->erase();
-    }
+    assert(false);
   }
 
   // Erase all phi's properly. There might be cross-reference across blocks,
@@ -936,12 +918,13 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         if (!spillOffset.count(op))
           op->add<RdAttr>(getReg(op));
         else
-          op->add<SpilledRdAttr>(op->getResultType() == Value::f32, spillOffset[op]);
+          op->add<SpilledRdAttr> GET_SPILLED_ARGS(op);
       }
     }
   }
 
   // Deal with spilled variables.
+  std::vector<Op*> remove;
   for (auto bb : region->getBlocks()) {
     int delta = 0;
     for (auto op : bb->getOps()) {
@@ -959,6 +942,12 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       }
 
       if (auto rd = op->find<SpilledRdAttr>()) {
+        // We will rematerialize them later.
+        if (isa<LiOp>(rd->ref) || isa<LaOp>(rd->ref)) {
+          remove.push_back(op);
+          continue;
+        }
+
         int offset = delta + rd->offset;
         bool fp = rd->fp;
         auto reg = fp ? fspillReg : spillReg;
@@ -981,7 +970,13 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         auto ldty = fp ? Value::f32 : Value::i64;
 
         builder.setBeforeOp(op);
-        if (offset < 2048)
+        // Rematerialized.
+        auto ref = rs->ref;
+        if (isa<LiOp>(ref))
+          builder.create<LiOp>({ RDC(reg), new IntAttr(V(ref)) });
+        else if (isa<LaOp>(ref))
+          builder.create<LaOp>({ RDC(reg), new NameAttr(NAME(ref)) });
+        else if (offset < 2048)
           builder.create<LoadOp>(ldty, { RDC(reg), RSC(Reg::sp), new IntAttr(offset), new SizeAttr(8) });
         else if (offset < 4096) {
           builder.create<AddiOp>({ RDC(spillReg), RSC(Reg::sp), new IntAttr(2047), new SizeAttr(8) });
@@ -998,7 +993,13 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         auto ldty = fp ? Value::f32 : Value::i64;
 
         builder.setBeforeOp(op);
-        if (offset < 2048)
+        // Rematerialized.
+        auto ref = rs2->ref;
+        if (isa<LiOp>(ref))
+          builder.create<LiOp>({ RDC(reg), new IntAttr(V(ref)) });
+        else if (isa<LaOp>(ref))
+          builder.create<LaOp>({ RDC(reg), new NameAttr(NAME(ref)) });
+        else if (offset < 2048)
           builder.create<LoadOp>(ldty, { RDC(reg), RSC(Reg::sp), new IntAttr(offset), new SizeAttr(8) });
         else if (offset < 4096) {
           builder.create<AddiOp>({ RDC(spillReg2), RSC(Reg::sp), new IntAttr(2047), new SizeAttr(8) });
@@ -1009,6 +1010,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       }
     }
   }
+
+  for (auto op : remove)
+    op->erase();
 }
 
 int RegAlloc::latePeephole(Op *funcOp) {
