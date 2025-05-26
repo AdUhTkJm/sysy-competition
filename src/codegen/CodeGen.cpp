@@ -19,16 +19,19 @@ void Builder::setToRegionEnd(Region *region) {
 void Builder::setToBlockStart(BasicBlock *block) {
   bb = block;
   at = bb->begin();
+  init = true;
 }
 
 void Builder::setToBlockEnd(BasicBlock *block) {
   bb = block;
   at = bb->end();
+  init = true;
 }
 
 void Builder::setBeforeOp(Op *op) {
   bb = op->parent;
   at = op->place;
+  init = true;
 }
 
 void Builder::setAfterOp(Op *op) {
@@ -37,7 +40,7 @@ void Builder::setAfterOp(Op *op) {
 }
 
 Op *Builder::copy(Op *op) {
-  auto opnew = new Op(op->id, op->resultTy, op->operands);
+  auto opnew = new Op(op->opid, op->resultTy, op->operands);
   for (auto attr : op->attrs) {
     auto cloned = attr->clone();
     cloned->refcnt++;

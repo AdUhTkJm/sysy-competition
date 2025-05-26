@@ -134,6 +134,7 @@ int main(int argc, char **argv) {
   sys::Sema sema(node, ctx);
 
   sys::CodeGen cg(node);
+  delete node;
   if (opts.dumpMidIR)
     cg.getModule()->dump(std::cerr);
 

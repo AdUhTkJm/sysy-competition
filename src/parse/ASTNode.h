@@ -20,6 +20,7 @@ public:
   int getID() const { return id; }
 
   ASTNode(int id): id(id) {}
+  virtual ~ASTNode() {}
 };
 
 template<class T, int NodeID>
@@ -37,7 +38,6 @@ public:
   int value;
 
   IntNode(int value): value(value) {}
-  
 };
 
 class FloatNode : public ASTNodeImpl<FloatNode, __LINE__> {
@@ -52,6 +52,7 @@ public:
   std::vector<ASTNode*> nodes;
 
   BlockNode(const decltype(nodes) &n): nodes(n) {}
+  ~BlockNode() { for (auto node : nodes) delete node; }
 };
 
 class VarDeclNode : public ASTNodeImpl<VarDeclNode, __LINE__> {
@@ -63,6 +64,7 @@ public:
 
   VarDeclNode(const std::string &name, ASTNode *init, bool mut = true, bool global = false):
     name(name), init(init), mut(mut), global(global) {}
+  ~VarDeclNode() { delete init; }
 };
 
 class VarRefNode : public ASTNodeImpl<VarRefNode, __LINE__> {
@@ -94,6 +96,7 @@ public:
 
   BinaryNode(decltype(kind) k, ASTNode *l, ASTNode *r):
     kind(k), l(l), r(r) {}
+  ~BinaryNode() { delete l; delete r; }
 };
 
 class UnaryNode : public ASTNodeImpl<UnaryNode, __LINE__> {
@@ -106,6 +109,7 @@ public:
 
   UnaryNode(decltype(kind) k, ASTNode *node):
     kind(k), node(node) {}
+  ~UnaryNode() { delete node; }
 };
 
 class FnDeclNode : public ASTNodeImpl<FnDeclNode, __LINE__> {
@@ -116,6 +120,7 @@ public:
 
   FnDeclNode(std::string name, const decltype(args) &a, BlockNode *body):
     name(name), args(a), body(body) {}
+  ~FnDeclNode() { delete body; }
 };
 
 class ReturnNode : public ASTNodeImpl<ReturnNode, __LINE__> {
@@ -124,6 +129,7 @@ public:
   std::string func;
 
   ReturnNode(const std::string &func, ASTNode *node): node(node), func(func) {}
+  ~ReturnNode() { delete node; }
 };
 
 class IfNode : public ASTNodeImpl<IfNode, __LINE__> {
@@ -132,6 +138,7 @@ public:
 
   IfNode(ASTNode *cond, ASTNode *ifso, ASTNode *ifnot):
     cond(cond), ifso(ifso), ifnot(ifnot) {}
+  ~IfNode() { delete cond; delete ifso; delete ifnot; }
 };
 
 class AssignNode : public ASTNodeImpl<AssignNode, __LINE__> {
@@ -139,6 +146,7 @@ public:
   ASTNode *l, *r;
 
   AssignNode(ASTNode *l, ASTNode *r): l(l), r(r) {}
+  ~AssignNode() { delete l; delete r; }
 };
 
 class WhileNode : public ASTNodeImpl<WhileNode, __LINE__> {
@@ -146,6 +154,7 @@ public:
   ASTNode *cond, *body;
 
   WhileNode(ASTNode *cond, ASTNode *body): cond(cond), body(body) {}
+  ~WhileNode() { delete cond; delete body; }
 };
 
 // Size is to be deduced by type.

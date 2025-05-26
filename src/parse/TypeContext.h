@@ -86,6 +86,11 @@ public:
     }
     return ptr;
   }
+
+  ~TypeContext() {
+    for (auto x : content)
+      delete x;
+  }
 };
   
 }

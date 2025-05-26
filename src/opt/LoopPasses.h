@@ -50,7 +50,7 @@ public:
   auto getStop() const { return stop; }
   int getStep() const { return step; }
 
-  bool contains(BasicBlock *bb) const { return bbs.count(bb); }
+  bool contains(const BasicBlock *bb) const { return bbs.count(const_cast<BasicBlock*>(bb)); }
 
   // Note that this relies on a previous dump of the parent op,
   // otherwise the numbers of blocks are meaningless.
@@ -77,11 +77,12 @@ class LoopAnalysis : public Pass {
 
 public:
   LoopAnalysis(ModuleOp *module): Pass(module) {}
+  ~LoopAnalysis();
 
-  std::string name() { return "loop-analysis"; }
-  std::map<std::string, int> stats() { return {}; }
+  std::string name() override { return "loop-analysis"; }
+  std::map<std::string, int> stats() override { return {}; }
   LoopForest runImpl(Region *region);
-  void run();
+  void run() override;
   void reset() { info = {}; }
 
   auto getResult() { return info; }
@@ -98,9 +99,9 @@ class CanonicalizeLoop : public Pass {
 public:
   CanonicalizeLoop(ModuleOp *module, bool lcssa): Pass(module), lcssa(lcssa) {}
 
-  std::string name() { return "canonicalize-loop"; }
-  std::map<std::string, int> stats() { return {}; }
-  void run();
+  std::string name() override { return "canonicalize-loop"; }
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
 };
 
 class LoopRotate : public Pass {
@@ -110,9 +111,9 @@ class LoopRotate : public Pass {
 public:
   LoopRotate(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "loop-rotate"; }
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "loop-rotate"; }
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 class ConstLoopUnroll : public Pass {
@@ -129,9 +130,9 @@ class ConstLoopUnroll : public Pass {
 public:
   ConstLoopUnroll(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "const-loop-unroll"; }
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "const-loop-unroll"; }
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 class LoopUnswitch : public Pass {
@@ -139,9 +140,9 @@ class LoopUnswitch : public Pass {
 public:
   LoopUnswitch(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "loop-unswitch"; }
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "loop-unswitch"; }
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 class SCEV : public Pass {
@@ -162,9 +163,9 @@ class SCEV : public Pass {
 public:
   SCEV(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "scev"; }
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "scev"; }
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 class LICM : public Pass {
@@ -181,9 +182,9 @@ class LICM : public Pass {
 public:
   LICM(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "licm"; }
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "licm"; }
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 }

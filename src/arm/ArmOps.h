@@ -7,13 +7,13 @@
 #define ARMOPBASE(ValueTy, Ty) \
   class Ty : public OpImpl<Ty, __LINE__ + 1048576> { \
   public: \
-    Ty(const std::vector<Value> &values): OpImpl(ValueTy, values) { \
+    explicit Ty(const std::vector<Value> &values): OpImpl(ValueTy, values) { \
       setName("arm."#Ty); \
     } \
     Ty(): OpImpl(ValueTy, {}) { \
       setName("arm."#Ty); \
     } \
-    Ty(const std::vector<Attr*> &attrs): OpImpl(ValueTy, {}, attrs) { \
+    explicit Ty(const std::vector<Attr*> &attrs): OpImpl(ValueTy, {}, attrs) { \
       setName("arm."#Ty); \
     } \
     Ty(const std::vector<Value> &values, const std::vector<Attr*> &attrs): OpImpl(ValueTy, values, attrs) { \
@@ -27,7 +27,7 @@
     Ty(Value::Type resultTy, const std::vector<Value> &values): OpImpl(resultTy, values) { \
       setName("arm."#Ty); \
     } \
-    Ty(Value::Type resultTy): OpImpl(resultTy, {}) { \
+    explicit Ty(Value::Type resultTy): OpImpl(resultTy, {}) { \
       setName("arm."#Ty); \
     } \
     Ty(Value::Type resultTy, const std::vector<Attr*> &attrs): OpImpl(resultTy, {}, attrs) { \

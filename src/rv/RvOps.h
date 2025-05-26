@@ -7,13 +7,13 @@
 #define RVOPBASE(ValueTy, Ty) \
   class Ty : public OpImpl<Ty, __LINE__ + 524288> { \
   public: \
-    Ty(const std::vector<Value> &values): OpImpl(ValueTy, values) { \
+    explicit Ty(const std::vector<Value> &values): OpImpl(ValueTy, values) { \
       setName("rv."#Ty); \
     } \
     Ty(): OpImpl(ValueTy, {}) { \
       setName("rv."#Ty); \
     } \
-    Ty(const std::vector<Attr*> &attrs): OpImpl(ValueTy, {}, attrs) { \
+    explicit Ty(const std::vector<Attr*> &attrs): OpImpl(ValueTy, {}, attrs) { \
       setName("rv."#Ty); \
     } \
     Ty(const std::vector<Value> &values, const std::vector<Attr*> &attrs): OpImpl(ValueTy, values, attrs) { \
@@ -28,7 +28,7 @@
     Ty(Value::Type resultTy, const std::vector<Value> &values): OpImpl(resultTy, values) { \
       setName("rv."#Ty); \
     } \
-    Ty(Value::Type resultTy): OpImpl(resultTy, {}) { \
+    explicit Ty(Value::Type resultTy): OpImpl(resultTy, {}) { \
       setName("rv."#Ty); \
     } \
     Ty(Value::Type resultTy, const std::vector<Attr*> &attrs): OpImpl(resultTy, {}, attrs) { \

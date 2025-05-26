@@ -14,9 +14,9 @@ class Lower : public Pass {
 public:
   Lower(ModuleOp *module): Pass(module) {}
   
-  std::string name() { return "arm-lower"; };
-  std::map<std::string, int> stats() { return {}; };
-  void run();
+  std::string name() override { return "arm-lower"; };
+  std::map<std::string, int> stats() override { return {}; };
+  void run() override;
 };
 
 class InstCombine : public Pass {
@@ -24,9 +24,9 @@ class InstCombine : public Pass {
 public:
   InstCombine(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "arm-inst-combine"; };
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "arm-inst-combine"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 // The only difference with opt/DCE is that `isImpure` behaves differently.
@@ -40,22 +40,17 @@ class ArmDCE : public Pass {
 public:
   ArmDCE(ModuleOp *module): Pass(module) {}
     
-  std::string name() { return "arm-dce"; };
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "arm-dce"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 class RegAlloc : public Pass {
-  int spilled;
-  int convertedTotal;
+  int spilled = 0;
+  int convertedTotal = 0;
 
   std::map<FuncOp*, std::set<Reg>> usedRegisters;
   std::map<std::string, FuncOp*> fnMap;
-
-  std::map<Op*, std::set<Op*>> interf;
-  std::map<Op*, std::set<Reg>> forbidden;
-  std::map<Op*, Reg> assignment;
-  std::unordered_map<Op*, int> spillOffset;
 
   void runImpl(Region *region, bool isLeaf);
   void proEpilogue(FuncOp *funcOp, bool isLeaf);
@@ -65,18 +60,18 @@ public:
 
   RegAlloc(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "arm-regalloc"; };
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "arm-regalloc"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 class LateLegalize : public Pass {
 public:
   LateLegalize(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "arm-late-legalize"; };
-  std::map<std::string, int> stats() { return {}; }
-  void run();
+  std::string name() override { return "arm-late-legalize"; };
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
 };
 
 // Dumps the output.
@@ -89,9 +84,9 @@ class Dump : public Pass {
 public:
   Dump(ModuleOp *module, const std::string &out): Pass(module), out(out) {}
 
-  std::string name() { return "arm-dump"; };
-  std::map<std::string, int> stats() { return {}; }
-  void run();
+  std::string name() override { return "arm-dump"; };
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
 };
 
 };

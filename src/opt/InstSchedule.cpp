@@ -50,7 +50,7 @@ void InstSchedule::runImpl(BasicBlock *bb) {
 
   auto phis = bb->getPhis();
   std::unordered_set<Op*> operands;
-  for (auto phi : phis) {
+  for (const auto phi : phis) {
     for (auto operand : phi->getOperands())
       operands.insert(operand.defining);
   }

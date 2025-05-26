@@ -107,7 +107,7 @@ void GVN::dvnt(BasicBlock *bb, Domtree &domtree) {
       continue;
     }
     
-    Expr key { .id = op->getID() };
+    Expr key { .id = op->opid };
     for (auto operand : op->getOperands()) {
       auto def = operand.defining;
       if (!symbols.count(def)) {

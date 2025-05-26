@@ -16,9 +16,9 @@ class Pureness : public Pass {
 public:
   Pureness(ModuleOp *module): Pass(module) {}
     
-  std::string name() { return "pureness"; };
-  std::map<std::string, int> stats() { return {}; }
-  void run();
+  std::string name() override { return "pureness"; };
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
 };
 
 // Puts CallerAttr to each function.
@@ -26,9 +26,9 @@ class CallGraph : public Pass {
 public:
   CallGraph(ModuleOp *module): Pass(module) {}
     
-  std::string name() { return "call-graph"; };
-  std::map<std::string, int> stats() { return {}; }
-  void run();
+  std::string name() override { return "call-graph"; };
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
 };
 
 // Gives an AliasAttr to values, if they are addresses.
@@ -38,9 +38,9 @@ class Alias : public Pass {
 public:
   Alias(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "alias"; };
-  std::map<std::string, int> stats() { return {}; }
-  void run();
+  std::string name() override { return "alias"; };
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
 };
 
 // Integer range analysis.
@@ -53,9 +53,9 @@ class Range : public Pass {
 public:
   Range(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "range"; }
-  std::map<std::string, int> stats() { return {}; }
-  void run();
+  std::string name() override { return "range"; }
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
 };
 
 // Mark functions that are called at most once.
@@ -63,9 +63,9 @@ class AtMostOnce : public Pass {
 public:
   AtMostOnce(ModuleOp *module): Pass(module) {}
     
-  std::string name() { return "at-most-once"; };
-  std::map<std::string, int> stats() { return {}; }
-  void run();
+  std::string name() override { return "at-most-once"; };
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
 };
 
 }

@@ -127,8 +127,8 @@ public:
 
   LslAttr(int vi): vi(vi) {}
   
-  std::string toString() { return "<lsl = " + std::to_string(vi) + ">"; }
-  LslAttr *clone() { return new LslAttr(vi); }
+  std::string toString() override { return "<lsl = " + std::to_string(vi) + ">"; }
+  LslAttr *clone() override { return new LslAttr(vi); }
 };
 
 #define RATTR(Ty, name) \
@@ -136,8 +136,8 @@ public:
   public: \
     Reg reg; \
     Ty(Reg reg): reg(reg) {} \
-    std::string toString() { return "<" name + showReg(reg) + ">"; } \
-    Ty *clone() { return new Ty(reg); } \
+    std::string toString() override { return "<" name + showReg(reg) + ">"; } \
+    Ty *clone() override { return new Ty(reg); } \
   };
 
 RATTR(RegAttr, "");

@@ -1,3 +1,4 @@
+#!pnpm tsx
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import * as fs from 'fs';
@@ -97,8 +98,8 @@ async function main() {
 
   const count = parseInt(process.argv[2]);
 
-  const file1 = `scores/${count}.txt`;
-  const file2 = `scores/${count + 1}.txt`;
+  const file1 = `rank/${count}.txt`;
+  const file2 = `rank/${count + 1}.txt`;
 
   const data1 = await read(file1);
   const data2 = await read(file2);

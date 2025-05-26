@@ -11,9 +11,9 @@ class FlattenCFG : public Pass {
 public:
   FlattenCFG(ModuleOp *module): Pass(module) {}
   
-  std::string name() { return "flatten-cfg"; };
-  std::map<std::string, int> stats() { return {}; };
-  void run();
+  std::string name() override { return "flatten-cfg"; };
+  std::map<std::string, int> stats() override { return {}; };
+  void run() override;
 };
 
 // A weak scheduler that only works on basic blocks.
@@ -23,9 +23,9 @@ class InstSchedule : public Pass {
 public:
   InstSchedule(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "inst-schedule"; };
-  std::map<std::string, int> stats() { return {}; }
-  void run();
+  std::string name() override { return "inst-schedule"; };
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
 };
 
 }

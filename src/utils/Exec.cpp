@@ -110,7 +110,7 @@ namespace sys {
 }
 
 void Interpreter::exec(Op *op) {
-  switch (op->getID()) {
+  switch (op->opid) {
   case IntOp::id:
     store(op, (intptr_t) V(op));
     break;
@@ -263,7 +263,7 @@ Interpreter::Value Interpreter::execf(Region *region, const std::vector<Value> &
   auto entry = region->getFirstBlock();
   ip = entry->getFirstOp();
   while (!isa<ReturnOp>(ip)) {
-    switch (ip->getID()) {
+    switch (ip->opid) {
     case GotoOp::id: {
       auto dest = TARGET(ip);
       prev = ip->getParent();

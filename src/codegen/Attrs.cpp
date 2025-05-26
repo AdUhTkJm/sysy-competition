@@ -73,9 +73,7 @@ std::string CallerAttr::toString() {
   if (!callers.size())
     return "<no caller>";
   
-  ss << "<caller = ";
-  if (callers.size() > 0)
-    ss << callers[0];
+  ss << "<caller = " << callers[0];
   for (int i = 1; i < callers.size(); i++)
     ss << ", " << callers[i];
   ss << ">";
@@ -155,10 +153,8 @@ bool AliasAttr::add(Op *base, int offset) {
   if (vec.size() == 1 && vec[0] == -1)
     return false;
   
-  for (auto value : vec) {
-    if (value == offset)
-      return false;
-  }
+  if (std::find(vec.begin(), vec.end(), offset) != vec.end())
+    return false;
   vec.push_back(offset);
   return true;
 }

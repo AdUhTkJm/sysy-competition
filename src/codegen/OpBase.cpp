@@ -29,7 +29,7 @@ void BasicBlock::remove(iterator at) {
   ops.erase(at);
 }
 
-BasicBlock *BasicBlock::nextBlock() {
+BasicBlock *BasicBlock::nextBlock() const {
   auto it = place;
   return *++it;
 }
@@ -47,7 +47,7 @@ Op *Op::nextOp() {
 Value::Value(Op *from): defining(from) {}
 
 Op::Op(int id, Value::Type resultTy, const std::vector<Value> &values):
-  id(id), resultTy(resultTy) {
+  resultTy(resultTy), opid(id) {
   for (auto x : values) {
     operands.push_back(x);
     x.defining->uses.insert(this);
@@ -55,7 +55,7 @@ Op::Op(int id, Value::Type resultTy, const std::vector<Value> &values):
 }
 
 Op::Op(int id, Value::Type resultTy, const std::vector<Value> &values, const std::vector<Attr*> &attrs):
-  id(id), resultTy(resultTy) {
+  resultTy(resultTy), opid(id) {
   for (auto x : values) {
     operands.push_back(x);
     x.defining->uses.insert(this);
@@ -365,7 +365,7 @@ void BasicBlock::forceErase() {
   delete this;
 }
 
-std::vector<Op*> BasicBlock::getPhis() {
+std::vector<Op*> BasicBlock::getPhis() const {
   std::vector<Op*> phis;
   for (auto op : ops) {
     if (!isa<PhiOp>(op))
@@ -376,7 +376,7 @@ std::vector<Op*> BasicBlock::getPhis() {
   return phis;
 }
 
-bool BasicBlock::dominatedBy(BasicBlock *bb) {
+bool BasicBlock::dominatedBy(const BasicBlock *bb) const {
   for (auto p = this; p; p = p->idom) {
     if (p == bb)
       return true;

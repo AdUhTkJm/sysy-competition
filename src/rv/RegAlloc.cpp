@@ -17,8 +17,8 @@ public:
 
   SpilledRdAttr(bool fp, int offset): fp(fp), offset(offset) {}
 
-  std::string toString() { return "<rd-spilled = " + std::to_string(offset) + (fp ? "f" : "") + ">"; }
-  SpilledRdAttr *clone() { return new SpilledRdAttr(fp, offset); }
+  std::string toString() override { return "<rd-spilled = " + std::to_string(offset) + (fp ? "f" : "") + ">"; }
+  SpilledRdAttr *clone() override { return new SpilledRdAttr(fp, offset); }
 };
 
 class SpilledRsAttr : public AttrImpl<SpilledRsAttr, RVLINE + 2097152> {
@@ -28,8 +28,8 @@ public:
 
   SpilledRsAttr(bool fp, int offset): fp(fp), offset(offset) {}
 
-  std::string toString() { return "<rs-spilled = " + std::to_string(offset) + (fp ? "f" : "") + ">"; }
-  SpilledRsAttr *clone() { return new SpilledRsAttr(fp, offset); }
+  std::string toString() override { return "<rs-spilled = " + std::to_string(offset) + (fp ? "f" : "") + ">"; }
+  SpilledRsAttr *clone() override { return new SpilledRsAttr(fp, offset); }
 };
 
 class SpilledRs2Attr : public AttrImpl<SpilledRs2Attr, RVLINE + 2097152> {
@@ -39,8 +39,8 @@ public:
 
   SpilledRs2Attr(bool fp, int offset): fp(fp), offset(offset) {}
 
-  std::string toString() { return "<rs2-spilled = " + std::to_string(offset) + + (fp ? "f" : "") + ">"; }
-  SpilledRs2Attr *clone() { return new SpilledRs2Attr(fp, offset); }
+  std::string toString() override { return "<rs2-spilled = " + std::to_string(offset) + + (fp ? "f" : "") + ">"; }
+  SpilledRs2Attr *clone() override { return new SpilledRs2Attr(fp, offset); }
 };
 
 }

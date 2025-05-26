@@ -86,7 +86,7 @@ std::string freg(Reg reg) {
 }
 
 void Dump::dumpOp(Op *op, std::ostream &os) {
-  switch (op->getID()) {
+  switch (op->opid) {
   TERNARY_W(MlaOp, "mla");
   TERNARY_W(MsubWOp, "msub");
 

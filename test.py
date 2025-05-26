@@ -38,7 +38,11 @@ BUILD_DIR = Path("build")
 FINAL_BINARY = BUILD_DIR / "sysc"
 COMPILER = "clang++"
 AR = "ar"
-CFLAGS = ["-c", "-std=c++17", "-O2", "-g", "-Wall", "-Wno-sign-compare", "-Wno-parentheses"]
+CFLAGS = [
+  "-c", "-std=c++17", "-O2", "-g",
+  "-Wall", "-Wextra", "-Wuninitialized", "-Wstrict-aliasing",
+  "-Wno-sign-compare", "-Wno-parentheses"
+]
 LDFLAGS = []
 CACHE_FILE = BUILD_DIR / ".build_cache.pkl"
 INCLUDE_CACHE_FILE = BUILD_DIR / ".include_cache.pkl"

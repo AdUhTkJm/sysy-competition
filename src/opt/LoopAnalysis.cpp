@@ -191,3 +191,10 @@ void LoopAnalysis::run() {
   for (auto func : funcs)
     info[func] = runImpl(func->getRegion());
 }
+
+LoopAnalysis::~LoopAnalysis() {
+  for (const auto &[k, v] : info) {
+    for (auto loop : v.getLoops())
+      delete loop;
+  }
+}

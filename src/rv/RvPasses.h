@@ -16,9 +16,9 @@ class Lower : public Pass {
 public:
   Lower(ModuleOp *module): Pass(module) {}
   
-  std::string name() { return "rv-lower"; };
-  std::map<std::string, int> stats() { return {}; };
-  void run();
+  std::string name() override { return "rv-lower"; };
+  std::map<std::string, int> stats() override { return {}; };
+  void run() override;
 };
 
 class StrengthReduct : public Pass {
@@ -28,9 +28,9 @@ class StrengthReduct : public Pass {
 public:
   StrengthReduct(ModuleOp *module): Pass(module) {}
     
-  std::string name() { return "strength-reduction"; };
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "strength-reduction"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 class InstCombine : public Pass {
@@ -38,9 +38,9 @@ class InstCombine : public Pass {
 public:
   InstCombine(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "rv-inst-combine"; };
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "rv-inst-combine"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 // The only difference with opt/DCE is that `isImpure` behaves differently.
@@ -54,9 +54,9 @@ class RvDCE : public Pass {
 public:
   RvDCE(ModuleOp *module): Pass(module) {}
     
-  std::string name() { return "rv-dce"; };
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "rv-dce"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 class RegAlloc : public Pass {
@@ -74,9 +74,9 @@ class RegAlloc : public Pass {
 public:
   RegAlloc(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "rv-regalloc"; };
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "rv-regalloc"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 // Dumps the output.
@@ -87,9 +87,9 @@ class Dump : public Pass {
 public:
   Dump(ModuleOp *module, const std::string &out): Pass(module), out(out) {}
 
-  std::string name() { return "rv-dump"; };
-  std::map<std::string, int> stats() { return {}; }
-  void run();
+  std::string name() override { return "rv-dump"; };
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
 };
 
 }

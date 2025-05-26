@@ -103,8 +103,8 @@ public:
 
   RegAttr(Reg reg): reg(reg) {}
 
-  std::string toString() { return "<reg = " + showReg(reg) + ">"; }
-  RegAttr *clone() { return new RegAttr(reg); }
+  std::string toString() override { return "<reg = " + showReg(reg) + ">"; }
+  RegAttr *clone() override { return new RegAttr(reg); }
 };
 
 class RdAttr : public AttrImpl<RegAttr, RVLINE> {
@@ -113,8 +113,8 @@ public:
 
   RdAttr(Reg reg): reg(reg) {}
 
-  std::string toString() { return "<rd = " + showReg(reg) + ">"; }
-  RdAttr *clone() { return new RdAttr(reg); }
+  std::string toString() override { return "<rd = " + showReg(reg) + ">"; }
+  RdAttr *clone() override { return new RdAttr(reg); }
 };
 
 class RsAttr : public AttrImpl<RegAttr, RVLINE> {
@@ -123,8 +123,8 @@ public:
 
   RsAttr(Reg reg): reg(reg) {}
 
-  std::string toString() { return "<rs = " + showReg(reg) + ">"; }
-  RsAttr *clone() { return new RsAttr(reg); }
+  std::string toString() override { return "<rs = " + showReg(reg) + ">"; }
+  RsAttr *clone() override { return new RsAttr(reg); }
 };
 
 class Rs2Attr : public AttrImpl<RegAttr, RVLINE> {
@@ -133,8 +133,8 @@ public:
 
   Rs2Attr(Reg reg): reg(reg) {}
 
-  std::string toString() { return "<rs2 = " + showReg(reg) + ">"; }
-  Rs2Attr *clone() { return new Rs2Attr(reg); }
+  std::string toString() override { return "<rs2 = " + showReg(reg) + ">"; }
+  Rs2Attr *clone() override { return new Rs2Attr(reg); }
 };
 
 // Stack offset from bp.
@@ -144,8 +144,8 @@ public:
 
   StackOffsetAttr(int offset): offset(offset) {}
 
-  std::string toString() { return "<offset = " + std::to_string(offset) + ">"; }
-  StackOffsetAttr *clone() { return new StackOffsetAttr(offset); }
+  std::string toString() override { return "<offset = " + std::to_string(offset) + ">"; }
+  StackOffsetAttr *clone() override { return new StackOffsetAttr(offset); }
 };
 
 }

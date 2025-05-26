@@ -14,8 +14,8 @@ public:
 
   NameAttr(std::string name): name(name) {}
 
-  std::string toString() { return "<name = " + name + ">"; }
-  NameAttr *clone() { return new NameAttr(name); }
+  std::string toString() override { return "<name = " + name + ">"; }
+  NameAttr *clone() override { return new NameAttr(name); }
 };
 
 class IntAttr : public AttrImpl<IntAttr, __LINE__> {
@@ -24,8 +24,8 @@ public:
 
   IntAttr(int value): value(value) {}
 
-  std::string toString() { return "<" + std::to_string(value) + ">"; }
-  IntAttr *clone() { return new IntAttr(value); }
+  std::string toString() override { return "<" + std::to_string(value) + ">"; }
+  IntAttr *clone() override { return new IntAttr(value); }
 };
 
 class FloatAttr : public AttrImpl<FloatAttr, __LINE__> {
@@ -34,8 +34,8 @@ public:
 
   FloatAttr(float value): value(value) {}
 
-  std::string toString() { return "<" + std::to_string(value) + "f>"; }
-  FloatAttr *clone() { return new FloatAttr(value); }
+  std::string toString() override { return "<" + std::to_string(value) + "f>"; }
+  FloatAttr *clone() override { return new FloatAttr(value); }
 };
 
 class SizeAttr : public AttrImpl<SizeAttr, __LINE__> {
@@ -44,8 +44,8 @@ public:
 
   SizeAttr(size_t value): value(value) {}
 
-  std::string toString() { return "<size = " + std::to_string(value) + ">"; }
-  SizeAttr *clone() { return new SizeAttr(value); }
+  std::string toString() override { return "<size = " + std::to_string(value) + ">"; }
+  SizeAttr *clone() override { return new SizeAttr(value); }
 };
 
 // A map for printing purposes.
@@ -59,8 +59,8 @@ public:
 
   TargetAttr(BasicBlock *bb): bb(bb) {}
 
-  std::string toString();
-  TargetAttr *clone() { return new TargetAttr(bb); }
+  std::string toString() override;
+  TargetAttr *clone() override { return new TargetAttr(bb); }
 };
 
 // The target for BranchOp if the condition is false.
@@ -70,8 +70,8 @@ public:
 
   ElseAttr(BasicBlock *bb): bb(bb) {}
 
-  std::string toString();
-  ElseAttr *clone() { return new ElseAttr(bb); }
+  std::string toString() override;
+  ElseAttr *clone() override { return new ElseAttr(bb); }
 };
 
 class FromAttr : public AttrImpl<FromAttr, __LINE__> {
@@ -80,8 +80,8 @@ public:
 
   FromAttr(BasicBlock *bb): bb(bb) {}
 
-  std::string toString();
-  FromAttr *clone() { return new FromAttr(bb); }
+  std::string toString() override;
+  FromAttr *clone() override { return new FromAttr(bb); }
 };
 
 class IntArrayAttr : public AttrImpl<IntArrayAttr, __LINE__> {
@@ -94,8 +94,8 @@ public:
 
   IntArrayAttr(int *vi, int size);
 
-  std::string toString();
-  IntArrayAttr *clone() { return new IntArrayAttr(vi, size); }
+  std::string toString() override;
+  IntArrayAttr *clone() override { return new IntArrayAttr(vi, size); }
 };
 
 class FloatArrayAttr : public AttrImpl<FloatArrayAttr, __LINE__> {
@@ -108,20 +108,20 @@ public:
 
   FloatArrayAttr(float *vf, int size);
 
-  std::string toString();
-  FloatArrayAttr *clone() { return new FloatArrayAttr(vf, size); }
+  std::string toString() override;
+  FloatArrayAttr *clone() override { return new FloatArrayAttr(vf, size); }
 };
 
 class ImpureAttr : public AttrImpl<ImpureAttr, __LINE__> {
 public:
-  std::string toString() { return "<impure>"; }
-  ImpureAttr *clone() { return new ImpureAttr; }
+  std::string toString() override { return "<impure>"; }
+  ImpureAttr *clone() override { return new ImpureAttr; }
 };
 
 class AtMostOnceAttr : public AttrImpl<AtMostOnceAttr, __LINE__> {
 public:
-  std::string toString() { return "<once>"; }
-  AtMostOnceAttr *clone() { return new AtMostOnceAttr; }
+  std::string toString() override { return "<once>"; }
+  AtMostOnceAttr *clone() override { return new AtMostOnceAttr; }
 };
 
 class ArgCountAttr : public AttrImpl<ArgCountAttr, __LINE__> {
@@ -130,8 +130,8 @@ public:
 
   ArgCountAttr(int count): count(count) {}
 
-  std::string toString() { return "<count = " + std::to_string(count) + ">"; }
-  ArgCountAttr *clone() { return new ArgCountAttr(count); }
+  std::string toString() override { return "<count = " + std::to_string(count) + ">"; }
+  ArgCountAttr *clone() override { return new ArgCountAttr(count); }
 };
 
 class CallerAttr : public AttrImpl<CallerAttr, __LINE__> {
@@ -145,8 +145,8 @@ public:
   CallerAttr(const std::vector<std::string> &callers): callers(callers) {}
   CallerAttr() {}
 
-  std::string toString();
-  CallerAttr *clone() { return new CallerAttr(callers); }
+  std::string toString() override;
+  CallerAttr *clone() override { return new CallerAttr(callers); }
 };
 
 class AliasAttr : public AttrImpl<AliasAttr, __LINE__> {
@@ -178,8 +178,8 @@ public:
   bool mustAlias(const AliasAttr *other) const;
   bool neverAlias(const AliasAttr *other) const;
   bool mayAlias(const AliasAttr *other) const;
-  std::string toString();
-  AliasAttr *clone() { return unknown ? new AliasAttr() : new AliasAttr(location); }
+  std::string toString() override;
+  AliasAttr *clone() override { return unknown ? new AliasAttr() : new AliasAttr(location); }
 };
 
 class RangeAttr : public AttrImpl<RangeAttr, __LINE__> {
@@ -193,8 +193,8 @@ public:
   RangeAttr(int low, int high): range({ low, high }) {}
   RangeAttr(std::pair<int, int> range): range(range) {}
 
-  std::string toString();
-  RangeAttr *clone() { return new RangeAttr(range); }
+  std::string toString() override;
+  RangeAttr *clone() override { return new RangeAttr(range); }
 };
 
 // Marks whether an alloca is floating point.
@@ -203,8 +203,8 @@ class FPAttr : public AttrImpl<FPAttr, __LINE__> {
 public:
   FPAttr() {}
 
-  std::string toString() { return "<fp>"; }
-  FPAttr *clone() { return new FPAttr; }
+  std::string toString() override { return "<fp>"; }
+  FPAttr *clone() override { return new FPAttr; }
 };
 
 // Checks whether the value is loop-invariant.
@@ -213,16 +213,16 @@ class VariantAttr : public AttrImpl<VariantAttr, __LINE__> {
 public:
   VariantAttr() {}
 
-  std::string toString() { return "<variant>"; }
-  VariantAttr *clone() { return new VariantAttr; }
+  std::string toString() override { return "<variant>"; }
+  VariantAttr *clone() override { return new VariantAttr; }
 };
 
 class PositiveAttr : public AttrImpl<PositiveAttr, __LINE__> {
 public:
   PositiveAttr() {}
 
-  std::string toString() { return "<+>"; }
-  PositiveAttr *clone() { return new PositiveAttr; }
+  std::string toString() override { return "<+>"; }
+  PositiveAttr *clone() override { return new PositiveAttr; }
 };
 
 class IncreaseAttr : public AttrImpl<IncreaseAttr, __LINE__> {
@@ -244,8 +244,8 @@ public:
   bool isConstant() const { return amt.size() == 1; }
   int getValue() const { return amt[0]; }
 
-  std::string toString();
-  IncreaseAttr *clone() { return new IncreaseAttr(amt, mod); }
+  std::string toString() override;
+  IncreaseAttr *clone() override { return new IncreaseAttr(amt, mod); }
 };
 
 

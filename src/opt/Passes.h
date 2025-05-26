@@ -29,9 +29,9 @@ class Mem2Reg : public Pass {
 public:
   Mem2Reg(ModuleOp *module): Pass(module) {}
     
-  std::string name() { return "mem2reg"; };
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "mem2reg"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 // Global value numbering.
@@ -80,9 +80,9 @@ class GVN : public Pass {
 public:
   GVN(ModuleOp *module): Pass(module) {}
     
-  std::string name() { return "gvn"; };
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "gvn"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
   void runImpl(Region *region);
 };
 
@@ -95,9 +95,9 @@ class Inline : public Pass {
 public:
   Inline(ModuleOp *module, int threshold): Pass(module), threshold(threshold) {}
     
-  std::string name() { return "inline"; };
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "inline"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 // Globalizes local arrays.
@@ -106,9 +106,9 @@ class Globalize : public Pass {
 public:
   Globalize(ModuleOp *module): Pass(module) {}
     
-  std::string name() { return "globalize"; };
-  std::map<std::string, int> stats() { return {}; }
-  void run();
+  std::string name() override { return "globalize"; };
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
 };
 
 // Global code motion.
@@ -136,9 +136,9 @@ class GCM : public Pass {
 public:
   GCM(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "gcm"; };
-  std::map<std::string, int> stats() { return {}; }
-  void run();
+  std::string name() override { return "gcm"; };
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
 };
 
 // Folds a wide range of expressions.
@@ -149,9 +149,9 @@ class RegularFold : public Pass {
 public:
   RegularFold(ModuleOp *module): Pass(module) {}
     
-  std::string name() { return "regular-fold"; };
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "regular-fold"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 class LateInline : public Pass {
@@ -160,9 +160,9 @@ class LateInline : public Pass {
 public:
   LateInline(ModuleOp *module, int threshold): Pass(module), threshold(threshold) {}
     
-  std::string name() { return "late-inline"; };
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "late-inline"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 class HoistConstArray : public Pass {
@@ -172,18 +172,18 @@ class HoistConstArray : public Pass {
 public:
   HoistConstArray(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "hoist-const-array"; }
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "hoist-const-array"; }
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 class Verify : public Pass {
 public:
   Verify(ModuleOp *module): Pass(module) {}
     
-  std::string name() { return "verify"; };
-  std::map<std::string, int> stats() { return {}; }
-  void run();
+  std::string name() override { return "verify"; };
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
 };
 
 }

@@ -12,9 +12,9 @@ class MoveAlloca : public Pass {
 public:
   MoveAlloca(ModuleOp *module): Pass(module) {}
     
-  std::string name() { return "move-alloca"; };
-  std::map<std::string, int> stats() { return {}; };
-  void run();
+  std::string name() override { return "move-alloca"; };
+  std::map<std::string, int> stats() override { return {}; };
+  void run() override;
 };
 
 // Dead code elimination. Deals with functions, basic blocks and variables.
@@ -35,9 +35,9 @@ public:
   // since the blocks aren't actually well-formed.
   DCE(ModuleOp *module, bool elimBlocks = true): Pass(module), elimBlocks(elimBlocks) {}
     
-  std::string name() { return "dce"; };
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "dce"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 // Assume every operation is dead unless proved otherwise.
@@ -48,9 +48,9 @@ class AggressiveDCE : public Pass {
 public:
   AggressiveDCE(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "aggressive-dce"; };
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "aggressive-dce"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 // Dead (actually, redundant) load elimination.
@@ -61,9 +61,9 @@ class DLE : public Pass {
 public:
   DLE(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "dle"; }
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "dle"; }
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 // Dead argument elimination.
@@ -75,9 +75,9 @@ class DAE : public Pass {
 public:
   DAE(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "dae"; }
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "dae"; }
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 // Dead store elimination.
@@ -91,9 +91,9 @@ class DSE : public Pass {
 public:
   DSE(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "dse"; };
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "dse"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 class SimplifyCFG : public Pass {
@@ -103,9 +103,9 @@ class SimplifyCFG : public Pass {
 public:
   SimplifyCFG(ModuleOp *module): Pass(module) {}
 
-  std::string name() { return "simplify-cfg"; };
-  std::map<std::string, int> stats();
-  void run();
+  std::string name() override { return "simplify-cfg"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
 };
 
 }

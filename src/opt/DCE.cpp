@@ -202,6 +202,11 @@ void DCE::run() {
             phi->pushOperand(ops[i]);
             phi->add<FromAttr>(from);
           }
+
+          // The added attributes are also copies.
+          // No need to preserve the ones in this vector.
+          for (auto attr : attrs)
+            delete attr;
         }
       }
 

@@ -121,32 +121,32 @@ public:
     parent(parent), place(place) {}
 
   auto &getOps() { return ops; }
-  Op *getFirstOp() { return *ops.begin(); }
-  Op *getLastOp() { return *--ops.end(); }
+  Op *getFirstOp() const { return *ops.begin(); }
+  Op *getLastOp() const { return *--ops.end(); }
 
   iterator begin() { return ops.begin(); }
   iterator end() { return ops.end(); }
 
-  Region *getParent() { return parent; }
+  Region *getParent() const { return parent; }
 
-  const auto &getPreds() { return preds; }
-  const auto &getSuccs() { return succs; }
-  const auto &getDominanceFrontier() { return domFront; }
-  const auto &getPDoms() { return postdoms; }
-  const auto &getPDomFrontier() { return postdomFront; }
-  const auto &getLiveIn() { return liveIn; }
-  const auto &getLiveOut() { return liveOut; }
+  const auto &getPreds() const { return preds; }
+  const auto &getSuccs() const { return succs; }
+  const auto &getDominanceFrontier() const { return domFront; }
+  const auto &getPDoms() const { return postdoms; }
+  const auto &getPDomFrontier() const { return postdomFront; }
+  const auto &getLiveIn() const { return liveIn; }
+  const auto &getLiveOut() const { return liveOut; }
 
-  std::vector<Op*> getPhis();
+  std::vector<Op*> getPhis() const;
   
-  BasicBlock *getIdom() { return idom; }
-  BasicBlock *getIPdom() { return ipdom; }
-  BasicBlock *nextBlock();
+  BasicBlock *getIdom() const { return idom; }
+  BasicBlock *getIPdom() const { return ipdom; }
+  BasicBlock *nextBlock() const;
 
-  bool dominatedBy(BasicBlock *bb);
-  bool dominates(BasicBlock *bb) { return bb->dominatedBy(this); }
-  bool postDominatedBy(BasicBlock *bb) { return postdoms.count(bb); }
-  bool postDominates(BasicBlock *bb) { return bb->postdoms.count(this); }
+  bool dominatedBy(const BasicBlock *bb) const;
+  bool dominates(const BasicBlock *bb) const { return bb->dominatedBy(this); }
+  bool postDominatedBy(const BasicBlock *bb) const { return postdoms.count(const_cast<BasicBlock*>(bb)); }
+  bool postDominates(const BasicBlock *bb) const { return bb->postdoms.count(const_cast<BasicBlock*>(bb)); }
 
   // Inserts before `at`.
   void insert(iterator at, Op *op);
@@ -172,14 +172,13 @@ public:
 };
 
 class Attr {
-  const int id;
   int refcnt = 0;
 
   friend class Op;
   friend class Builder;
 public:
-  int getID() const { return id; }
-  Attr(int id): id(id) {}
+  const int attrid;
+  Attr(int id): attrid(id) {}
   
   virtual ~Attr() {}
   virtual std::string toString() = 0;
@@ -188,8 +187,6 @@ public:
 
 class Op {
 protected:
-  const int id;
-
   std::set<Op*> uses;
   std::vector<Value> operands;
   std::vector<Region*> regions;
@@ -208,7 +205,8 @@ protected:
 
   static std::vector<Op*> toDelete;
 public:
-  int getID() const { return id; }
+  const int opid;
+
   const std::string &getName() { return opname; }
   BasicBlock *getParent() { return parent; }
   Op *getParentOp();
@@ -291,7 +289,8 @@ public:
   void remove() {
     for (auto it = attrs.begin(); it != attrs.end(); it++)
       if (isa<T>(*it)) {
-        (*it)->refcnt--;
+        if (!--(*it)->refcnt)
+          delete *it;
         attrs.erase(it);
         return;
       }
@@ -341,7 +340,7 @@ public:
   constexpr static int id = OpID;
   
   static bool classof(Op *op) {
-    return op->getID() == OpID;
+    return op->opid == OpID;
   }
 
   OpImpl(Value::Type resultTy, const std::vector<Value> &values): Op(OpID, resultTy, values) {}
@@ -353,7 +352,7 @@ template<class T, int AttrID>
 class AttrImpl : public Attr {
 public:
   static bool classof(Attr *attr) {
-    return attr->getID() == AttrID;
+    return attr->attrid == AttrID;
   }
 
   AttrImpl(): Attr(AttrID) {}

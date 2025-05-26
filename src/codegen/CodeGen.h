@@ -12,6 +12,7 @@ namespace sys {
 class Builder {
   BasicBlock *bb;
   BasicBlock::iterator at;
+  bool init = false;
 public:
   // Guards insertion point.
   struct Guard {
@@ -33,6 +34,7 @@ public:
   // We use 8 overloads because literal { ... } can't be deduced.
   template<class T>
   T *create(const std::vector<Value> &v) {
+    assert(init);
     auto op = new T(v);
     bb->insert(at, op);
     return op;
@@ -40,6 +42,7 @@ public:
 
   template<class T>
   T *create() {
+    assert(init);
     auto op = new T();
     bb->insert(at, op);
     return op;
@@ -47,6 +50,7 @@ public:
 
   template<class T>
   T *create(const std::vector<Attr*> &v) {
+    assert(init);
     auto op = new T(v);
     bb->insert(at, op);
     return op;
@@ -54,6 +58,7 @@ public:
 
   template<class T>
   T *create(const std::vector<Value> &v, const std::vector<Attr*> &v2) {
+    assert(init);
     auto op = new T(v, v2);
     bb->insert(at, op);
     return op;
@@ -61,6 +66,7 @@ public:
 
   template<class T>
   T *create(Value::Type resultTy, const std::vector<Value> &v) {
+    assert(init);
     auto op = new T(resultTy, v);
     bb->insert(at, op);
     return op;
@@ -68,6 +74,7 @@ public:
 
   template<class T>
   T *create(Value::Type resultTy) {
+    assert(init);
     auto op = new T(resultTy);
     bb->insert(at, op);
     return op;
@@ -75,6 +82,7 @@ public:
 
   template<class T>
   T *create(Value::Type resultTy, const std::vector<Attr*> &v) {
+    assert(init);
     auto op = new T(resultTy, v);
     bb->insert(at, op);
     return op;
@@ -82,6 +90,7 @@ public:
 
   template<class T>
   T *create(Value::Type resultTy, const std::vector<Value> &v, const std::vector<Attr*> &v2) {
+    assert(init);
     auto op = new T(resultTy, v, v2);
     bb->insert(at, op);
     return op;
@@ -190,6 +199,7 @@ public:
   };
 
   CodeGen(ASTNode *node);
+  CodeGen(const CodeGen &other) = delete;
 
   ModuleOp *getModule() { return module; }
 };
