@@ -144,8 +144,10 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
   
   expanded += produced.size();
   
-  for (auto child : domtree[bb])
-    rewrite(child, info);
+  for (auto child : domtree[bb]) {
+    if (info->contains(child))
+      rewrite(child, info);
+  }
 }
 
 void SCEV::runImpl(LoopInfo *info) {
@@ -163,6 +165,8 @@ void SCEV::runImpl(LoopInfo *info) {
 
   auto phis = header->getPhis();
   auto preheader = info->getPreheader();
+  if (!preheader)
+    return;
 
   // Inspect phis to find the amount by which something increases.
   start.clear();
