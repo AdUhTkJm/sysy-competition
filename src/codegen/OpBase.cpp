@@ -265,6 +265,8 @@ Op *Op::getPhiFrom(Op *phi, BasicBlock *bb) {
     if (FROM(attrs[i]) == bb)
       return phi->DEF(i);
   }
+
+  std::cerr << "no operand from " << bbmap[bb] << ": " << phi;
   assert(false);
 }
 

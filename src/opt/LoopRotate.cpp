@@ -21,7 +21,7 @@ void LoopRotate::runImpl(LoopInfo *info) {
   if (info->getExits().size() != 1)
     return;
 
-  auto exit = *info->getExits().begin();
+  auto exit = info->getExit();
 
   auto induction = info->getInduction();
   auto header = info->getHeader();

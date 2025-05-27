@@ -94,7 +94,6 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
   // We don't want to assign a phi to each of them.
   // We use a threshold to guard against this.
   if (candidates.size() >= 6) {
-    std::cerr << module << candidates.size();
     for (auto op : candidates)
       nochange.insert(op);
     candidates.clear();
@@ -178,6 +177,7 @@ void SCEV::runImpl(LoopInfo *info) {
   // Check rotated loops.
   if (!isa<BranchOp>(latch->getLastOp()))
     return;
+  
 
   auto phis = header->getPhis();
   auto preheader = info->getPreheader();
@@ -185,6 +185,11 @@ void SCEV::runImpl(LoopInfo *info) {
     return;
 
   if (info->getExits().size() != 1)
+    return;
+
+  // Latch and header must point to the same block.
+  // (See h_functional/09_BFS for a situation where this isn't true.)
+  if (!ordinary(info))
     return;
 
   // Inspect phis to find the amount by which something increases.
@@ -243,7 +248,7 @@ void SCEV::runImpl(LoopInfo *info) {
   // Transform `addi` to `addl` and factor out the modulus.
   // This won't overflow because i32*i32 <= i64.
   Builder builder;
-  auto exit = *info->getExits().begin();
+  auto exit = info->getExit();
   auto insert = nonphi(exit);
   
   std::unordered_map<Op*, Op*> exitlatch;

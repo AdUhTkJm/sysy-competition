@@ -16,7 +16,7 @@ BasicBlock *ConstLoopUnroll::copyLoop(LoopInfo *loop, BasicBlock *bb, int unroll
   BasicBlock *latch = loop->getLatch();
   BasicBlock *lastLatch = loop->getLatch();
   BasicBlock *header = loop->getHeader();
-  BasicBlock *exit = *loop->getExits().begin();
+  BasicBlock *exit = loop->getExit();
   BasicBlock *latchRewire = nullptr;
   auto region = lastLatch->getParent();
 
@@ -166,7 +166,7 @@ bool ConstLoopUnroll::runImpl(LoopInfo *loop) {
   if (!loop->getInduction())
     return false;
 
-  if (loop->getExits().size() > 1)
+  if (loop->getExits().size() != 1)
     return false;
 
   auto header = loop->getHeader();
@@ -176,10 +176,15 @@ bool ConstLoopUnroll::runImpl(LoopInfo *loop) {
   if (!isa<BranchOp>(latch->getLastOp()))
     return false;
 
-  auto exit = *loop->getExits().begin();
+  auto exit = loop->getExit();
   // We don't want an internal `break` to interfere.
   // It should come from either preheader or latch.
   if (exit->preds.size() > 2)
+    return false;
+
+  // Header and latch point to different places.
+  // Don't unroll it.
+  if (!ordinary(loop))
     return false;
 
   int loopsize = 0;

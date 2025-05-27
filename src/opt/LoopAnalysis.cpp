@@ -198,3 +198,18 @@ LoopAnalysis::~LoopAnalysis() {
       delete loop;
   }
 }
+
+bool sys::ordinary(LoopInfo *info) {
+  if (info->getLatches().size() != 1 || info->getExits().size() != 1)
+    return false;
+  
+  auto header = info->getHeader();
+  auto latch = info->getLatch();
+
+  auto termlatch = latch->getLastOp();
+  auto termheader = header->getLastOp();
+  auto exit = info->getExit();
+  auto latcht = TARGET(termlatch) == exit ? ELSE(termlatch) : TARGET(termlatch);
+  auto headert = TARGET(termheader) == exit ? ELSE(termheader) : TARGET(termheader);
+  return latcht == headert;
+}

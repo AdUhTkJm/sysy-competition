@@ -45,6 +45,7 @@ public:
   auto getHeader() const { return header; }
   auto getParent() const { return parent; }
   auto getLatch() const { assert(latches.size() == 1); return *latches.begin(); }
+  auto getExit() const { assert(exits.size() == 1); return *exits.begin(); }
   auto getInduction() const { return induction; }
   auto getStart() const { return start; }
   auto getStop() const { return stop; }
@@ -186,6 +187,9 @@ public:
   std::map<std::string, int> stats() override;
   void run() override;
 };
+
+// Checks whether header and latch points to the same exit.
+bool ordinary(LoopInfo *info);
 
 }
 
