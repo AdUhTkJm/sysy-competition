@@ -5,7 +5,7 @@
 
 using namespace sys;
 
-void handleIf(IfOp *x) {
+static void handleIf(Op *x) {
   Builder builder;
 
   auto bb = x->getParent();
@@ -59,7 +59,7 @@ void handleIf(IfOp *x) {
   x->erase();
 }
 
-void handleWhile(WhileOp *x) {
+static void handleWhile(Op *x) {
   Builder builder;
 
   auto bb = x->getParent();

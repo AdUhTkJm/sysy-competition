@@ -39,7 +39,7 @@ protected:
       auto ts = op->findAll<T>();
       success = false;
       for (auto t : ts)
-        success |= rewriter(t);
+        success |= rewriter(cast<T>(t));
     } while (success);
   }
 
@@ -56,6 +56,9 @@ protected:
   std::map<std::string, FuncOp*> getFunctionMap();
   std::map<std::string, GlobalOp*> getGlobalMap();
   DomTree getDomTree(Region *region);
+
+  // Find the first op that isn't an AllocaOp.
+  Op *nonalloca(Region *region);
 public:
   Pass(ModuleOp *module): module(module) {}
   void cleanup();

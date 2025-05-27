@@ -44,7 +44,7 @@ int EarlyConstFold::foldImpl() {
   int folded = fold.stats()["folded-ops"];
 
   bool changed;
-  std::vector<IfOp*> ifs;
+  std::vector<Op*> ifs;
   do {
     changed = false;
     ifs = module->findAll<IfOp>();

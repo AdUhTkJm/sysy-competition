@@ -98,3 +98,16 @@ void Pass::cleanup() {
     return false;
   });
 }
+
+Op *Pass::nonalloca(Region *region) {
+  auto entry = region->getFirstBlock();
+  Op *nonalloca = entry->getFirstOp();
+  while (!nonalloca->atBack()) {
+    if (isa<AllocaOp>(nonalloca))
+      nonalloca = nonalloca->nextOp();
+    else break;
+  }
+  if (nonalloca->atBack())
+    nonalloca = entry->nextBlock()->getFirstOp();
+  return nonalloca;
+}

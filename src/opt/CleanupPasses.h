@@ -7,16 +7,6 @@
 
 namespace sys {
 
-// Moves all alloca to the beginning.
-class MoveAlloca : public Pass {
-public:
-  MoveAlloca(ModuleOp *module): Pass(module) {}
-    
-  std::string name() override { return "move-alloca"; };
-  std::map<std::string, int> stats() override { return {}; };
-  void run() override;
-};
-
 // Dead code elimination. Deals with functions, basic blocks and variables.
 class DCE : public Pass {
   std::vector<Op*> removeable;

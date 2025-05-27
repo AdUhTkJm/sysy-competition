@@ -30,7 +30,7 @@ void AtMostOnce::run() {
 
     auto calls = caller->findAll<CallOp>();
     bool good = true;
-    CallOp *call = nullptr;
+    Op *call = nullptr;
 
     // First, make sure there's only one call that calls the function.
     for (auto op : calls) {

@@ -10,7 +10,7 @@ std::map<std::string, int> HoistConstArray::stats() {
 }
 
 // Warning: buggy. "all values are constants" part hasn't been implemented.
-void HoistConstArray::attemptHoist(AllocaOp *op) {
+void HoistConstArray::attemptHoist(Op *op) {
   // A alloca is deemed constant if we statically know that all its elements are stored to, 
   // and are stored to only once, and all values are constants.
   // (That's too restrictive; perhaps this won't be much gain?)

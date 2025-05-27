@@ -78,6 +78,7 @@ OPE(LoadOp);
 OP(ReturnOp);
 OP(IfOp);
 OP(WhileOp);
+OP(ForOp);
 OP(ProceedOp);
 OP(GotoOp);   // Jumps unconditionally.
 OP(BranchOp); // Branches according to the only operand.

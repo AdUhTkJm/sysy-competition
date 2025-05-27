@@ -236,6 +236,7 @@ bool Rule::matchExpr(Expr *expr, Op* op) {
   MATCH_BINARY("fsub", SubFOp);
   MATCH_BINARY("fmul", MulFOp);
   MATCH_BINARY("fdiv", DivFOp);
+  MATCH_BINARY("store", StoreOp);
 
   MATCH_UNARY("not", NotOp);
   MATCH_UNARY("snz", SetNotZeroOp);
@@ -244,6 +245,7 @@ bool Rule::matchExpr(Expr *expr, Op* op) {
   MATCH_UNARY("br", BranchOp);
   MATCH_UNARY("f2i", F2IOp);
   MATCH_UNARY("i2f", I2FOp);
+  MATCH_UNARY("load", LoadOp);
 
   return false;
 }

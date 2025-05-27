@@ -150,6 +150,7 @@ public:
   void insertAfter(iterator at, Op *op);
   void remove(iterator at);
 
+  // Moves to end by default.
   void moveAllOpsTo(BasicBlock *bb);
 
   // Moves every op after `op` to `dest`, including `op`.
@@ -216,6 +217,7 @@ public:
   const auto &getAttrs() const { return attrs; }
 
   int getOperandCount() const { return operands.size(); }
+  int getRegionCount() const { return regions.size(); }
 
   Region *getRegion(int i = 0) { return regions[i]; }
   Value getOperand(int i = 0) { return operands[i]; }
@@ -251,6 +253,10 @@ public:
   void moveAfter(Op *op);
   void moveToEnd(BasicBlock *block);
   void moveToStart(BasicBlock *block);
+
+  bool inside(Op *op);
+  bool atFront() { return this == parent->getFirstOp(); }
+  bool atBack() { return this == parent->getLastOp(); }
 
   // erase() will delay its deletion.
   // This function must be called to actually call `operator delete`.
@@ -302,10 +308,10 @@ public:
   }
 
   template<class T>
-  std::vector<T*> findAll() {
-    std::vector<T*> result;
+  std::vector<Op*> findAll() {
+    std::vector<Op*> result;
     if (isa<T>(this))
-      result.push_back(cast<T>(this));
+      result.push_back(this);
 
     for (auto region : getRegions())
       for (auto bb : region->getBlocks())

@@ -85,7 +85,7 @@ int RegAlloc::latePeephole(Op *funcOp) {
   });
 
   bool changed;
-  std::vector<StoreOp*> stores;
+  std::vector<Op*> stores;
   do {
     changed = false;
     // This modifies the content of stores, so cannot run in a rewriter.

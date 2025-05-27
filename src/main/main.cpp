@@ -12,6 +12,7 @@
 #include "../opt/LowerPasses.h"
 #include "../opt/Analysis.h"
 #include "../pre-opt/PrePasses.h"
+#include "../pre-opt/PreLoopPasses.h"
 #include "../arm/ArmPasses.h"
 #include "../rv/RvPasses.h"
 
@@ -50,6 +51,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::Pureness>();
   pm.addPass<sys::EarlyConstFold>(/*beforePureness=*/ false);
   pm.addPass<sys::TCO>();
+  pm.addPass<sys::Remerge>();
   pm.addPass<sys::DCE>(/*elimBlocks=*/ false);
 
   // ===== Flattened CFG =====
@@ -133,10 +135,12 @@ int main(int argc, char **argv) {
 
   sys::CodeGen cg(node);
   delete node;
-  if (opts.dumpMidIR)
-    cg.getModule()->dump(std::cerr);
 
-  sys::PassManager pm(cg.getModule(), opts);
+  sys::ModuleOp *module = cg.getModule();
+  if (opts.dumpMidIR)
+    std::cerr << module;
+
+  sys::PassManager pm(module, opts);
   
   initPipeline(pm);
   

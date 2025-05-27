@@ -21,7 +21,8 @@ class Mem2Reg : public Pass {
   void runImpl(FuncOp *func);
   void fillPhi(BasicBlock *bb, SymbolTable symbols);
   
-  std::map<PhiOp*, AllocaOp*> phiFrom;
+  // Maps phi to alloca.
+  std::map<Op*, Op*> phiFrom;
   std::set<BasicBlock*> visited;
   // Allocas we're going to convert in the pass.
   std::set<Op*> converted;
@@ -168,7 +169,7 @@ public:
 class HoistConstArray : public Pass {
   int hoisted = 0;
   
-  void attemptHoist(AllocaOp *op);
+  void attemptHoist(Op *op);
 public:
   HoistConstArray(ModuleOp *module): Pass(module) {}
 

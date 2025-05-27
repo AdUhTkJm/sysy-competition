@@ -304,6 +304,14 @@ void Op::dump(std::ostream &os, int depth) {
   os << "\n";
 }
 
+bool Op::inside(Op *op) {
+  for (Op *runner = this; !isa<ModuleOp>(runner); runner = runner->getParentOp()) {
+    if (op == runner)
+      return true;
+  }
+  return false;
+}
+
 void BasicBlock::moveAllOpsTo(BasicBlock *bb) {
   for (auto it = begin(); it != end(); ) {
     auto advanced = it; ++advanced;

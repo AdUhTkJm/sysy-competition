@@ -172,7 +172,7 @@ void Dump::dump(std::ostream &os) {
 
   auto globals = module->findAll<GlobalOp>();
   // Arrays of all zeros should be put in .bss segment.
-  std::vector<GlobalOp*> bss;
+  std::vector<Op*> bss;
 
   if (!globals.empty())
     os << "\n.data\n";
