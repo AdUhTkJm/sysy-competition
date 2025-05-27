@@ -182,11 +182,6 @@ bool ConstLoopUnroll::runImpl(LoopInfo *loop) {
   if (exit->preds.size() > 2)
     return false;
 
-  // Header and latch point to different places.
-  // Don't unroll it.
-  if (!ordinary(loop))
-    return false;
-
   int loopsize = 0;
   for (auto bb : loop->getBlocks())
     loopsize += bb->getOps().size();

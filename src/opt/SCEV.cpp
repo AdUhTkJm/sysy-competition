@@ -1,4 +1,5 @@
 #include "LoopPasses.h"
+#include "CleanupPasses.h"
 #include "../utils/Matcher.h"
 
 using namespace sys;
@@ -10,6 +11,7 @@ std::map<std::string, int> SCEV::stats() {
 }
 
 static Rule constIncr("(add x 'a)");
+static Rule constIncrL("(addl x 'a)");
 static Rule modIncr("(mod (add x y) 'a)");
 
 void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
@@ -18,6 +20,9 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
   auto latch = info->getLatch();
 
   for (auto op : bb->getOps()) {
+    if (op->has<IncreaseAttr>())
+      continue;
+
     if (isa<AddIOp>(op) || isa<AddLOp>(op)) {
       auto x = op->DEF(0);
       auto y = op->DEF(1);
@@ -46,6 +51,24 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
         for (int i = 0; i < amt2.size(); i++)
           amt[i] += amt2[i];
         op->add<IncreaseAttr>(amt);
+        continue;
+      }
+    }
+
+    if (isa<SubIOp>(op)) {
+      auto x = op->DEF(0);
+      auto y = op->DEF(1);
+      if (!x->has<IncreaseAttr>()) {
+        if (y->has<IncreaseAttr>())
+          std::swap(x, y);
+        else
+          continue;
+      }
+
+      // Case 1. x - <invariant>
+      if (y->getParent()->dominates(preheader)) {
+        start[y] = y;
+        op->add<IncreaseAttr>(INCR(x)->amt);
         continue;
       }
     }
@@ -109,7 +132,6 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
       auto def = operand.defining;
 
       if (!start.count(def)) {
-        assert(nochange.count(def));
         nochange.insert(op);
         good = false;
         break;
@@ -131,7 +153,11 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
   }
 
   // Now replace them with the phi, create an `add` and a new phi at header.
+  // We only want to replace memory accesses.
   for (auto op : produced) {
+    if (!isa<AddLOp>(op))
+      continue;
+
     builder.setToBlockStart(header);
     auto phi = builder.create<PhiOp>({ start[op] }, { new FromAttr(preheader) });
 
@@ -144,11 +170,7 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
     builder.setBeforeOp(op);
     auto vi = builder.create<IntOp>({ new IntAttr(amt[0]) });
 
-    Op *add;
-    if (isa<AddLOp>(op))
-      add = builder.create<AddLOp>({ phi, vi });
-    else
-      add = builder.create<AddIOp>({ phi, vi });
+    Op *add = builder.create<AddLOp>({ phi, vi });
 
     op->replaceAllUsesWith(phi);
     op->erase();
@@ -166,8 +188,8 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
 }
 
 void SCEV::runImpl(LoopInfo *info) {
-  for (auto subloop : info->getSubloops())
-    runImpl(subloop);
+  for (auto loop : info->getSubloops())
+    runImpl(loop);
 
   if (info->getLatches().size() > 1)
     return;
@@ -177,7 +199,8 @@ void SCEV::runImpl(LoopInfo *info) {
   // Check rotated loops.
   if (!isa<BranchOp>(latch->getLastOp()))
     return;
-  
+  if (isa<BranchOp>(header->getLastOp()))
+    return;
 
   auto phis = header->getPhis();
   auto preheader = info->getPreheader();
@@ -185,11 +208,6 @@ void SCEV::runImpl(LoopInfo *info) {
     return;
 
   if (info->getExits().size() != 1)
-    return;
-
-  // Latch and header must point to the same block.
-  // (See h_functional/09_BFS for a situation where this isn't true.)
-  if (!ordinary(info))
     return;
 
   // Inspect phis to find the amount by which something increases.
@@ -284,6 +302,75 @@ void SCEV::runImpl(LoopInfo *info) {
   }
 }
 
+void SCEV::discardIv(LoopInfo *info) {
+  for (auto loop : info->getSubloops())
+    discardIv(loop);
+
+  if (info->getLatches().size() > 1)
+    return;
+
+  auto header = info->getHeader();
+  auto latch = info->getLatch();
+  if (!isa<BranchOp>(latch->getLastOp()))
+    return;
+  if (isa<BranchOp>(header->getLastOp()))
+    return;
+
+  auto phis = header->getPhis();
+  auto preheader = info->getPreheader();
+  if (!preheader)
+    return;
+
+  if (info->getExits().size() != 1)
+    return;
+
+  if (!info->getInduction())
+    return;
+
+  auto iv = info->getInduction();
+  // Once at `addi` and another at branch test.
+  if (iv->getUses().size() >= 2)
+    return;
+
+  auto stop = info->getStop();
+  if (!stop || !stop->getParent()->dominates(preheader))
+    return;
+
+  Op *candidate = nullptr, *step, *start;
+  // Try to identify a phi that also increases and is not the induction variable.
+  for (auto phi : phis) {
+    if (phi == iv)
+      continue;
+
+    auto latchval = Op::getPhiFrom(phi, latch);
+    // Try to match (addl (x 'a)).
+    if (constIncrL.match(latchval, { { "x", phi } })) {
+      auto v = constIncrL.extract("'a");
+      start = Op::getPhiFrom(phi, preheader);
+      candidate = phi;
+      step = v;
+    }
+  }
+
+  if (!candidate)
+    return;
+  std::cerr << "chosen: " << candidate;
+
+  // We've identified a candidate. Now make a ending condition.
+  Builder builder;
+  builder.setBeforeOp(preheader->getLastOp());
+  auto vi = builder.create<IntOp>({ new IntAttr(V(step)) });
+  auto diff = builder.create<SubIOp>({ Value(stop), info->getStart() });
+  auto mul = builder.create<MulIOp>({ diff, vi });
+  auto end = builder.create<AddLOp>({ start, mul });
+
+  // Replace the operand of the `br` to test (phi < end) instead.
+  auto term = latch->getLastOp();
+  builder.setBeforeOp(term);
+  auto cond = builder.create<LtOp>({ candidate, end });
+  term->setOperand(0, cond);
+}
+
 void SCEV::run() {
   LoopAnalysis analysis(module);
   analysis.run();
@@ -299,6 +386,20 @@ void SCEV::run() {
     for (auto loop : forest.getLoops()) {
       if (!loop->getParent())
         runImpl(loop);
+    }
+  }
+
+  // Temporarily disable this. It's not fully debugged.
+  return;
+
+  AggressiveDCE(module).run();
+  module->dump();
+  for (auto func : funcs) {
+    const auto &forest = forests[func];
+
+    for (auto loop : forest.getLoops()) {
+      if (!loop->getParent())
+        discardIv(loop);
     }
   }
 }

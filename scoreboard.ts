@@ -38,8 +38,10 @@ async function fetch(url: string) {
 
 }
 
-function parseLine(line: string): ScoreEntry {
+function parseLine(line: string): ScoreEntry | null {
   const parts = line.trim().split(/\s+/);
+  if (parts.length < 6)
+    return null;
 
   return {
     name: parts[1],
@@ -47,8 +49,10 @@ function parseLine(line: string): ScoreEntry {
   };
 }
 
-function parseTest(line: string): ScoreEntry {
+function parseTest(line: string): ScoreEntry | null {
   const parts = line.trim().split(/\s+/);
+  if (parts.length < 2)
+    return null;
 
   return {
     name: parts[0],
@@ -56,7 +60,7 @@ function parseTest(line: string): ScoreEntry {
   };
 }
 
-async function read(filePath: string, parser: (string) => ScoreEntry): Promise<ScoreEntry[]> {
+async function read(filePath: string, parser: (string) => ScoreEntry | null): Promise<ScoreEntry[]> {
   const fileStream = fs.createReadStream(filePath);
   const rl = readline.createInterface({
     input: fileStream,

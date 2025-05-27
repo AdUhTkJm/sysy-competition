@@ -58,6 +58,16 @@ public:
   void run() override;
 };
 
+// Positivity analysis. Very coarse, but suffices for now.
+class Positive : public Pass {
+public:
+  Positive(ModuleOp *module): Pass(module) {}
+    
+  std::string name() override { return "positive"; };
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
+};
+
 // Mark functions that are called at most once.
 class AtMostOnce : public Pass {
 public:

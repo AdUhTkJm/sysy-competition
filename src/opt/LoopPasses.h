@@ -55,8 +55,13 @@ public:
 
   // Note that this relies on a previous dump of the parent op,
   // otherwise the numbers of blocks are meaningless.
-  void dump(std::ostream &os);
+  void dump(std::ostream &os = std::cerr);
 };
+
+inline std::ostream &operator<<(std::ostream &os, LoopInfo *info) {
+  info->dump(os);
+  return os;
+}
 
 // Each loop structure is a tree.
 // Multiple loops become a forest.
@@ -161,6 +166,7 @@ class SCEV : public Pass {
 
   void rewrite(BasicBlock *bb, LoopInfo *info);
   void runImpl(LoopInfo *info);
+  void discardIv(LoopInfo *info);
 public:
   SCEV(ModuleOp *module): Pass(module) {}
 
@@ -187,9 +193,6 @@ public:
   std::map<std::string, int> stats() override;
   void run() override;
 };
-
-// Checks whether header and latch points to the same exit.
-bool ordinary(LoopInfo *info);
 
 }
 
