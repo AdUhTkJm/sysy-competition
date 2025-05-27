@@ -10,6 +10,7 @@ std::map<std::string, int> SCEV::stats() {
 }
 
 static Rule constIncr("(add x 'a)");
+static Rule modIncr("(mod (add x y) 'a)");
 
 void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
   auto preheader = info->getPreheader();
@@ -183,8 +184,12 @@ void SCEV::runImpl(LoopInfo *info) {
   if (!preheader)
     return;
 
+  if (info->getExits().size() != 1)
+    return;
+
   // Inspect phis to find the amount by which something increases.
   start.clear();
+  std::unordered_set<Op*> mods;
   for (auto phi : phis) {
     auto latchval = Op::getPhiFrom(phi, latch);
     // Try to match (add (x 'a)).
@@ -194,6 +199,20 @@ void SCEV::runImpl(LoopInfo *info) {
 
       // Also find out the start value.
       start[phi] = Op::getPhiFrom(phi, preheader);
+    }
+
+    // Also try to match repeated modulus.
+    if (modIncr.match(latchval, { { "x", phi } })) {
+      // Check that the phi is never referred to elsewhere
+      // (otherwise the transform wouldn't be sound).
+      int usecnt = 0;
+      for (auto use : phi->getUses()) {
+        if (info->contains(use->getParent()))
+          usecnt++;
+      }
+      // The only use is the increment.
+      if (usecnt == 1)
+        mods.insert(phi);
     }
   }
 
@@ -221,6 +240,38 @@ void SCEV::runImpl(LoopInfo *info) {
   // Do it in dominance-order, so that every def comes before use.
   rewrite(header, info);
 
+  // Transform `addi` to `addl` and factor out the modulus.
+  // This won't overflow because i32*i32 <= i64.
+  Builder builder;
+  auto exit = *info->getExits().begin();
+  auto insert = nonphi(exit);
+  
+  std::unordered_map<Op*, Op*> exitlatch;
+  for (auto phi : exit->getPhis()) 
+    exitlatch[Op::getPhiFrom(phi, latch)] = phi;
+
+  for (auto phi : mods) {
+    auto mod = Op::getPhiFrom(phi, latch);
+    auto latchphi = exitlatch.count(mod) ? exitlatch[mod] : exitlatch[phi];
+    if (!latchphi) {
+      std::cerr << "warning: bad?\n";
+      continue;
+    }
+
+    auto addi = mod->DEF(0), v = mod->DEF(1);
+    auto addl = builder.replace<AddLOp>(addi, addi->getOperands(), addi->getAttrs());
+    mod->replaceAllUsesWith(addl);
+
+    // Create a mod at the beginning of exit.
+    builder.setBeforeOp(insert);
+    auto modl = builder.create<ModLOp>(mod->getAttrs());
+    latchphi->replaceAllUsesWith(modl);
+    // We must push operands later, otherwise the operand itself will also be replaced.
+    modl->pushOperand(latchphi);
+    modl->pushOperand(v);
+    mod->erase();
+  }
+
   // Remove IncreaseAttr for other loops to analyze.
   for (auto bb : info->getBlocks()) {
     for (auto op : bb->getOps())
@@ -234,17 +285,6 @@ void SCEV::run() {
   auto forests = analysis.getResult();
 
   auto funcs = collectFuncs();
-
-  runRewriter([&](PhiOp *op) {
-    // Discard trivial phis.
-    if (op->getOperands().size() == 1) {
-      auto def = op->getOperand().defining;
-      op->replaceAllUsesWith(def);
-      op->erase();
-      return true;
-    }
-    return false;
-  });
   
   for (auto func : funcs) {
     const auto &forest = forests[func];

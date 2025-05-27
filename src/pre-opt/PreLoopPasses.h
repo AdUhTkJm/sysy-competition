@@ -9,7 +9,7 @@
 namespace sys {
 
 // Raise whiles to fors whenever possible.
-class RaiseToFor : Pass {
+class RaiseToFor : public Pass {
 public:
   RaiseToFor(ModuleOp *module): Pass(module) {}
 
@@ -19,7 +19,7 @@ public:
 };
 
 // Lower operations back to its original form.
-class Lower : Pass {
+class Lower : public Pass {
 public:
   Lower(ModuleOp *module): Pass(module) {}
   

@@ -111,3 +111,14 @@ Op *Pass::nonalloca(Region *region) {
     nonalloca = entry->nextBlock()->getFirstOp();
   return nonalloca;
 }
+
+Op *Pass::nonphi(BasicBlock *bb) {
+  Op *nonphi = bb->getFirstOp();
+  while (!nonphi->atBack()) {
+    if (isa<PhiOp>(nonphi))
+      nonphi = nonphi->nextOp();
+    else break;
+  }
+  // A basic block should have at least one op, so it's safe.
+  return nonphi;
+}

@@ -4,14 +4,20 @@
 using namespace sys;
 
 static Rule forCond("(lt (load x) y)");
-static Rule constIncr("(add (load x) 'a)");
-static Rule store("(store (add (load x) 'a) x)");
+static Rule constIncr("(store (add (load x) 'a) x)");
 
 void RaiseToFor::run() {
+  Builder builder;
   auto loops = module->findAll<WhileOp>();
 
   for (auto loop : loops) {
+    // Nothing before this loop, which means `i` cannot be initialized.
+    // Doesn't seem right, but we mustn't crash in that case.
+    if (loop->atFront())
+      continue;
+
     // Analyze the condition.
+    // By construction there can't be anything else in the before region.
     auto before = loop->getRegion(0);
     auto after = loop->getRegion(1);
 
@@ -22,16 +28,18 @@ void RaiseToFor::run() {
 
     // The induction variable is `load x`, and the address should be `x`.
     auto ivAddr = forCond.extract("x");
+    Op *stop = forCond.extract("y");
     
     // Checks all stores to the address in the loop.
     bool good = true, foundIncr = false;
     int incr;
     for (auto use : ivAddr->getUses()) {
-      if (!use->inside(loop))
+      if (!use->inside(loop) || isa<LoadOp>(use))
         continue;
 
       if (!constIncr.match(use, { { "x", ivAddr } })) {
         good = false;
+        std::cerr << "bad: " << use << "\n";
         break;
       }
 
@@ -64,7 +72,7 @@ void RaiseToFor::run() {
     auto conts = loop->findAll<ContinueOp>();
     std::copy(conts.begin(), conts.end(), std::back_inserter(terms));
     for (auto x : terms) {
-      if (x->atFront() || !store.match(x->prevOp())) {
+      if (x->atFront() || !constIncr.match(x->prevOp())) {
         good = false;
         break;
       }
@@ -72,10 +80,69 @@ void RaiseToFor::run() {
 
     // TCO removes empty blocks, so this is safe.
     auto back = after->getLastBlock()->getLastOp();
-    if (!good || !store.match(back))
+    if (!good || !constIncr.match(back))
       continue;
     
     // Now time to check for initial value of the induction variable.
-    
+    // Go straight up and give up when the first if/while is found.
+    Op *runner, *init;
+    for (runner = loop->prevOp(); !runner->atFront(); runner = runner->prevOp()) {
+      if (isa<WhileOp>(runner) || isa<IfOp>(runner)) {
+        good = false;
+        break;
+      }
+
+      // The value found here.
+      if (isa<StoreOp>(runner) && runner->DEF(1) == ivAddr) {
+        init = runner->DEF(0);
+        break;
+      }
+    }
+
+    if (!good || runner->atFront())
+      continue;
+
+    // We've got all necessary info for `for`. (Bad phrasing.)
+    builder.setBeforeOp(loop);
+    auto floop = builder.create<ForOp>({ init, stop }, { new IntAttr(incr) });
+    auto region = floop->appendRegion();
+
+    // Move everything in after region to the ForOp.
+    const auto &bbs = after->getBlocks();
+    for (auto it = bbs.begin(); it != bbs.end();) {
+      auto next = it; next++;
+      (*it)->moveToEnd(region);
+      it = next;
+    }
+
+    // Move the before region before the ForOp, and delete the ProceedOp.
+    assert(before->getBlocks().size() == 1);
+    auto bb = before->getFirstBlock();
+    bb->getLastOp()->erase();
+    bb->inlineBefore(floop);
+
+    std::vector<Op*> remove;
+    for (auto use : ivAddr->getUses()) {
+      std::cerr << module << use;
+      if (!use->inside(floop))
+        continue;
+
+      // Remove all stores to ivAddr inside the loop.
+      if (isa<StoreOp>(use))
+        remove.push_back(use);
+
+      // Replace all loads to it by the induction variable,
+      // given by the "result" of ForOp.
+      else if (isa<LoadOp>(use)) {
+        use->replaceAllUsesWith(floop);
+        remove.push_back(use);
+      }
+    }
+
+    for (auto x : remove)
+      x->erase();
+
+    // Erase the while.
+    loop->erase();
   }
 }

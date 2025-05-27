@@ -80,6 +80,7 @@ void Lower::run() {
   REPLACE(MuluhOp, MulhuOp);
   REPLACE(DivIOp, DivwOp);
   REPLACE(ModIOp, RemwOp);
+  REPLACE(ModLOp, RemOp);
   REPLACE(LShiftOp, SllwOp);
   REPLACE(LShiftLOp, SllOp);
   REPLACE(RShiftOp, SrawOp);

@@ -7,7 +7,7 @@ void Remerge::runImpl(Region *region) {
   const auto &bbs = region->getBlocks();
   for (auto bb : bbs) {
     if (bb != entry)
-      bb->moveAllOpsTo(entry);
+      bb->inlineToEnd(entry);
   }
   for (auto it = --bbs.end(); it != bbs.begin();) {
     auto next = it; --next;

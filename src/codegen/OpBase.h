@@ -150,8 +150,10 @@ public:
   void insertAfter(iterator at, Op *op);
   void remove(iterator at);
 
-  // Moves to end by default.
-  void moveAllOpsTo(BasicBlock *bb);
+  // These inline functions will copy-paste,
+  // without dealing with terminators etc.
+  void inlineToEnd(BasicBlock *bb);
+  void inlineBefore(Op *op);
 
   // Moves every op after `op` to `dest`, including `op`.
   void splitOpsAfter(BasicBlock *dest, Op *op);

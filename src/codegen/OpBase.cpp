@@ -312,30 +312,37 @@ bool Op::inside(Op *op) {
   return false;
 }
 
-void BasicBlock::moveAllOpsTo(BasicBlock *bb) {
+void BasicBlock::inlineToEnd(BasicBlock *bb) {
   for (auto it = begin(); it != end(); ) {
-    auto advanced = it; ++advanced;
-    // `it` invalidates now.
+    auto next = it; ++next;
     (*it)->moveToEnd(bb);
-    it = advanced;
+    it = next;
+  }
+}
+
+void BasicBlock::inlineBefore(Op *op) {
+  for (auto it = begin(); it != end(); ) {
+    auto next = it; ++next;
+    (*it)->moveBefore(op);
+    it = next;
   }
 }
 
 void BasicBlock::splitOpsAfter(BasicBlock *dest, Op *op) {
   for (auto it = op->place; it != end(); ) {
-    auto advanced = it; ++advanced;
+    auto next = it; ++next;
     // `it` invalidates now.
     (*it)->moveToEnd(dest);
-    it = advanced;
+    it = next;
   }
 }
 
 void BasicBlock::splitOpsBefore(BasicBlock *dest, Op *op) {
   for (auto it = begin(); it != op->place; ) {
-    auto advanced = it; ++advanced;
+    auto next = it; ++next;
     // `it` invalidates now.
     (*it)->moveToEnd(dest);
-    it = advanced;
+    it = next;
   }
 }
 
@@ -456,11 +463,11 @@ std::pair<BasicBlock*, BasicBlock*> Region::moveTo(BasicBlock *bb) {
   auto result = std::make_pair(getFirstBlock(), getLastBlock());
 
   for (auto it = begin(); it != end(); ) {
-    auto advanced = it; advanced++;
+    auto next = it; next++;
     auto current = *it;
     current->moveAfter(prev);
     prev = current;
-    it = advanced;
+    it = next;
   }
 
   return result;

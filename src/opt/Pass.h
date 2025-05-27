@@ -59,6 +59,8 @@ protected:
 
   // Find the first op that isn't an AllocaOp.
   Op *nonalloca(Region *region);
+  // Find the first op that isn't a PhiOp.
+  Op *nonphi(BasicBlock *bb);
 public:
   Pass(ModuleOp *module): module(module) {}
   void cleanup();

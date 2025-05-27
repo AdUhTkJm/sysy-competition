@@ -29,9 +29,13 @@ void LoopRotate::runImpl(LoopInfo *info) {
   // Here `x` is an SSA value defined outside loop.
   // Check header condition for this.
   auto term = header->getLastOp();
-  Rule br("(br (lt i x))");
-  if (!br.match(term, { { "i", induction } }))
-    return;
+  Rule br("(br (lt i x))"), brle("(br (le i x))");
+  bool le = false;
+  if (!br.match(term, { { "i", induction } })) {
+    if (!brle.match(term, { { "i", induction } }))
+      return;
+    le = true;
+  }
   if (ELSE(term) != exit)
     return;
 
@@ -48,7 +52,7 @@ void LoopRotate::runImpl(LoopInfo *info) {
   if (!isa<GotoOp>(preterm))
     return;
   
-  auto upper = br.extract("x");
+  auto upper = le ? brle.extract("x") : br.extract("x");
   auto upperFrom = upper->getParent();
   if (!upperFrom->dominates(header) || upperFrom == header) {
     if (!isa<IntOp>(upper))
@@ -86,8 +90,12 @@ void LoopRotate::runImpl(LoopInfo *info) {
   }
 
   builder.setBeforeOp(preterm);
-  auto lt = builder.create<LtOp>({ (Value) info->getStart(), upper });
-  builder.replace<BranchOp>(preterm, { lt }, { new TargetAttr(header), new ElseAttr(exit) });
+  Value cmp;
+  if (le)
+    cmp = builder.create<LeOp>({ (Value) info->getStart(), upper });
+  else
+    cmp = builder.create<LtOp>({ (Value) info->getStart(), upper });
+  builder.replace<BranchOp>(preterm, { cmp }, { new TargetAttr(header), new ElseAttr(exit) });
 
   // Replace the branch at header with a goto.
   auto target = TARGET(term);
@@ -97,8 +105,11 @@ void LoopRotate::runImpl(LoopInfo *info) {
   // This time we should compare the increased induction variable with the upper bound,
   // i.e. the value from latch.
   builder.setBeforeOp(latchterm);
-  auto lt2 = builder.create<LtOp>({ valueMap[induction], upper->getResult() });
-  builder.replace<BranchOp>(latchterm, { lt2 }, { new TargetAttr(header), new ElseAttr(exit) });
+  if (le)
+    cmp = builder.create<LeOp>({ valueMap[induction], upper->getResult() });
+  else
+    cmp = builder.create<LtOp>({ valueMap[induction], upper->getResult() });
+  builder.replace<BranchOp>(latchterm, { cmp }, { new TargetAttr(header), new ElseAttr(exit) });
 
   // Fix phi nodes at exit.
   auto phis = exit->getPhis();
