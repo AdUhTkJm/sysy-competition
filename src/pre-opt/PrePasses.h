@@ -1,7 +1,7 @@
 #ifndef PREPASSES_H
 #define PREPASSES_H
 
-#include "Pass.h"
+#include "../opt/Pass.h"
 #include "../codegen/CodeGen.h"
 #include "../codegen/Attrs.h"
 

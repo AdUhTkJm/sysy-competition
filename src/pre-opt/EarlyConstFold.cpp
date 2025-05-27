@@ -1,5 +1,5 @@
 #include "PrePasses.h"
-#include "Passes.h"
+#include "../opt/Passes.h"
 
 using namespace sys;
 
