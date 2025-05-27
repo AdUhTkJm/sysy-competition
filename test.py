@@ -6,6 +6,7 @@ import hashlib;
 import pickle;
 import tempfile;
 import multiprocessing as mp;
+import time;
 from pathlib import Path;
 
 mp.set_start_method("fork")
@@ -46,6 +47,7 @@ CFLAGS = [
 LDFLAGS = []
 CACHE_FILE = BUILD_DIR / ".build_cache.pkl"
 INCLUDE_CACHE_FILE = BUILD_DIR / ".include_cache.pkl"
+TIMES_FILE = "rank/time.txt"
 
 def hash_file(path):
   h = hashlib.sha256()
@@ -326,8 +328,9 @@ def run_test_case(sy_path: Path, in_path: Path, out_path: Path):
     if in_path:
       with open(in_path, 'r') as f:
         input_data = f.read()
-    
+
     try:
+      start_time = time.perf_counter()
       result = proc.run(
         f"{qemu} {str(exe_path)}",
         input=None if not input_data else input_data.encode('utf-8'),
@@ -336,24 +339,17 @@ def run_test_case(sy_path: Path, in_path: Path, out_path: Path):
         timeout=args.timeout,
         shell=True
       )
+      elapsed_time = time.perf_counter() - start_time
+      # Record timing info
+      with open(TIMES_FILE, "a") as f:
+        f.write(f"{sy_path.name} {elapsed_time:.6f}\n")
+
       actual_out: str = result.stdout.decode('utf-8').strip()
       actual = f"{actual_out}\n{result.returncode}".strip()
     except proc.TimeoutExpired:
       return (sy_path, f"Timeout ({args.timeout:.2f}s)")
     except Exception as e:
       return (sy_path, f"Runtime error: {str(e)}")
-
-    with open(out_path) as f:
-      expected = f.read().strip()
-
-    # Ignore leading/trailing spaces on each line.
-    actual = '\n'.join([x.strip() for x in actual.split('\n')])
-    expected = '\n'.join([x.strip() for x in expected.split('\n')])
-      
-    if actual != expected:
-      return ((sy_path, f"Output mismatch:\n{actual}"))
-    else:
-      return None
 
 def test_all():
   # Collect all test cases

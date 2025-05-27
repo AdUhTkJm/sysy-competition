@@ -151,6 +151,7 @@ static Rule rules[] = {
 
   // Not
   "(change (not 'a) (!not 'a))",
+  "(change (not (snz x)) (not x))",
   "(change (not (eq x y)) (ne x y))",
   "(change (not (lt x y)) (ge x y))",
   "(change (not (le x y)) (gt x y))",
@@ -186,6 +187,7 @@ static Rule rules[] = {
   "(change (snz (le x y)) (le x y))",
   "(change (snz (lt x y)) (lt x y))",
   "(change (snz (ne x y)) (ne x y))",
+  "(change (snz (not x)) (not x))",
 
   // FP Set not zero
   "(change (snz *a) (!fne *a *0))",
