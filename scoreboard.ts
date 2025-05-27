@@ -74,16 +74,16 @@ async function read(filePath: string): Promise<ScoreEntry[]> {
   return entries;
 }
 
-function compare(f1: ScoreEntry[], f2: ScoreEntry[], threshold = 0.1) {
+function compare(f1: ScoreEntry[], f2: ScoreEntry[], threshold = 1) {
   console.log("Significant changes:");
   f1.forEach((a, i) => {
     const b = f2[i];
-    const delta = b.time - a.time;
+    const delta = (b.time - a.time) / a.time * 100;
     if (Math.abs(delta) >= threshold) {
       const plus = delta > 0 ? "+" : "";
       const change = `${a.time.toFixed(2)} -> ${b.time.toFixed(2)}`.padEnd(16);
       console.log(
-        `${a.name.padEnd(15)} ${change} (${plus}${delta.toFixed(2)})`
+        `${a.name.padEnd(15)} ${change} (${plus}${delta.toFixed(2)}%)`
       );
     }
   });
