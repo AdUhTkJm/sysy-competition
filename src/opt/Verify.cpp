@@ -14,7 +14,7 @@ static void checkDom(Region *region, Op *module) {
     if (reachable.count(bb))
       continue;
     reachable.insert(bb);
-    for (auto succ : bb->getSuccs())
+    for (auto succ : bb->succs)
       queue.push_back(succ);
   }
 
@@ -47,7 +47,7 @@ void Verify::run() {
   for (auto phi : phis) {
     // Check the number of phi's must be equal to the number of predecessors.
     auto parent = phi->getParent();
-    if (parent->getPreds().size() != phi->getOperandCount()) {
+    if (parent->preds.size() != phi->getOperandCount()) {
       std::cerr << module << "phi without enough operands:\n  " << phi;
       assert(false);
     }
@@ -55,7 +55,7 @@ void Verify::run() {
     // Check that all operands from Phi must come from the immediate predecessor.
     auto bb = phi->getParent();
     for (auto attr : phi->getAttrs()) {
-      if (!bb->getPreds().count(FROM(attr))) {
+      if (!bb->preds.count(FROM(attr))) {
         std::cerr << module << "phi operands are not from predecessor:\n  " << phi;
         assert(false);
       }

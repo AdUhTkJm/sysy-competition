@@ -160,7 +160,7 @@ void DCE::run() {
         if (reachable.count(bb))
           continue;
         reachable.insert(bb);
-        for (auto succ : bb->getSuccs())
+        for (auto succ : bb->succs)
           queue.push_back(succ);
       }
 

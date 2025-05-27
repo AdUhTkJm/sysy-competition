@@ -695,7 +695,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
   // Split critical edges.
   for (auto bb : bbs) {
-    if (bb->getSuccs().size() <= 1)
+    if (bb->succs.size() <= 1)
       continue;
 
     // Note that we need to split even if there's no phi in one of the blocks.
@@ -727,7 +727,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     builder.create<BOp>({ new TargetAttr(oldElse) });
 
     // Rename the blocks of the phis.
-    for (auto succ : bb->getSuccs()) {
+    for (auto succ : bb->succs) {
       for (auto phis : succ->getPhis()) {
         for (auto attr : phis->getAttrs()) {
           auto from = cast<FromAttr>(attr);

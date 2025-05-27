@@ -89,6 +89,8 @@ RVOP(BneOp);
 RVOP(BeqOp);
 RVOP(BltOp);
 RVOP(BgeOp);
+RVOP(BleOp);
+RVOP(BgtOp);
 RVOP(SeqzOp); // Set equal to zero (pseudo, = sltiu)
 RVOP(SnezOp); // Set not equal to zero (pseudo, 2 ops)
 RVOP(SltOp); // Set less than
@@ -124,6 +126,8 @@ inline bool hasRd(Op *op) {
     isa<BltOp>(op) ||
     isa<BgeOp>(op) ||
     isa<BneOp>(op) ||
+    isa<BleOp>(op) ||
+    isa<BgtOp>(op) ||
     isa<WriteRegOp>(op) ||
     isa<CallOp>(op)
   );

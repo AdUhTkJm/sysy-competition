@@ -69,7 +69,7 @@ void DLE::runImpl(Region *region) {
     std::set<Op*> newLiveIn;
 
     bool firstPred = true;
-    for (auto pred : bb->getPreds()) {
+    for (auto pred : bb->preds) {
       if (firstPred) {
         newLiveIn = liveOut[pred];
         firstPred = false;
@@ -131,7 +131,7 @@ void DLE::runImpl(Region *region) {
     if (live != liveOut[bb]) {
       liveOut[bb] = live;
 
-      for (auto succ : bb->getSuccs())
+      for (auto succ : bb->succs)
         worklist.push_back(succ);
     }
   }

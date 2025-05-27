@@ -1,6 +1,4 @@
 #include "RvPasses.h"
-#include "RvOps.h"
-#include "../codegen/Attrs.h"
 
 using namespace sys::rv;
 using namespace sys;

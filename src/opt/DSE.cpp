@@ -26,7 +26,7 @@ void DSE::runImpl(Region *region) {
 
     // liveIn[bb] = \bigcup liveOut[pred]
     std::set<Op*> live;
-    for (auto pred : bb->getPreds())
+    for (auto pred : bb->preds)
       live.insert(out[pred].begin(), out[pred].end());
 
     auto oldOut = out[bb];
@@ -61,7 +61,7 @@ void DSE::runImpl(Region *region) {
     // Update if `out` changed.
     if (curLive != out[bb]) {
       out[bb] = curLive;
-      for (auto succ : bb->getSuccs())
+      for (auto succ : bb->succs)
         worklist.push_back(succ);
     }
   }

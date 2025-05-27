@@ -164,11 +164,11 @@ void Globalize::runImpl(Region *region) {
       if (shouldBreak)
         break;
 
-      if (runner->getSuccs().size() != 1)
+      if (runner->succs.size() != 1)
         break;
 
-      BasicBlock *succ = *runner->getSuccs().begin();
-      if (succ->getPreds().size() != 1)
+      BasicBlock *succ = *runner->succs.begin();
+      if (succ->preds.size() != 1)
         break;
 
       runner = succ;

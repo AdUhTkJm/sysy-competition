@@ -10,7 +10,7 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
   
   // Collect all blocks and latches in a loop.
   for (auto bb : region->getBlocks()) {
-    for (auto succ : bb->getSuccs()) {
+    for (auto succ : bb->succs) {
       if (!bb->dominatedBy(succ))
         continue;
       
@@ -41,7 +41,7 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
         if (back == header)
           continue;
         
-        for (auto pred : back->getPreds()) {
+        for (auto pred : back->preds) {
           if (!info->bbs.count(pred)) {
             info->bbs.insert(pred);
             worklist.push_back(pred);
@@ -62,7 +62,7 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
 
     BasicBlock *preheader = nullptr;
     // Find preheader if there exists one.
-    for (auto pred : header->getPreds()) {
+    for (auto pred : header->preds) {
       if (info->latches.count(pred))
         continue;
       if (preheader) {
@@ -73,13 +73,13 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
       preheader = pred;
     }
     // Preheader must also have a single edge to header.
-    if (preheader && preheader->getSuccs().size() == 1)
+    if (preheader && preheader->succs.size() == 1)
       info->preheader = preheader;
     
     // Find exit and exiting blocks.
     for (auto loopbb : info->bbs) {
       bool exiting = false;
-      for (auto succ : loopbb->getSuccs()) {
+      for (auto succ : loopbb->succs) {
         if (!info->contains(succ)) {
           exiting = true;
           info->exits.insert(succ);

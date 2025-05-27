@@ -166,7 +166,7 @@ void LateInline::run() {
 
     // Phi's that point to the block before the call should go from `end` instead.
     // As preds haven't been updated it's alright.
-    for (auto succ : bb->getSuccs()) {
+    for (auto succ : bb->succs) {
       auto phis = succ->getPhis();
       for (auto phi : phis) {
         for (auto attr : phi->getAttrs()) {

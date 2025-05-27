@@ -136,7 +136,7 @@ void Mem2Reg::fillPhi(BasicBlock *bb, SymbolTable symbols) {
     }
   }
 
-  for (auto succ : bb->getSuccs()) {
+  for (auto succ : bb->succs) {
     auto phis = succ->getPhis();
     for (auto op : phis) {
       auto alloca = phiFrom[cast<PhiOp>(op)];

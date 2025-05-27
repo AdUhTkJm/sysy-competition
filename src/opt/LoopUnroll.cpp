@@ -16,7 +16,6 @@ BasicBlock *ConstLoopUnroll::copyLoop(LoopInfo *loop, BasicBlock *bb, int unroll
   BasicBlock *latch = loop->getLatch();
   BasicBlock *lastLatch = loop->getLatch();
   BasicBlock *header = loop->getHeader();
-  BasicBlock *preheader = loop->getPreheader();
   BasicBlock *exit = *loop->getExits().begin();
   BasicBlock *latchRewire = nullptr;
   auto region = lastLatch->getParent();
@@ -180,7 +179,7 @@ bool ConstLoopUnroll::runImpl(LoopInfo *loop) {
   auto exit = *loop->getExits().begin();
   // We don't want an internal `break` to interfere.
   // It should come from either preheader or latch.
-  if (exit->getPreds().size() > 2)
+  if (exit->preds.size() > 2)
     return false;
 
   int loopsize = 0;
@@ -189,7 +188,7 @@ bool ConstLoopUnroll::runImpl(LoopInfo *loop) {
 
   // Not every loop can be unrolled, even not all constant-bounded loops.
   // See 65_color.sy, where we are attempting to unroll a nested loop with a total of 18^5*7 = 13226976 iterations.
-  if (loopsize > 1000)
+  if (loopsize > 300)
     return false;
 
   auto phis = header->getPhis();

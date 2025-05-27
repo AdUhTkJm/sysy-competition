@@ -20,7 +20,7 @@ Op *getValueFor(BasicBlock *bb, LoopInfo *info, std::map<BasicBlock*, Op*> &phiM
   Builder builder;
   builder.setToBlockStart(bb);
   auto phi = builder.create<PhiOp>();
-  for (auto pred : bb->getPreds()) {
+  for (auto pred : bb->preds) {
     phi->pushOperand(getValueFor(pred, info, phiMap));
     phi->add<FromAttr>(pred);
   }
@@ -60,7 +60,7 @@ void CanonicalizeLoop::canonicalize(LoopInfo *loop) {
 
         builder.setToBlockStart(exit);
         auto phi = builder.create<PhiOp>();
-        for (auto pred : exit->getPreds()) {
+        for (auto pred : exit->preds) {
           if (loop->contains(pred)) {
             phi->pushOperand(op);
             phi->add<FromAttr>(pred);
@@ -131,7 +131,7 @@ void CanonicalizeLoop::run() {
 
     for (auto loop : forest.getLoops()) {
       auto header = loop->getHeader();
-      const auto &preds = header->getPreds();
+      const auto &preds = header->preds;
       auto region = header->getParent();
       auto preheader = region->insert(header);
 

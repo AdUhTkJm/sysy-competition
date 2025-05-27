@@ -94,8 +94,6 @@ class BasicBlock {
   std::list<Op*> ops;
   Region *parent;
   Region::iterator place;
-  std::set<BasicBlock*> preds;
-  std::set<BasicBlock*> succs;
   // Note these are dominatORs, which mean `this` is dominatED by the elements.
   std::set<BasicBlock*> doms;
   // Dominance frontiers. `this` dominatES all blocks which are preds of the elements.
@@ -113,8 +111,9 @@ class BasicBlock {
 
   friend class Region;
   friend class Op;
-  friend class SimplifyCFG;
 public:
+  std::set<BasicBlock*> preds;
+  std::set<BasicBlock*> succs;
   using iterator = decltype(ops)::iterator;
 
   BasicBlock(Region *parent, Region::iterator place):
@@ -129,8 +128,6 @@ public:
 
   Region *getParent() const { return parent; }
 
-  const auto &getPreds() const { return preds; }
-  const auto &getSuccs() const { return succs; }
   const auto &getDominanceFrontier() const { return domFront; }
   const auto &getPDoms() const { return postdoms; }
   const auto &getPDomFrontier() const { return postdomFront; }

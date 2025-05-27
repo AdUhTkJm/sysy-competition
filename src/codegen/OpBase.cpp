@@ -494,7 +494,7 @@ void Region::updatePreds() {
   }
 
   for (auto bb : bbs) {
-    for (auto pred : bb->getPreds())
+    for (auto pred : bb->preds)
       pred->succs.insert(bb);
   }
 }
@@ -527,7 +527,7 @@ Best best;
 void updateDFN(BasicBlock *current) {
   dfn[current] = num++;
   vertex.push_back(current);
-  for (auto v : current->getSuccs()) {
+  for (auto v : current->succs) {
     if (!dfn.count(v)) {
       parents[v] = current;
       updateDFN(v);
@@ -780,7 +780,7 @@ void Region::updateLiveness() {
   // Do a dataflow approach. We start with all exit blocks;
   // i.e. those that have no successors.
   std::copy_if(bbs.begin(), bbs.end(), std::back_inserter(worklist), [&](BasicBlock *bb) {
-    return bb->getSuccs().size() == 0;
+    return bb->succs.size() == 0;
   });
 
   bool changed;
@@ -792,7 +792,7 @@ void Region::updateLiveness() {
       // LiveOut(B) = \bigcup_{S\in succ(B)} (LiveIn(S) - PhiDefs(S)) \cup PhiUses(B)
       // Here PhiUses(B) means the set of variables used in Phi nodes of S that come from B.
       std::set<Op*> liveOut;
-      for (auto succ : bb->getSuccs()) {
+      for (auto succ : bb->succs) {
         std::set_difference(
           succ->liveIn.begin(), succ->liveIn.end(),
           phis[succ].begin(), phis[succ].end(),
@@ -868,7 +868,7 @@ void Region::dump(std::ostream &os, int depth) {
       auto bb = *it;
       indent(os, depth * 2 - 2);
       os << "bb" << getBlockID(bb) << ":     // preds = [ ";
-      for (auto x : bb->getPreds())
+      for (auto x : bb->preds)
         os << getBlockID(x) << " ";
       
       os << "]; dom frontier = [ ";

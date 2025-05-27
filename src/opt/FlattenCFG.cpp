@@ -234,7 +234,7 @@ void tidy(FuncOp *func) {
 
   // If the (newly produced) first block has any preds, then make a new entry block,
   // and move the real "entry ops" (alloca and getarg) to that block.
-  if (body->getFirstBlock()->getPreds().size() >= 1) {
+  if (body->getFirstBlock()->preds.size() >= 1) {
     auto first = body->getFirstBlock();
     auto entry = body->insert(first);
     auto ops = first->getOps();
