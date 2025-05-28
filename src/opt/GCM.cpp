@@ -139,8 +139,10 @@ void GCM::runImpl(Region *region, const LoopForest &forest) {
   updateDepth(entry, 0);
 
   // Note that blocks outside loop should have a depth 0.
-  for (auto loop : forest.getLoops())
-    updateLoopDepth(loop, 1);
+  for (auto loop : forest.getLoops()) {
+    if (!loop->getParent())
+      updateLoopDepth(loop, 1);
+  }
 
   std::vector<BasicBlock*> rpo;
   postorder(entry, tree, rpo);

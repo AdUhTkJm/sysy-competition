@@ -74,8 +74,9 @@ void PassManager::run() {
     // Before mem2reg, we don't have phis.
     // Verify pass only checks phis; so no point running it before that.
     if (opts.verify && pastMem2Reg) {
-      std::cerr << "checking " << pass->name() << "\n";
+      std::cerr << "checking " << pass->name() << "...";
       Verify(module).run();
+      std::cerr << " passed\n";
     }
 
     // We can't simulate for backend.

@@ -328,7 +328,7 @@ void SCEV::discardIv(LoopInfo *info) {
     return;
 
   auto iv = info->getInduction();
-  // Once at `addi` and another at branch test.
+  // Only referred to once at `addi`.
   if (iv->getUses().size() >= 2)
     return;
 
@@ -354,7 +354,10 @@ void SCEV::discardIv(LoopInfo *info) {
 
   if (!candidate)
     return;
-  std::cerr << "chosen: " << candidate;
+
+  auto after = Op::getPhiFrom(candidate, latch);
+  if (!after->getParent()->dominates(latch))
+    return;
 
   // We've identified a candidate. Now make a ending condition.
   Builder builder;
@@ -367,7 +370,7 @@ void SCEV::discardIv(LoopInfo *info) {
   // Replace the operand of the `br` to test (phi < end) instead.
   auto term = latch->getLastOp();
   builder.setBeforeOp(term);
-  auto cond = builder.create<LtOp>({ candidate, end });
+  auto cond = builder.create<LtOp>({ after, end });
   term->setOperand(0, cond);
 }
 
@@ -389,16 +392,13 @@ void SCEV::run() {
     }
   }
 
-  // Temporarily disable this. It's not fully debugged.
-  return;
-
+  // return;
   AggressiveDCE(module).run();
-  module->dump();
   for (auto func : funcs) {
     const auto &forest = forests[func];
 
     for (auto loop : forest.getLoops()) {
-      if (!loop->getParent())
+      if (!loop->getSubloops().size())
         discardIv(loop);
     }
   }

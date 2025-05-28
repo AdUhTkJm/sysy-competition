@@ -1,4 +1,5 @@
 #include "CleanupPasses.h"
+#include <unordered_set>
 
 using namespace sys;
 
@@ -23,7 +24,7 @@ void AggressiveDCE::runImpl(FuncOp *fn) {
   auto stores = fn->findAll<StoreOp>();
   auto branches = fn->findAll<BranchOp>();
 
-  std::set<Op*> live;
+  std::unordered_set<Op*> live;
   std::vector<Op*> queue(rets.begin(), rets.end());
   for (auto call : calls) {
     if (call->has<ImpureAttr>())
