@@ -742,7 +742,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     }
   }
 
-#define SOFFSET(op, Ty) ((Reg) -(op)->get<Spilled##Ty##Attr>()->offset)
+#define SOFFSET(op, Ty) ((Reg) (-(op)->get<Spilled##Ty##Attr>()->offset-1))
 #define SPILLABLE(op, Ty) (op->has<Ty##Attr>() ? op->get<Ty##Attr>()->reg : SOFFSET(op, Ty))
 
   // Detect circular copies and calculate a correct order.

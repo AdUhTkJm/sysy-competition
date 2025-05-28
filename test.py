@@ -350,6 +350,18 @@ def run_test_case(sy_path: Path, in_path: Path, out_path: Path):
       return (sy_path, f"Timeout ({args.timeout:.2f}s)")
     except Exception as e:
       return (sy_path, f"Runtime error: {str(e)}")
+    
+    with open(out_path) as f:
+      expected = f.read().strip()
+
+    # Ignore leading/trailing spaces on each line.
+    actual = '\n'.join([x.strip() for x in actual.split('\n')])
+    expected = '\n'.join([x.strip() for x in expected.split('\n')])
+      
+    if actual != expected:
+      return ((sy_path, f"Output mismatch:\n{actual}"))
+    else:
+      return None
 
 def test_all():
   # Collect all test cases

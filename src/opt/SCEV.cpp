@@ -359,10 +359,16 @@ void SCEV::discardIv(LoopInfo *info) {
   if (!after->getParent()->dominates(latch))
     return;
 
+  int oldstep = info->getStep();
+  // The candidate's step is not a multiple of the old step;
+  // we can't easily calculate the ending point.
+  if (!oldstep || V(step) % oldstep)
+    return;
+
   // We've identified a candidate. Now make a ending condition.
   Builder builder;
   builder.setBeforeOp(preheader->getLastOp());
-  auto vi = builder.create<IntOp>({ new IntAttr(V(step)) });
+  auto vi = builder.create<IntOp>({ new IntAttr(V(step) / oldstep) });
   auto diff = builder.create<SubIOp>({ Value(stop), info->getStart() });
   auto mul = builder.create<MulIOp>({ diff, vi });
   auto end = builder.create<AddLOp>({ start, mul });
