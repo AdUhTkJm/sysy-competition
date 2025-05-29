@@ -70,6 +70,23 @@ void Lower::run() {
     return false;
   });
 
+  // When `x` is 0 or 1, we have:
+  //   x ? y : z = (-x & y) | ((x - 1) & z)
+  //
+  // I strongly doubt if the competition has a good branch predictor.
+  runRewriter([&](SelectOp *op) {
+    auto x = op->DEF(0), y = op->DEF(1), z = op->DEF(2);
+    builder.setBeforeOp(op);
+    auto snez = builder.create<SnezOp>({ x });
+    auto zero = builder.create<LiOp>({ new IntAttr(0) });
+    auto neg = builder.create<SubOp>({ zero, snez });
+    auto sub = builder.create<AddiOp>({ snez }, { new IntAttr(-1) });
+    Value andy = builder.create<AndOp>({ neg, y });
+    Value andz = builder.create<AndOp>({ sub, z });
+    builder.replace<OrOp>(op, { andy, andz });
+    return false;
+  });
+
   REPLACE(IntOp, LiOp);
   REPLACE(AddIOp, AddwOp);
   REPLACE(AddLOp, AddOp);

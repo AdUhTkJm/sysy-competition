@@ -497,7 +497,7 @@ void Region::updatePreds() {
   }
 
   for (auto bb : bbs) {
-    assert(bb->getOps().size() > 0);
+    assert(bb->getOpCount() > 0);
     auto last = bb->getLastOp();
     if (last->has<TargetAttr>()) {
       auto target = last->get<TargetAttr>();

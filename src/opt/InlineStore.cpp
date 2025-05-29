@@ -103,6 +103,7 @@ void InlineStore::run() {
             auto attr = glob->get<IntArrayAttr>();
             attr->vi[offset / 4] = V(op->DEF(0));
           }
+          inlined++;
           op->erase();
         }
       }

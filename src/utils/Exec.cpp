@@ -217,6 +217,11 @@ void Interpreter::exec(Op *op) {
       assert(false);
     break;
   }
+  case SelectOp::id: {
+    Op *cond = op->DEF(0);
+    store(op, eval(cond) ? eval(op->DEF(1)) : eval(op->DEF(2)));
+    break;
+  }
   default:
     sys_unreachable("unknown op type: " << ip);
   }

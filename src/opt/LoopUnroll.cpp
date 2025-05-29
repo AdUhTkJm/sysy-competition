@@ -184,7 +184,7 @@ bool ConstLoopUnroll::runImpl(LoopInfo *loop) {
 
   int loopsize = 0;
   for (auto bb : loop->getBlocks())
-    loopsize += bb->getOps().size();
+    loopsize += bb->getOpCount();
 
   // Not every loop can be unrolled, even not all constant-bounded loops.
   // See 65_color.sy, where we are attempting to unroll a nested loop with a total of 18^5*7 = 13226976 iterations.

@@ -85,7 +85,6 @@ OP(GotoOp);   // Jumps unconditionally.
 OP(BranchOp); // Branches according to the only operand.
 OP(GlobalOp);
 OP(GetGlobalOp);
-OP(MemcpyOp); // Operand order: dst, src
 OPE(CallOp);
 OP(PhiOp);
 OP(F2IOp);
@@ -102,7 +101,7 @@ OP(MuluhOp);
 OP(SetNotZeroOp);
 OP(BreakOp);
 OP(ContinueOp);
-OP(UndefOp); // Put directly under ModuleOp, not in any function.
+OP(SelectOp);
 
 }
 

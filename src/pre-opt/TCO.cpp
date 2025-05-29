@@ -120,7 +120,7 @@ void TCO::runImpl(FuncOp *func) {
 
   // Remove empty blocks introduced this way.
   for (auto bb : bbs) {
-    if (bb->getOps().size() == 0)
+    if (bb->getOpCount() == 0)
       bb->erase();
   }
 }

@@ -36,7 +36,7 @@ void LateInline::run() {
     auto fnRegion = func->getRegion();
     int opcount = 0;
     for (auto bb : fnRegion->getBlocks())
-      opcount += bb->getOps().size();
+      opcount += bb->getOpCount();
     if (opcount >= threshold)
       return false;
 

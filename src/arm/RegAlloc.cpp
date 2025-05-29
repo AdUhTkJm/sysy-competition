@@ -1061,7 +1061,7 @@ void RegAlloc::tidyup(Region *region) {
   // Replace blocks with only a single `j` as terminator.
   std::map<BasicBlock*, BasicBlock*> jumpTo;
   for (auto bb : region->getBlocks()) {
-    if (bb->getOps().size() == 1 && isa<BOp>(bb->getLastOp())) {
+    if (bb->getOpCount() == 1 && isa<BOp>(bb->getLastOp())) {
       auto target = bb->getLastOp()->get<TargetAttr>()->bb;
       jumpTo[bb] = target;
     }

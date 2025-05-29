@@ -151,7 +151,7 @@ void tidy(FuncOp *func) {
 
   // If the last Op isn't a `return`, then supply a `return`.
   auto last = body->getLastBlock();
-  if (last->getOps().size() == 0 || !isa<ReturnOp>(last->getLastOp())) {
+  if (last->getOpCount() == 0 || !isa<ReturnOp>(last->getLastOp())) {
     builder.setToBlockEnd(body->getLastBlock());
     builder.create<ReturnOp>();
   }
@@ -185,7 +185,7 @@ void tidy(FuncOp *func) {
   for (auto it = body->begin(); it != body->end(); ++it) {
     auto bb = *it;
     auto next = it; ++next;
-    if (bb->getOps().size() == 0 || !isTerminator(bb->getLastOp())) {
+    if (bb->getOpCount() == 0 || !isTerminator(bb->getLastOp())) {
       builder.setToBlockEnd(bb);
       builder.create<GotoOp>({ new TargetAttr(*next) });
     }
@@ -196,7 +196,7 @@ void tidy(FuncOp *func) {
   // If a basic block has only a single terminator, try to inline it.
   std::map<BasicBlock*, BasicBlock*> inliner;
   for (auto bb : body->getBlocks()) {
-    if (bb->getOps().size() != 1 || !isa<GotoOp>(bb->getLastOp()))
+    if (bb->getOpCount() != 1 || !isa<GotoOp>(bb->getLastOp()))
       continue;
 
     auto last = bb->getLastOp();

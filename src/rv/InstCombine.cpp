@@ -239,6 +239,16 @@ void InstCombine::run() {
     return false;
   });
 
+  // Replace (snez x) where x is always between 0 and 1.
+  runRewriter([&](SnezOp *op) {
+    auto def = op->DEF(0);
+    if (isa<SltOp>(def) || isa<SltiOp>(def) || isa<SnezOp>(def) || isa<SeqzOp>(def)) {
+      op->replaceAllUsesWith(def);
+      op->erase();
+    }
+    return false;
+  });
+
   runRewriter([&](BeqOp *op) {
     auto def = op->DEF(0);
     auto zero = op->DEF(1);

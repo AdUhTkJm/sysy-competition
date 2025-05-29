@@ -194,6 +194,12 @@ static Rule rules[] = {
   // FP Set not zero
   "(change (snz *a) (!fne *a *0))",
 
+  // Select
+  "(change (select 1 x y) x)",
+  "(change (select 0 x y) y)",
+  "(change (select c 1 0) (snz c))",
+  "(change (select c 0 1) (not c))",
+
   // float -> int
   "(change (f2i *a) (!cvt *a))",
 

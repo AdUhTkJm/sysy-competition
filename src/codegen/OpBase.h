@@ -120,6 +120,7 @@ public:
     parent(parent), place(place) {}
 
   auto &getOps() { return ops; }
+  int getOpCount() { return ops.size(); }
   Op *getFirstOp() const { return *ops.begin(); }
   Op *getLastOp() const { return *--ops.end(); }
 

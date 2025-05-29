@@ -191,6 +191,17 @@ public:
   void run() override;
 };
 
+// Recognize `if-else` patterns and raise to SelectOp.
+class Select : public Pass {
+  int raised = 0;
+public:
+  Select(ModuleOp *module): Pass(module) {}
+
+  std::string name() override { return "select"; }
+  std::map<std::string, int> stats() override;
+  void run() override;
+};
+
 class Verify : public Pass {
 public:
   Verify(ModuleOp *module): Pass(module) {}

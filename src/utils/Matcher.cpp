@@ -4,10 +4,17 @@
 
 using namespace sys;
 
+#define MATCH_TERNARY(opcode, Ty) \
+  if (opname == opcode && isa<Ty>(op)) { \
+    return matchExpr(list->elements[1], op->getOperand(0).defining) && \
+           matchExpr(list->elements[2], op->getOperand(1).defining) && \
+           matchExpr(list->elements[3], op->getOperand(2).defining); \
+  }
+
 #define MATCH_BINARY(opcode, Ty) \
   if (opname == opcode && isa<Ty>(op)) { \
     return matchExpr(list->elements[1], op->getOperand(0).defining) && \
-          matchExpr(list->elements[2], op->getOperand(1).defining); \
+           matchExpr(list->elements[2], op->getOperand(1).defining); \
   }
 
 #define MATCH_UNARY(opcode, Ty) \
@@ -210,6 +217,8 @@ bool Rule::matchExpr(Expr *expr, Op* op) {
     return false;
 
   std::string_view opname = head->value;
+
+  MATCH_TERNARY("select", SelectOp);
 
   MATCH_BINARY("eq", EqOp);
   MATCH_BINARY("ne", NeOp);
