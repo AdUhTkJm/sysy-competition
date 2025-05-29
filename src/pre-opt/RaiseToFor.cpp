@@ -29,6 +29,23 @@ void RaiseToFor::run() {
     // The induction variable is `load x`, and the address should be `x`.
     auto ivAddr = forCond.extract("x");
     Op *stop = forCond.extract("y");
+
+    // Make sure `stop` is loop-invariant.
+    if (isa<CallOp>(stop) && stop->has<ImpureAttr>())
+      continue;
+    if (isa<LoadOp>(stop)) {
+      auto addr = stop->DEF(0);
+      bool bad = false;
+
+      for (auto use : addr->getUses()) {
+        if (isa<StoreOp>(use) && use->inside(loop)) {
+          bad = true;
+          break;
+        }
+      }
+      if (bad)
+        continue;
+    }
     
     // Checks all stores to the address in the loop.
     bool good = true, foundIncr = false;
@@ -87,7 +104,8 @@ void RaiseToFor::run() {
     // Go straight up and give up when the first if/while is found.
     Op *runner, *init;
     for (runner = loop->prevOp(); !runner->atFront(); runner = runner->prevOp()) {
-      if (isa<WhileOp>(runner) || isa<IfOp>(runner)) {
+      // This checks while, for and if.
+      if (runner->getRegionCount()) {
         good = false;
         break;
       }
@@ -104,7 +122,9 @@ void RaiseToFor::run() {
 
     // We've got all necessary info for `for`. (Bad phrasing.)
     builder.setBeforeOp(loop);
-    auto floop = builder.create<ForOp>({ init, stop }, { new IntAttr(incr) });
+    // Record the `ivAddr` we use. The same alloca might be used afterwards.
+    // It is not used in transformations, but is necessary for lowering.
+    auto floop = builder.create<ForOp>({ init, stop, ivAddr }, { new IntAttr(incr) });
     auto region = floop->appendRegion();
 
     // Move everything in after region to the ForOp.
@@ -123,7 +143,6 @@ void RaiseToFor::run() {
 
     std::vector<Op*> remove;
     for (auto use : ivAddr->getUses()) {
-      std::cerr << module << use;
       if (!use->inside(floop))
         continue;
 
