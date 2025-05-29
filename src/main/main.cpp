@@ -12,7 +12,7 @@
 #include "../opt/LowerPasses.h"
 #include "../opt/Analysis.h"
 #include "../pre-opt/PrePasses.h"
-// #include "../pre-opt/PreLoopPasses.h"
+#include "../pre-opt/PreLoopPasses.h"
 #include "../arm/ArmPasses.h"
 #include "../rv/RvPasses.h"
 
@@ -54,7 +54,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::Remerge>();
   // pm.addPass<sys::RaiseToFor>();
   pm.addPass<sys::DCE>(/*elimBlocks=*/ false);
-  // pm.addPass<sys::Lower>();
+  pm.addPass<sys::Lower>();
 
   // ===== Flattened CFG =====
 

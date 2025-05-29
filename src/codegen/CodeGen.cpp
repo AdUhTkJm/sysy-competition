@@ -461,7 +461,15 @@ void CodeGen::emit(ASTNode *node) {
         auto base = arrTy->base;
         auto arrSize = arrTy->getSize();
         auto baseSize = getSize(arrTy->base);
-        for (int i = 0; i < arrSize; i++) {
+        int zeroFrom = arrSize - 1;
+        for (; zeroFrom >= 0; zeroFrom--) {
+          if (arr->va[zeroFrom])
+            break;
+        }
+        // Now [zeroFrom + 1, arrSize) are all zeroes.
+        // We don't want to create too many stores. Create a loop instead.
+        int max = arrSize - zeroFrom >= 16384 ? zeroFrom : arrSize;
+        for (int i = 0; i < max; i++) {
           Value value = arr->va[i]
             ? emitExpr(arr->va[i])
             : isa<FloatType>(base)
@@ -471,6 +479,25 @@ void CodeGen::emit(ASTNode *node) {
           auto offset =  builder.create<IntOp>({ new IntAttr(baseSize * i) });
           auto place = builder.create<AddLOp>({ addr, offset });
           builder.create<StoreOp>({ value, place }, { new SizeAttr(baseSize) });
+        }
+        if (max != arrSize) {
+          auto start = builder.create<IntOp>({ new IntAttr(zeroFrom + 1) });
+          auto end = builder.create<IntOp>({ new IntAttr(arrSize) });
+          auto iv = builder.create<AllocaOp>({ new SizeAttr(4) });
+          auto zero = isa<FloatType>(base)
+              ? (Value) builder.create<FloatOp>({ new FloatAttr(0) })
+              : (Value) builder.create<IntOp>({ new IntAttr(0) });
+          auto stride = builder.create<IntOp>({ new IntAttr(baseSize) });
+
+          auto loop = builder.create<ForOp>({ start, end, iv }, { new IntAttr(1) });
+          auto body = loop->appendRegion();
+          body->appendBlock();
+          
+          builder.setToRegionStart(body);
+
+          auto offset = builder.create<MulIOp>({ loop, stride });
+          auto place = builder.create<AddLOp>({ addr, offset });
+          builder.create<StoreOp>({ zero, place });
         }
 
         // An extra layer of indirection is needed for further reference.
