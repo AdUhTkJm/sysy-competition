@@ -178,6 +178,19 @@ public:
   void run() override;
 };
 
+// Inline constant stores to globals.
+class InlineStore : public Pass {
+  int inlined = 0;
+  
+  void attemptHoist(Op *op);
+public:
+  InlineStore(ModuleOp *module): Pass(module) {}
+
+  std::string name() override { return "inline-store"; }
+  std::map<std::string, int> stats() override;
+  void run() override;
+};
+
 class Verify : public Pass {
 public:
   Verify(ModuleOp *module): Pass(module) {}

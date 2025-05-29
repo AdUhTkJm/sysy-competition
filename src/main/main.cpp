@@ -12,7 +12,6 @@
 #include "../opt/LowerPasses.h"
 #include "../opt/Analysis.h"
 #include "../pre-opt/PrePasses.h"
-#include "../pre-opt/PreLoopPasses.h"
 #include "../arm/ArmPasses.h"
 #include "../rv/RvPasses.h"
 
@@ -99,6 +98,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DSE>();
   pm.addPass<sys::DLE>();
   pm.addPass<sys::DCE>();
+  pm.addPass<sys::InlineStore>();
   pm.addPass<sys::GCM>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::RegularFold>();
