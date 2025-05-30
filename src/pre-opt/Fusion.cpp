@@ -1,5 +1,4 @@
 #include "PreLoopPasses.h"
-#include "PrePasses.h"
 
 using namespace sys;
 
@@ -78,13 +77,16 @@ void Fusion::runImpl(FuncOp *func) {
       if (!fusible(next, loop))
         return;
 
+      // TODO: Check dependency.
+
       // Hoist the ops between `next` and `loop` to before `loop`.
       for (auto op : hoisted)
         op->moveBefore(loop);
 
       // Move all ops in `next` to `loop`.
       auto region = next->getRegion();
-      region->moveTo(loop->getRegion()->getLastBlock());
+      auto bb = region->getFirstBlock();
+      bb->inlineToEnd(loop->getRegion()->getLastBlock());
 
       // The ops might still be referencing the induction variable of `next`.
       // Change them to refer to `loop` instead.
@@ -105,9 +107,4 @@ void Fusion::run() {
 
   for (auto func : funcs)
     runImpl(func);
-
-  // Fusion can cause multiple basic blocks to reside in a region,
-  // which we don't want.
-  if (fused)
-    Remerge(module).run();
 }
