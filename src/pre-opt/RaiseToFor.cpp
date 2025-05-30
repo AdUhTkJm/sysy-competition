@@ -4,7 +4,13 @@
 using namespace sys;
 
 static Rule forCond("(lt (load x) y)");
-static Rule constIncr("(store (add (load x) 'a) x)");
+static Rule constIncr("(store (add (load x) y) x)");
+
+std::map<std::string, int> RaiseToFor::stats() {
+  return {
+    { "raised-for-loops", raised },
+  };
+}
 
 void RaiseToFor::run() {
   Builder builder;
@@ -49,22 +55,20 @@ void RaiseToFor::run() {
     
     // Checks all stores to the address in the loop.
     bool good = true, foundIncr = false;
-    int incr;
+    Op *incr;
     for (auto use : ivAddr->getUses()) {
       if (!use->inside(loop) || isa<LoadOp>(use))
         continue;
 
       if (!constIncr.match(use, { { "x", ivAddr } })) {
         good = false;
-        std::cerr << "bad: " << use << "\n";
         break;
       }
 
-      Op *vi = constIncr.extract("'a");
-      // RegularFold guarantees `V(vi) != 0`.
+      Op *vi = constIncr.extract("y");
       if (!foundIncr)
-        incr = V(vi), foundIncr = true;
-      else if (incr != V(vi)) {
+        incr = vi, foundIncr = true;
+      else if (incr != vi) {
         good = false;
         break;
       }
@@ -80,7 +84,8 @@ void RaiseToFor::run() {
       break;
     }
 
-    if (!good)
+    // The increment doesn't need to be a constant, but it must be loop-invariant.
+    if (!good || !foundIncr || (!isa<IntOp>(incr) && incr->inside(loop)))
       continue;
 
     // We also need to check that there's a store to `ivAddr`
@@ -103,6 +108,7 @@ void RaiseToFor::run() {
     // Now time to check for initial value of the induction variable.
     // Go straight up and give up when the first if/while is found.
     Op *runner, *init;
+    bool removable = true;
     for (runner = loop->prevOp(); !runner->atFront(); runner = runner->prevOp()) {
       // This checks while, for and if.
       if (runner->getRegionCount()) {
@@ -110,21 +116,34 @@ void RaiseToFor::run() {
         break;
       }
 
-      // The value found here.
+      // The value is found here.
       if (isa<StoreOp>(runner) && runner->DEF(1) == ivAddr) {
         init = runner->DEF(0);
         break;
       }
+
+      // The address is used between the store and the loop.
+      // We can't remove that store.
+      if (ivAddr->getUses().count(runner))
+        removable = false;
     }
 
     if (!good || runner->atFront())
       continue;
 
+    // Hoist the increment out of loop when possible.
+    if (isa<IntOp>(incr) && incr->inside(loop))
+      incr->moveBefore(loop);
+  
+    // Remove the store to induction variable as initial value, when possible.
+    if (removable)
+      runner->erase();
+
     // We've got all necessary info for `for`. (Bad phrasing.)
     builder.setBeforeOp(loop);
     // Record the `ivAddr` we use. The same alloca might be used afterwards.
     // It is not used in transformations, but is necessary for lowering.
-    auto floop = builder.create<ForOp>({ init, stop, ivAddr }, { new IntAttr(incr) });
+    auto floop = builder.create<ForOp>({ init, stop, incr, ivAddr });
     auto region = floop->appendRegion();
 
     // Move everything in after region to the ForOp.
@@ -163,5 +182,8 @@ void RaiseToFor::run() {
 
     // Erase the while.
     loop->erase();
+
+    // Record that a loop has been raised.
+    raised++;
   }
 }

@@ -488,8 +488,9 @@ void CodeGen::emit(ASTNode *node) {
               ? (Value) builder.create<FloatOp>({ new FloatAttr(0) })
               : (Value) builder.create<IntOp>({ new IntAttr(0) });
           auto stride = builder.create<IntOp>({ new IntAttr(baseSize) });
+          auto incr = builder.create<IntOp>({ new IntAttr(1) });
 
-          auto loop = builder.create<ForOp>({ start, end, iv }, { new IntAttr(1) });
+          auto loop = builder.create<ForOp>({ start, end, incr, iv });
           auto body = loop->appendRegion();
           body->appendBlock();
           

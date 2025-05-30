@@ -52,8 +52,9 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::EarlyConstFold>(/*beforePureness=*/ false);
   pm.addPass<sys::TCO>();
   pm.addPass<sys::Remerge>();
-  // pm.addPass<sys::RaiseToFor>();
+  pm.addPass<sys::RaiseToFor>();
   pm.addPass<sys::DCE>(/*elimBlocks=*/ false);
+  pm.addPass<sys::Fusion>();
   pm.addPass<sys::Lower>();
 
   // ===== Flattened CFG =====

@@ -9,7 +9,7 @@ void Lower::run() {
   // Destruct fors and turn them into whiles.
   for (auto loop : loops) {
     builder.setBeforeOp(loop);
-    auto ivAddr = loop->getOperand(2);
+    auto ivAddr = loop->getOperand(3);
 
     // Put a load of the address at the entry.
     auto region = loop->getRegion();
@@ -23,19 +23,18 @@ void Lower::run() {
     auto terms = loop->findAll<BreakOp>();
     auto conts = loop->findAll<ContinueOp>();
     std::copy(conts.begin(), conts.end(), std::back_inserter(terms));
+    auto incr = loop->getOperand(2);
 
     for (auto op : terms) {
       builder.setBeforeOp(op);
-      auto vi = builder.create<IntOp>({ new IntAttr(V(loop)) });
-      auto add = builder.create<AddIOp>({ iv, vi });
+      auto add = builder.create<AddIOp>({ iv, incr });
       builder.create<StoreOp>({ add, ivAddr });
     }
 
     // Also do it at the end.
     auto last = region->getLastBlock();
     builder.setToBlockEnd(last);
-    auto vi = builder.create<IntOp>({ new IntAttr(V(loop)) });
-    auto add = builder.create<AddIOp>({ iv, vi });
+    auto add = builder.create<AddIOp>({ iv, incr });
     builder.create<StoreOp>({ add, ivAddr });
 
     // Create a while loop.
