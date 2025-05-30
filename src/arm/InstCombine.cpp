@@ -19,19 +19,16 @@ static ArmRule rules[] = {
   "(change (subw x (mov #a)) (!only-if (!inbit 12 (!minus #a)) (addwi x (!minus #a))))",
 
   // CBZ
-  "(change (cbz (csetlt x) >ifso >ifnot) (blt x >ifnot >ifso))",
-  "(change (cbz (csetle x) >ifso >ifnot) (ble x >ifnot >ifso))",
-  "(change (cbz (csetne x) >ifso >ifnot) (beq x >ifso >ifnot))",
-  "(change (cbz (cseteq x) >ifso >ifnot) (bne x >ifso >ifnot))",
+  "(change (cbz (csetlt x y) >ifso >ifnot) (blt x y >ifnot >ifso))",
+  "(change (cbz (csetle x y) >ifso >ifnot) (ble x y >ifnot >ifso))",
+  "(change (cbz (csetne x y) >ifso >ifnot) (beq x y >ifso >ifnot))",
+  "(change (cbz (cseteq x y) >ifso >ifnot) (bne x y >ifso >ifnot))",
 
   // CBNZ
-  "(change (cbnz (csetlt x) >ifso >ifnot) (blt x >ifso >ifnot))",
-  "(change (cbnz (csetle x) >ifso >ifnot) (ble x >ifso >ifnot))",
-  "(change (cbnz (csetne x) >ifso >ifnot) (bne x >ifso >ifnot))",
-  "(change (cbnz (cseteq x) >ifso >ifnot) (beq x >ifso >ifnot))",
-
-  // CMP
-  "(change (cmp x (mov #a)) (!only-if (!inbit 12 #a) (cmpi x #a)))",
+  "(change (cbnz (csetlt x y) >ifso >ifnot) (blt x y >ifso >ifnot))",
+  "(change (cbnz (csetle x y) >ifso >ifnot) (ble x y >ifso >ifnot))",
+  "(change (cbnz (csetne x y) >ifso >ifnot) (bne x y >ifso >ifnot))",
+  "(change (cbnz (cseteq x y) >ifso >ifnot) (beq x y >ifso >ifnot))",
 
   // LDR
   "(change (ldrw (addxi x #a) #b) (!only-if (!inbit 12 (!add #a #b)) (ldrw x (!add #a #b))))",
@@ -40,9 +37,6 @@ static ArmRule rules[] = {
   // STR
   "(change (strw y (addxi x #a) #b) (!only-if (!inbit 12 (!add #a #b)) (strw y x (!add #a #b))))",
   "(change (strx y (addxi x #a) #b) (!only-if (!inbit 12 (!add #a #b)) (strx y x (!add #a #b))))",
-
-  // Meaning: jump to `ifso` if x == 0.
-  "(change (beq (tst x x) >ifso >ifnot) (cbz x >ifso >ifnot))",
 };
 
 void InstCombine::run() {

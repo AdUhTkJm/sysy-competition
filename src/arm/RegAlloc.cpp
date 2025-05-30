@@ -86,9 +86,12 @@ std::map<std::string, int> RegAlloc::stats() {
 #define BINARY UNARY ADD_ATTR(1, Rs2Attr)
 #define TERNARY BINARY ADD_ATTR(2, Rs3Attr)
 
-#define REPLACE_BRANCH(T1, T2, attrs) \
-  REPLACE_BRANCH_IMPL(T1, T2, attrs); \
-  REPLACE_BRANCH_IMPL(T2, T1, attrs)
+#define UNARY_BRANCH RSC(RS(op))
+#define BINARY_BRANCH RSC(RS(op)), RS2C(RS2(op))
+
+#define REPLACE_BRANCH(T1, T2, ...) \
+  REPLACE_BRANCH_IMPL(T1, T2, __VA_ARGS__); \
+  REPLACE_BRANCH_IMPL(T2, T1, __VA_ARGS__)
 
 // Say the before is `blt`, then we might see
 //   blt %1 %2 <target = bb1> <else = bb2>
@@ -97,7 +100,7 @@ std::map<std::string, int> RegAlloc::stats() {
 // If the next block is just <bb1>, then we flip it to bge, and make the target <bb2>.
 // if the next block is <bb2>, then we make the target <bb2>.
 // otherwise, make the target <bb1>, and add another `j <bb2>`.
-#define REPLACE_BRANCH_IMPL(BeforeTy, AfterTy, attrs) \
+#define REPLACE_BRANCH_IMPL(BeforeTy, AfterTy, ...) \
   runRewriter(funcOp, [&](BeforeTy *op) { \
     if (!op->has<ElseAttr>()) \
       return false; \
@@ -112,7 +115,7 @@ std::map<std::string, int> RegAlloc::stats() {
     if (me->nextBlock() == target) { \
       builder.replace<AfterTy>(op, { \
         new TargetAttr(ifnot), \
-        attrs \
+        __VA_ARGS__ \
       }); \
       return true; \
     } \
@@ -589,13 +592,27 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(LsrXOp, BINARY);
   LOWER(AsrWOp, BINARY);
   LOWER(AsrXOp, BINARY);
-  LOWER(CmpOp, BINARY);
-  LOWER(FcmpOp, BINARY);
-  LOWER(TstOp, BINARY);
   LOWER(FaddOp, BINARY);
   LOWER(FsubOp, BINARY);
   LOWER(FmulOp, BINARY);
   LOWER(FdivOp, BINARY);
+  
+  LOWER(BltOp, BINARY);
+  LOWER(BleOp, BINARY);
+  LOWER(BeqOp, BINARY);
+  LOWER(BneOp, BINARY);
+  LOWER(BgtOp, BINARY);
+  LOWER(BgeOp, BINARY);
+  LOWER(CsetLeOp, BINARY);
+  LOWER(CsetLtOp, BINARY);
+  LOWER(CsetNeOp, BINARY);
+  LOWER(CsetEqOp, BINARY);
+  LOWER(CsetLeFOp, BINARY);
+  LOWER(CsetLtFOp, BINARY);
+  LOWER(CsetNeFOp, BINARY);
+  LOWER(CsetEqFOp, BINARY);
+  LOWER(CsetEqTstOp, BINARY);
+  LOWER(CsetNeTstOp, BINARY);
   
   LOWER(LdrWOp, UNARY);
   LOWER(LdrXOp, UNARY);
@@ -614,24 +631,13 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(AsrXIOp, UNARY);
   LOWER(CbzOp, UNARY);
   LOWER(CbnzOp, UNARY);
-  LOWER(CmpIOp, UNARY);
   LOWER(ScvtfOp, UNARY);
   LOWER(FcvtzsOp, UNARY);
   LOWER(FmovWOp, UNARY);
   LOWER(NegOp, UNARY);
   LOWER(FnegOp, UNARY);
-  LOWER(FcmpZOp, UNARY);
-  
-  // Branches don't have operands; they rely on flags.
-  LOWER(BltOp, NULLARY);
-  LOWER(BleOp, NULLARY);
-  LOWER(BeqOp, NULLARY);
-  LOWER(BneOp, NULLARY);
-  // Same applies for cset operations.
-  LOWER(CsetLeOp, NULLARY);
-  LOWER(CsetLtOp, NULLARY);
-  LOWER(CsetNeOp, NULLARY);
-  LOWER(CsetEqOp, NULLARY);
+  LOWER(CsetEqFcmpZOp, UNARY);
+  LOWER(CsetNeFcmpZOp, UNARY);
 
   // Note that some ops are dealt with later.
   // We can't remove all operands here.
@@ -1099,10 +1105,10 @@ void RegAlloc::tidyup(Region *region) {
 
   // Now branches are still having both TargetAttr and ElseAttr.
   // Replace them (perform split when necessary), so that they only have one target.
-  REPLACE_BRANCH(BltOp, BgeOp,);
-  REPLACE_BRANCH(BleOp, BgtOp,);
-  REPLACE_BRANCH(BeqOp, BneOp,);
-  REPLACE_BRANCH(CbzOp, CbnzOp, RSC(RS(op)));
+  REPLACE_BRANCH(BltOp, BgeOp, BINARY_BRANCH);
+  REPLACE_BRANCH(BleOp, BgtOp, BINARY_BRANCH);
+  REPLACE_BRANCH(BeqOp, BneOp, BINARY_BRANCH);
+  REPLACE_BRANCH(CbzOp, CbnzOp, UNARY_BRANCH);
 
   // Also, eliminate useless BOp.
   runRewriter(funcOp, [&](BOp *op) {

@@ -39,6 +39,12 @@ using namespace sys::arm;
   case Ty::id: \
     os << name << ' ' << wreg(RS(op)) << ", bb" << bbcnt(TARGET(op)) << "\n"; \
     break
+    
+#define JMP_BINARY(Ty, name) \
+  case Ty::id: \
+    os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n"; \
+    os << name << " bb" << bbcnt(TARGET(op)) << "\n"; \
+    break
 
 #define TERNARY_W(Ty, name) TERNARY(Ty, name, wreg)
 #define TERNARY_X(Ty, name) TERNARY(Ty, name, xreg)
@@ -100,16 +106,10 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   BINARY_F(FmulOp, "fmul");
   BINARY_F(FdivOp, "fdiv");
 
-  BINARY_NO_RD_W(CmpOp, "cmp");
-  BINARY_NO_RD_W(TstOp, "tst");
-  BINARY_NO_RD_F(FcmpOp, "tst");
-
   BINARY_X(AddXOp, "add");
   BINARY_X(MulXOp, "mul");
 
   UNARY_I_W(AddWIOp, "add");
-
-  UNARY_I_NO_RD_W(CmpIOp, "cmp");
 
   UNARY_I_X(AddXIOp, "add");
 
@@ -120,19 +120,16 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   UNARY_F(FmovOp, "fmov");
 
   JMP(BOp, "b");
-  JMP(BneOp, "bne");
-  JMP(BeqOp, "beq");
-  JMP(BltOp, "blt");
-  JMP(BleOp, "ble");
-  JMP(BgtOp, "bgt");
-  JMP(BgeOp, "bge");
+  JMP_BINARY(BneOp, "bne");
+  JMP_BINARY(BeqOp, "beq");
+  JMP_BINARY(BltOp, "blt");
+  JMP_BINARY(BleOp, "ble");
+  JMP_BINARY(BgtOp, "bgt");
+  JMP_BINARY(BgeOp, "bge");
 
   JMP_UNARY(CbzOp, "cbz");
   JMP_UNARY(CbnzOp, "cbnz");
 
-  case FcmpZOp::id:
-    os << "fcmp " << freg(RD(op)) << ", #0.0\n";
-    break;
   case AdrOp::id:
     os << "ldr " << xreg(RD(op)) << ", =" << NAME(op) << "\n";
     break;
@@ -161,15 +158,51 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     os << "ldr " << freg(RD(op)) << ", [" << xreg(RS(op)) << ", #" << V(op) << "]\n";
     break;
   case CsetLtOp::id:
+    os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
     os << "cset " << wreg(RD(op)) << ", lt\n";
     break;
   case CsetLeOp::id:
+    os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
     os << "cset " << wreg(RD(op)) << ", le\n";
     break;
   case CsetNeOp::id:
+    os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
     os << "cset " << wreg(RD(op)) << ", ne\n";
     break;
   case CsetEqOp::id:
+    os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
+    os << "cset " << wreg(RD(op)) << ", eq\n";
+    break;
+  case CsetLtFOp::id:
+    os << "cmp " << freg(RS(op)) << ", " << freg(RS2(op)) << "\n";
+    os << "cset " << wreg(RD(op)) << ", lt\n";
+    break;
+  case CsetLeFOp::id:
+    os << "cmp " << freg(RS(op)) << ", " << freg(RS2(op)) << "\n";
+    os << "cset " << wreg(RD(op)) << ", le\n";
+    break;
+  case CsetNeFOp::id:
+    os << "cmp " << freg(RS(op)) << ", " << freg(RS2(op)) << "\n";
+    os << "cset " << wreg(RD(op)) << ", ne\n";
+    break;
+  case CsetEqFOp::id:
+    os << "cmp " << freg(RS(op)) << ", " << freg(RS2(op)) << "\n";
+    os << "cset " << wreg(RD(op)) << ", eq\n";
+    break;
+  case CsetEqFcmpZOp::id:
+    os << "fcmpz " << freg(RS(op)) << "\n";
+    os << "cset " << wreg(RD(op)) << ", eq\n";
+    break;
+  case CsetNeFcmpZOp::id:
+    os << "fcmpz " << freg(RS(op)) << "\n";
+    os << "cset " << wreg(RD(op)) << ", ne\n";
+    break;
+  case CsetNeTstOp::id:
+    os << "tst " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
+    os << "cset " << wreg(RD(op)) << ", ne\n";
+    break;
+  case CsetEqTstOp::id:
+    os << "tst " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
     os << "cset " << wreg(RD(op)) << ", eq\n";
     break;
   case RetOp::id:

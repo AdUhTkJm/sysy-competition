@@ -81,6 +81,27 @@ using namespace sys::arm;
     return true; \
   }
 
+#define MATCH_BRANCH_BINARY(opcode, Ty) \
+  if (opname == opcode && isa<Ty>(op)) { \
+    if (!matchExpr(list->elements[1], op->getOperand(0).defining)) \
+      return false; \
+    if (!matchExpr(list->elements[2], op->getOperand(1).defining)) \
+      return false; \
+    auto target = TARGET(op); \
+    auto var = cast<Atom>(list->elements[3])->value; \
+    assert(var[0] == '>'); \
+    if (blockBinding.count(var)) \
+      return blockBinding[var] == target; \
+    blockBinding[var] = target; \
+    auto ifnot = ELSE(op); \
+    var = cast<Atom>(list->elements[4])->value; \
+    assert(var[0] == '>'); \
+    if (blockBinding.count(var)) \
+      return blockBinding[var] == ifnot; \
+    blockBinding[var] = ifnot; \
+    return true; \
+  }
+
 #define EVAL_BINARY(opcode, op) \
   if (opname == "!" opcode) { \
     int a = evalExpr(list->elements[1]); \
@@ -144,6 +165,17 @@ using namespace sys::arm;
     BasicBlock *target = blockBinding[bb1]; \
     BasicBlock *ifnot = blockBinding[bb2]; \
     return builder.create<Ty>({ arg }, { new TargetAttr(target), new ElseAttr(ifnot) }); \
+  }
+
+#define BUILD_BRANCH_BINARY(opcode, Ty) \
+  if (opname == opcode) { \
+    Value arg1 = buildExpr(list->elements[1]); \
+    Value arg2 = buildExpr(list->elements[2]); \
+    auto bb1 = cast<Atom>(list->elements[3])->value; \
+    auto bb2 = cast<Atom>(list->elements[4])->value; \
+    BasicBlock *target = blockBinding[bb1]; \
+    BasicBlock *ifnot = blockBinding[bb2]; \
+    return builder.create<Ty>({ arg1, arg2 }, { new TargetAttr(target), new ElseAttr(ifnot) }); \
   }
 
 ArmRule::ArmRule(const char *text): text(text) {
@@ -248,8 +280,10 @@ bool ArmRule::matchExpr(Expr *expr, Op* op) {
   MATCH_BINARY("and", AndOp);
   MATCH_BINARY("or", OrOp);
   MATCH_BINARY("eor", EorOp);
-  MATCH_BINARY("tst", TstOp);
-  MATCH_BINARY("cmp", CmpOp);
+  MATCH_BINARY("csetne", CsetNeOp);
+  MATCH_BINARY("csetlt", CsetLtOp);
+  MATCH_BINARY("csetle", CsetLeOp);
+  MATCH_BINARY("cseteq", CsetEqOp);
 
   MATCH_BINARY_IMM("strw", StrWOp);
   MATCH_BINARY_IMM("strf", StrFOp);
@@ -267,7 +301,6 @@ bool ArmRule::matchExpr(Expr *expr, Op* op) {
   MATCH_UNARY_IMM("lsrxi", LsrXIOp);
   MATCH_UNARY_IMM("asrwi", AsrWIOp);
   MATCH_UNARY_IMM("asrxi", AsrXIOp);
-  MATCH_UNARY_IMM("cmpi", CmpIOp);
   MATCH_UNARY_IMM("andi", AndIOp);
   MATCH_UNARY_IMM("ori", OrIOp);
   MATCH_UNARY_IMM("eori", EorIOp);
@@ -275,19 +308,15 @@ bool ArmRule::matchExpr(Expr *expr, Op* op) {
   MATCH_IMM("mov", MovIOp);
 
   MATCH_UNARY("neg", NegOp);
-  MATCH_UNARY("csetne", CsetNeOp);
-  MATCH_UNARY("csetlt", CsetLtOp);
-  MATCH_UNARY("csetle", CsetLeOp);
-  MATCH_UNARY("cseteq", CsetEqOp);
 
   MATCH_BRANCH("cbz", CbzOp);
   MATCH_BRANCH("cbnz", CbnzOp);
-  MATCH_BRANCH("beq", BeqOp);
-  MATCH_BRANCH("bne", BneOp);
-  MATCH_BRANCH("blt", BltOp);
-  MATCH_BRANCH("bgt", BgtOp);
-  MATCH_BRANCH("ble", BleOp);
-  MATCH_BRANCH("bge", BgeOp);
+  MATCH_BRANCH_BINARY("beq", BeqOp);
+  MATCH_BRANCH_BINARY("bne", BneOp);
+  MATCH_BRANCH_BINARY("blt", BltOp);
+  MATCH_BRANCH_BINARY("bgt", BgtOp);
+  MATCH_BRANCH_BINARY("ble", BleOp);
+  MATCH_BRANCH_BINARY("bge", BgeOp);
 
   if (opname == "j" && isa<GotoOp>(op)) {
     auto target = TARGET(op);
@@ -408,8 +437,10 @@ Op *ArmRule::buildExpr(Expr *expr) {
   BUILD_BINARY("and", AndOp);
   BUILD_BINARY("or", OrOp);
   BUILD_BINARY("eor", EorOp);
-  BUILD_BINARY("tst", TstOp);
-  BUILD_BINARY("cmp", CmpOp);
+  BUILD_BINARY("csetne", CsetNeOp);
+  BUILD_BINARY("csetlt", CsetLtOp);
+  BUILD_BINARY("csetle", CsetLeOp);
+  BUILD_BINARY("cseteq", CsetEqOp);
 
   BUILD_BINARY_IMM("strw", StrWOp);
   BUILD_BINARY_IMM("strf", StrFOp);
@@ -425,7 +456,6 @@ Op *ArmRule::buildExpr(Expr *expr) {
   BUILD_UNARY_IMM("lslxi", LslXIOp);
   BUILD_UNARY_IMM("asrwi", AsrWIOp);
   BUILD_UNARY_IMM("asrxi", AsrXIOp);
-  BUILD_UNARY_IMM("cmpi", CmpIOp);
   BUILD_UNARY_IMM("andi", AndIOp);
   BUILD_UNARY_IMM("ori", OrIOp);
   BUILD_UNARY_IMM("eori", EorIOp);
@@ -433,18 +463,15 @@ Op *ArmRule::buildExpr(Expr *expr) {
   BUILD_IMM("mov", MovIOp);
 
   BUILD_UNARY("neg", NegOp);
-  BUILD_UNARY("csetne", CsetNeOp);
-  BUILD_UNARY("csetlt", CsetLtOp);
-  BUILD_UNARY("csetle", CsetLeOp);
-  BUILD_UNARY("cseteq", CsetEqOp);
 
   BUILD_BRANCH("cbz", CbzOp);
   BUILD_BRANCH("cbnz", CbnzOp);
-  BUILD_BRANCH("beq", BeqOp);
-  BUILD_BRANCH("bne", BneOp);
-  BUILD_BRANCH("blt", BltOp);
-  BUILD_BRANCH("bgt", BgtOp);
-  BUILD_BRANCH("ble", BleOp);
+  BUILD_BRANCH_BINARY("beq", BeqOp);
+  BUILD_BRANCH_BINARY("bne", BneOp);
+  BUILD_BRANCH_BINARY("blt", BltOp);
+  BUILD_BRANCH_BINARY("bgt", BgtOp);
+  BUILD_BRANCH_BINARY("ble", BleOp);
+  BUILD_BRANCH_BINARY("bge", BgeOp);
 
   if (opname == "b") {
     auto bb = cast<Atom>(list->elements[1])->value;

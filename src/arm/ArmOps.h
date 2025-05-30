@@ -80,6 +80,7 @@ ARMOP(UdivWOp);
 
 ARMOP(MlaOp);
 ARMOP(MsubWOp); // Multiply-sub: rs3 - rs2 * rs
+ARMOPL(MsubXOp);
 ARMOP(NegOp);
 ARMOPF(FnegOp);
 
@@ -126,19 +127,33 @@ ARMOP(AsrWIOp); // Arithmetic r-shift, accept immediate
 ARMOPL(AsrXIOp); // Arithmetic r-shift, accept immediate
 
 ARMOP(CselOp); // xd = cond ? xn : xm
-ARMOP(CmpOp); // We do think `cmp` has a result, which is "explicitly" stating the CPSR flags
-ARMOP(CmpIOp); // Accept immediate
-ARMOP(TstOp); // Same applies to `tst`
 
 // ====== CSET family ======
 // Read CPSR flags into a register. Each flag is a different op.
-// It takes the result of CmpOp.
+// We don't allow CmpOp and similar to appear in itself.
+// It implicitly carries a CmpOp with it.
 ARMOP(CsetNeOp); // Z == 0
 ARMOP(CsetEqOp); // Z == 1
 ARMOP(CsetLtOp);
 ARMOP(CsetLeOp);
 ARMOP(CsetGtOp);
 ARMOP(CsetGeOp);
+
+// These carry an FcmpOp.
+ARMOP(CsetNeFOp);
+ARMOP(CsetEqFOp);
+ARMOP(CsetLtFOp);
+ARMOP(CsetLeFOp);
+ARMOP(CsetGtFOp);
+ARMOP(CsetGeFOp);
+
+// These carry a TstOp.
+ARMOP(CsetNeTstOp);
+ARMOP(CsetEqTstOp);
+
+// These carry an FcmpZOp.
+ARMOP(CsetNeFcmpZOp);
+ARMOP(CsetEqFcmpZOp);
 
 // ====== Branch family ======
 // Note all of them takes ONE argument. For B-series it's the CPSR flags given by CmpOp,
@@ -159,8 +174,6 @@ ARMOP(RetOp);
 ARMOP(BlOp); // Branch-and-link (jal in RISC-V), so just a call
 
 ARMOPF(ScvtfOp); // i32 -> f32
-ARMOP(FcmpOp);
-ARMOP(FcmpZOp); // Compare with 0
 ARMOP(FmovOp);
 ARMOP(FcvtzsOp); // f32 -> i32, rounding to zero
 ARMOPF(FaddOp);
@@ -189,9 +202,6 @@ inline bool hasRd(Op *op) {
     isa<CbzOp>(op) ||
     isa<CbnzOp>(op) ||
     isa<RetOp>(op) ||
-    isa<CmpOp>(op) ||
-    isa<FcmpOp>(op) ||
-    isa<TstOp>(op) ||
     isa<WriteRegOp>(op) ||
     isa<SubSpOp>(op)
   );
