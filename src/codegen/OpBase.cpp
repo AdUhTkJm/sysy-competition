@@ -207,6 +207,12 @@ void Op::setAttribute(int i, Attr *attr) {
 }
 
 void Op::erase() {
+  parent->remove(place);
+  removeAllOperands();
+
+  for (auto region : regions)
+    region->erase();
+
   if (uses.size()) {
     std::cerr << "removing op in use:\n  ";
     dump(std::cerr);
@@ -217,12 +223,6 @@ void Op::erase() {
     }
     assert(false);
   }
-  
-  parent->remove(place);
-  removeAllOperands();
-
-  for (auto region : regions)
-    region->erase();
   
   toDelete.push_back(this);
 }

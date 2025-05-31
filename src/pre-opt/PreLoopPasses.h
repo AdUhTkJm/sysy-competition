@@ -5,6 +5,8 @@
 #include "../codegen/CodeGen.h"
 #include "../codegen/Ops.h"
 #include "../codegen/Attrs.h"
+#include "PreAttrs.h"
+#include <unordered_set>
 
 namespace sys {
 
@@ -17,6 +19,33 @@ public:
   std::string name() override { return "raise-to-for"; }
   std::map<std::string, int> stats() override;
   void run() override;
+};
+
+// Determine whether a const array is a view of another.
+// In that case, inline it.
+class View : public Pass {
+  int inlined = 0;
+  
+  std::unordered_map<std::string, std::unordered_set<Op*>> usedIn;
+  void runImpl(Op *func);
+public:
+  View(ModuleOp *module): Pass(module) {}
+
+  std::string name() override { return "view"; }
+  std::map<std::string, int> stats() override;
+  void run() override;
+};
+
+// Erase useless loops.
+class LoopDCE : public Pass {
+  int erased = 0;
+public:
+  LoopDCE(ModuleOp *module): Pass(module) {}
+
+  std::string name() override { return "loop-dce"; }
+  std::map<std::string, int> stats() override;
+  void run() override;
+
 };
 
 // Loop fusion.

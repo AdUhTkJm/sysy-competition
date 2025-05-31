@@ -4,6 +4,7 @@
 #include "../opt/Pass.h"
 #include "../codegen/Ops.h"
 #include "../codegen/Attrs.h"
+#include "PreAttrs.h"
 
 namespace sys {
 

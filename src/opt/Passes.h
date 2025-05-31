@@ -202,6 +202,20 @@ public:
   void run() override;
 };
 
+// Use SMT solver to super-optimize.
+class Superopt : public Pass {
+  int optimized = 0;
+
+  void rewireExit(Region *region);
+  void runImpl(Op *op);
+public:
+  Superopt(ModuleOp *module): Pass(module) {}
+    
+  std::string name() override { return "verify"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
+};
+
 class Verify : public Pass {
 public:
   Verify(ModuleOp *module): Pass(module) {}

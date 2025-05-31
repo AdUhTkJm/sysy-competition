@@ -1,5 +1,4 @@
 #include "PreAnalysis.h"
-#include "PreAttrs.h"
 
 using namespace sys;
 
@@ -55,6 +54,14 @@ void ArrayAccess::runImpl(Op *loop, std::vector<Op*> outer) {
       continue;
     }
 
+    if (isa<IfOp>(op)) {
+      runImpl(op, outer);
+      continue;
+    }
+
+    // Though WhileOp has regions, it is not considered here.
+    // It's because induction variable isn't clear.
+
     if (isa<AddIOp>(op)) {
       auto x = op->DEF(0);
       auto y = op->DEF(1);
@@ -99,6 +106,7 @@ void ArrayAccess::runImpl(Op *loop, std::vector<Op*> outer) {
           vx[i] += vy[i];
       }
       op->add<SubscriptAttr>(vx);
+      continue;
     }
   }
 }
