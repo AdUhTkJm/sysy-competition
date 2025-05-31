@@ -8,7 +8,7 @@
 namespace smt {
 
 #define TYPES \
-  X(Var) X(Const) X(And) X(Or) X(Xor) X(Not) X(Add) X(Eq)
+  X(Var) X(Const) X(And) X(Or) X(Xor) X(Not) X(Add) X(Eq) X(Ne)
 
 class BvExpr {
 public:
@@ -29,9 +29,10 @@ public:
   std::string name;
 
   BvExpr(Type ty): ty(ty) {}
+  BvExpr(Type ty, int vi): ty(ty), vi(vi) {}
   BvExpr(Type ty, BvExpr *l): ty(ty), l(l) {}
   BvExpr(Type ty, BvExpr *l, BvExpr *r): ty(ty), l(l), r(r) {}
-  BvExpr(const std::string &name): ty(Var), name(name) {}
+  BvExpr(Type ty, const std::string &name): ty(ty), name(name) {}
 
   std::string dump(std::ostream &os = std::cerr);
 };
@@ -66,7 +67,7 @@ class BvExprContext {
 
   std::unordered_set<BvExpr*, Hash, Eq> set;
 public:
-  template<class T, class... Args>
+  template<class... Args>
   BvExpr *create(BvExpr::Type ty, Args... args) {
     BvExpr *p = new BvExpr(ty, args...);
     if (auto it = set.find(p); it != set.end()) {

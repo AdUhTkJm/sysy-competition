@@ -5,6 +5,7 @@
 #include <vector>
 #include <unordered_map>
 #include <string>
+#include <queue>
 
 namespace smt {
 
@@ -59,6 +60,8 @@ class Solver {
   int dl = 0;
   // Total variable count.
   int varcnt = -1;
+  // Conflict count since last decay.
+  int conflict = 0;
   // The current place we should start dealing with unit propagation.
   size_t qhead = 0;
 
@@ -66,7 +69,20 @@ class Solver {
   bool addedConflict = false;
   // Set to true when unit propagation detects a conflict.
   bool unitConflict = false;
+
   Clause *conflictClause;
+
+  // Activity scores for each variable.
+  std::vector<double> activity;
+  // Heap of variables.
+  std::priority_queue<std::pair<double, Variable>> vheap;
+  // The phase (the preferred value of exploration) of variables.
+  std::vector<Boolean> phase;
+
+  // Increment of activity.
+  double inc = 1.0;
+  // Decay.
+  static constexpr double decay = 0.95;
 
   Boolean value(Atomic atom);
 

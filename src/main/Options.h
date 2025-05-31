@@ -18,6 +18,8 @@ struct Options {
     option verbose : 1;
     option stats : 1;
     option verify : 1;
+    option bv : 1;
+    option sat : 1;
   };
 
   std::string inputFile;

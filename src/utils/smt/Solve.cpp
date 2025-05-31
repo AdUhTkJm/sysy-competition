@@ -83,9 +83,34 @@ Bitvector BvSolver::blastAdd(const Bitvector &a, const Bitvector &b) {
   return result;
 }
 
+Bitvector BvSolver::blastConst(int vi) {
+  Bitvector c(32);
+  for (int i = 0; i < 32; i++) {
+    c[i] = ctx.create();
+    if ((vi >> i) & 1)
+      uf.link(c[i], _true);
+    else
+      uf.link(c[i], _false);
+  }
+  return c;
+}
+
 void BvSolver::blastEq(const Bitvector &a, const Bitvector &b) {
   for (int i = 0; i < 32; i++)
     uf.link(a[i], b[i]);
+}
+
+// Implemented as (a[1] ^ b[1]) | (a[2] ^ b[2]) | ...
+void BvSolver::blastNe(const Bitvector &a, const Bitvector &b) {
+  Bitvector c(32);
+  for (int i = 0; i < 32; i++) {
+    c[i] = ctx.create();
+    addXor(c[i], a[i], b[i]);
+  }
+  
+  for (int i = 0; i < 32; i++)
+    c[i] = ctx.pos(c[i]);
+  reserve(c);
 }
 
 Bitvector BvSolver::blastOp(BvExpr *expr) {
@@ -106,6 +131,12 @@ void BvSolver::blast(BvExpr *expr) {
     auto l = blastOp(expr->l);
     auto r = blastOp(expr->r);
     blastEq(l, r);
+    break;
+  }
+  case BvExpr::Ne: {
+    auto l = blastOp(expr->l);
+    auto r = blastOp(expr->r);
+    blastNe(l, r);
     break;
   }
   default:

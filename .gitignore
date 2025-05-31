@@ -3,6 +3,8 @@ bin
 test/official
 test/temp
 test/fuzz
+test/cnf
+test/cnf_performance
 temp
 final_performance
 functional

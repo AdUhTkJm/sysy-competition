@@ -16,6 +16,9 @@
 #include "../pre-opt/PreAnalysis.h"
 #include "../arm/ArmPasses.h"
 #include "../rv/RvPasses.h"
+#include "../utils/smt/SMT.h"
+
+using namespace smt;
 
 sys::Options opts;
 
@@ -120,8 +123,82 @@ void initPipeline(sys::PassManager &pm) {
     initRvPipeline(pm);
 }
 
+void removeDuplicates(std::vector<Atomic>& clause) {
+  std::sort(clause.begin(), clause.end());
+  auto last = std::unique(clause.begin(), clause.end());
+  clause.erase(last, clause.end());
+}
+
+void sat() {
+  Solver solver;
+  std::string line;
+  std::getline(std::cin, line);
+  while (line[0] == 'c')
+    std::getline(std::cin, line);
+
+  std::istringstream headerStream(line);
+  int n, m;
+  std::string dummy;
+  headerStream >> dummy >> dummy >> m >> n;
+  solver.init(m);
+
+  for (int i = 0; i < n; ++i) {
+    std::getline(std::cin, line);
+
+    std::vector<Atomic> clause;
+    std::istringstream lineStream(line);
+    int lit;
+
+    while (lineStream >> lit) {
+      if (lit == 0)
+        break;
+      auto var = std::abs(lit) - 1;
+      clause.push_back((Atomic) (lit < 0 ? var * 2 + 1 : var * 2));
+    }
+
+    removeDuplicates(clause);
+    solver.addClause(clause);
+  }
+  std::vector<signed char> assignments;
+  bool succ = solver.solve(assignments);
+  if (!succ) {
+    std::cout << "unsat\n";
+    return;
+  }
+
+  std::cout << "sat\n";
+  for (int i = 0; i < m; i++)
+    std::cout << (i + 1) << " = " << (assignments[i] ? "true" : "false") << "\n";
+}
+
+void bv() {
+  BvSolver solver;
+  BvExprContext ctx;
+  auto a = ctx.create(BvExpr::Const, 1);
+  auto b = ctx.create(BvExpr::Const, 2);
+  auto add = ctx.create(BvExpr::Add, a, b);
+  auto c = ctx.create(BvExpr::Const, 3);
+  auto ne = ctx.create(BvExpr::Ne, add, c);
+  bool succ = solver.infer(ne);
+  if (succ)
+    std::cout << "sat\n";
+  else
+    std::cout << "unsat\n";
+}
+
 int main(int argc, char **argv) {
   opts = sys::parseArgs(argc, argv);
+
+  // Test for submodule: bitvector SMT solver, and CDCL SAT solver.
+  if (opts.bv) {
+    bv();
+    return 0;
+  }
+
+  if (opts.sat) {
+    sat();
+    return 0;
+  }
 
   // Read input file.
   std::ifstream ifs(opts.inputFile);

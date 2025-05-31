@@ -88,40 +88,53 @@ void Solver::unitPropagation() {
         continue;
       }
 
-      Atomic watch = -1;
       // Try to find another literal to watch in the clause.
-      for (auto atomic : clause->content) {
-        if (atomic == neg || atomic == other)
-          continue;
+      // When there's only 2 literals, no other things are possible.
+      if (clause->content.size() > 2) {
+        Atomic watch = -1;
+        for (auto atomic : clause->content) {
+          if (atomic == neg || atomic == other)
+            continue;
 
-        if (value(atomic) != False) {
-          watch = atomic;
-          break;
+          if (value(atomic) != False) {
+            watch = atomic;
+            break;
+          }
+        }
+
+        if (watch != -1) {
+          clause->watch[watchid] = watch;
+          // Remove the current clause from watchers of `neg`.
+          watches[i] = watches.back();
+          watches.pop_back();
+          // Add the current clause to watchers of `watch`.
+          watched[watch].push_back(clause);
+          // Don't increment `i` because the current element has changed to a new one.
+          continue;
         }
       }
 
-      if (watch != -1) {
-        clause->watch[watchid] = watch;
-        // Remove the current clause from watchers of `neg`.
-        watches[i] = watches.back();
-        watches.pop_back();
-        // Add the current clause to watchers of `watch`.
-        watched[watch].push_back(clause);
-        // Don't increment `i` because the current element has changed to a new one.
-        continue;
-      } else {
-        if (other == -1 || value(other) == False) {
-          // Conflict.
-          unitConflict = true;
-          conflictClause = clause;
-          return;
+      // No other literals to watch. We can determine the final literal.
+      
+      // Assigned false. A conflict.
+      if (other == -1 || value(other) == False) {
+        // Increase activity.
+        for (auto atom : clause->content) {
+          Variable v = VAR(atom);
+          activity[v] += inc;
+          vheap.push({ activity[v], v });
         }
 
-        // Trigger a new round of unit propagation.
-        if (value(other) == Unassigned) {
-          enqueue(other, clause);
-          i++;
-        }
+        // Conflict.
+        unitConflict = true;
+        conflictClause = clause;
+        return;
+      }
+
+      // Trigger a new round of unit propagation.
+      if (value(other) == Unassigned) {
+        enqueue(other, clause);
+        i++;
       }
     }
   }
@@ -152,6 +165,12 @@ std::pair<int, std::vector<Atomic>> Solver::analyzeConflict() {
     assert(implied != -1);
 
     auto ante = antecedent[VAR(implied)];
+    // Increase activity of antecedent.
+    for (auto atom : ante->content) {
+      Variable v = VAR(atom);
+      activity[v] += inc;
+      vheap.push({ activity[v], v });
+    }
     
     for (auto atom : ante->content)
       learnt.insert(atom);
@@ -165,10 +184,19 @@ std::pair<int, std::vector<Atomic>> Solver::analyzeConflict() {
         atomics.insert(atom);
     }
   }
+
+  inc /= decay;
+  // Scale activity to prevent overflow.
+  if (inc >= 1e100) {
+    inc *= 1e-100;
+    for (int i = 0; i < varcnt; i++)
+      activity[i] *= 1e-100;
+  }
   
   // Backtrack to the second largest decision level.
   // If that doesn't exist, backtrack to dl = 0.
   std::vector<Atomic> result(learnt.begin(), learnt.end());
+
   if (result.size() <= 1)
     return { 0, result };
   else {
@@ -252,7 +280,9 @@ void Solver::enqueue(Atomic atom, Clause* ante) {
   if (assignment[var] != 0)
     return;
   
-  assignment[var] = !ISNEG(atom) ? True : False;
+  Boolean result = !ISNEG(atom) ? True : False;
+  phase[var] = result;
+  assignment[var] = result;
   antecedent[var] = ante;
   decisionLevel[var] = dl;
   trail.push_back(atom);
@@ -278,10 +308,32 @@ bool Solver::allAssigned() {
 }
 
 std::pair<Variable, Solver::Boolean> Solver::pickPivot() {
-  // Pick the first unassigned one, for now.
-  for (int i = 0; i < varcnt; i++) {
-    if (assignment[i] == Unassigned)
-      return { i, rand() & 1 ? True : False };
+  // If the heap is too large, rebuild it.
+  if (vheap.size() > varcnt * 8) {
+    decltype(vheap) newHeap;
+    for (Variable v = 0; v < varcnt; v++) {
+      if (assignment[v] == Unassigned)
+        newHeap.push({ activity[v], v });
+    }
+    vheap = std::move(newHeap);
+  }
+
+  while (!vheap.empty()) {
+    auto [score, v] = vheap.top();
+    vheap.pop();
+
+    // Stale.
+    if (score < activity[v])
+      continue;
+
+    if (assignment[v] == Unassigned)
+      return { v, phase[v] == Unassigned ? True : phase[v] };
+  }
+
+  // Pick the first unassigned variable if heap is exhausted.
+  for (Variable v = 0; v < varcnt; v++) {
+    if (assignment[v] == Unassigned)
+      return { v, phase[v] == Unassigned ? True : phase[v] };
   }
   assert(false);
 }
@@ -293,6 +345,8 @@ void Solver::init(int varcnt) {
   decisionLevel.resize(varcnt);
   // These are index by atomics.
   watched.resize(varcnt * 2 + 1);
+  activity.resize(varcnt);
+  phase.resize(varcnt);
 
   unitConflict = false;
 
@@ -314,6 +368,7 @@ bool Solver::solve(std::vector<signed char> &assignments) {
   assert(varcnt != -1);
   qhead = 0;
   dl = 0;
+  conflict = 0;
 
   if (addedConflict) {
     addedConflict = false;
@@ -353,6 +408,11 @@ bool Solver::solve(std::vector<signed char> &assignments) {
       enqueue(atom, cl);
     }
   }
+
+  // Clear clauses.
+  for (auto clause : clauses)
+    delete clause;
+  clauses.clear();
 
   assignments.resize(varcnt);
   for (int i = 0; i < varcnt; i++)

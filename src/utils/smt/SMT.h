@@ -41,9 +41,11 @@ class BvSolver {
   void addXor(Variable o, Variable a, Variable b);
 
   // These blast functions will add clauses to solver.
+  Bitvector blastConst(int vi);
   Bitvector blastAdd(const Bitvector &a, const Bitvector &b);
   Bitvector blastMul(const Bitvector &a, const Bitvector &b);
   void blastEq(const Bitvector &a, const Bitvector &b);
+  void blastNe(const Bitvector &a, const Bitvector &b);
 
   // Blast operators that have a value.
   Bitvector blastOp(BvExpr *expr);
