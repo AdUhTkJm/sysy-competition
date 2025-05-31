@@ -22,6 +22,8 @@ void Select::run() {
     if (bb1->getOpCount() != 1 || bb2->getOpCount() != 1)
       continue;
 
+    // TODO: check for a single block that have a single non-terminator.
+
     // Check if their unique predecessors are the same.
     if (bb1->preds.size() != 1 || bb2->preds.size() != 1)
       continue;
