@@ -25,6 +25,7 @@ parser.add_argument("-n", "--no-execute", action="store_true")
 parser.add_argument("-S", "--no-link", action="store_true")
 parser.add_argument("-O1", action="store_true")
 parser.add_argument("-r", "--run", action="store_true")
+parser.add_argument("--sat", action="store_true")
 parser.add_argument("-d", "--directory", type=str)
 parser.add_argument("--timeout", type=float, default=1)
 parser.add_argument("--asm", type=str)
@@ -406,6 +407,16 @@ def test_all():
       lines = '\n'.join([x.strip() for x in reason.split('\n')[:10]])
       print(f"  Reason: {lines}")
 
+def test_sat():
+  files = os.listdir("test/cnf")
+  for file in files:
+    print(f"checking: {file}")
+    out = proc.run(f"{BUILD_DIR}/sysc --sat < test/cnf/{file}", stdout=proc.PIPE, shell=True, text=True).stdout
+    if file.startswith("uf") and not out.startswith("sat"):
+      print(f"error: {file} out = '{out}'")
+    elif file.startswith("uuf") and not out.startswith("unsat"):
+      print(f"error: {file}")
+
 
 if __name__ == "__main__":
   if args.asm:
@@ -414,6 +425,9 @@ if __name__ == "__main__":
     exit(0)
 
   build()
+
+  if args.sat:
+    test_sat()
 
   if args.directory:
     test_all()

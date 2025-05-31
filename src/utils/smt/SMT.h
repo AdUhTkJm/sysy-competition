@@ -3,11 +3,13 @@
 
 #include "BvExpr.h"
 #include "CDCL.h"
+#include "../../main/Options.h"
 #include <vector>
 #include <unordered_map>
 
 namespace smt {
 
+// Bitvector[0] is the least significant bit.
 using Bitvector = std::vector<Variable>;
 
 class UnionFind {
@@ -26,8 +28,10 @@ class BvSolver {
 
   SATContext ctx;
   Solver solver;
-  UnionFind uf;
+  sys::Options opts;
+  std::unordered_map<std::string, Bitvector> bindings;
   std::vector<Clause> reserved;
+  std::vector<signed char> assignments;
 
   // These are literals false and true in SAT solver.
   Variable _false;
@@ -42,8 +46,22 @@ class BvSolver {
 
   // These blast functions will add clauses to solver.
   Bitvector blastConst(int vi);
+  Bitvector blastVar(const std::string &name);
+
+  // Add 32-bit numbers.
   Bitvector blastAdd(const Bitvector &a, const Bitvector &b);
-  Bitvector blastMul(const Bitvector &a, const Bitvector &b);
+  // Add 64-bit numbers. Only used internally.
+  Bitvector blastAddL(const Bitvector &a, const Bitvector &b);
+  
+  // Left shift by constant.
+  Bitvector blastLsh(const Bitvector &a, int x);
+  
+  // This gives a length-64 bit vector.
+  Bitvector blastFullMul(const Bitvector &a, const Bitvector &b);
+  // This gives a full multiplication and then modulus constant x.
+  // When `x` is zero, this modulus is 2^32, i.e. take the least significant 32 bits.
+  Bitvector blastMulMod(const Bitvector &a, const Bitvector &b, int x);
+
   void blastEq(const Bitvector &a, const Bitvector &b);
   void blastNe(const Bitvector &a, const Bitvector &b);
 
@@ -54,9 +72,10 @@ class BvSolver {
 
   void simplify(BvExpr *expr);
 public:
-  BvSolver();
+  BvSolver(const sys::Options &opts);
 
   bool infer(BvExpr *expr);
+  int extract(const std::string &name);
   std::unordered_map<BvExpr*, int64_t> model();
 };
 

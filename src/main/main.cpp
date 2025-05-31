@@ -171,30 +171,33 @@ void sat() {
     std::cout << (i + 1) << " = " << (assignments[i] ? "true" : "false") << "\n";
 }
 
-void bv() {
-  BvSolver solver;
+void bv(const sys::Options &opts) {
+  BvSolver solver(opts);
   BvExprContext ctx;
-  auto a = ctx.create(BvExpr::Const, 1);
-  auto b = ctx.create(BvExpr::Const, 2);
-  auto add = ctx.create(BvExpr::Add, a, b);
-  auto c = ctx.create(BvExpr::Const, 3);
-  auto ne = ctx.create(BvExpr::Ne, add, c);
-  bool succ = solver.infer(ne);
-  if (succ)
+  auto _1 = ctx.create(BvExpr::Const, 7);
+  auto _2 = ctx.create(BvExpr::Const, 4);
+  auto _3 = ctx.create(BvExpr::Mul, _1, _2);
+
+  auto _4 = ctx.create(BvExpr::Var, "x");
+  auto _5 = ctx.create(BvExpr::Const, 2);
+  auto _6 = ctx.create(BvExpr::Mul, _4, _5);
+  auto _7 = ctx.create(BvExpr::Eq, _3, _6);
+
+  bool succ = solver.infer(_7);
+  if (succ) {
     std::cout << "sat\n";
-  else
-    std::cout << "unsat\n";
+    std::cout << "x = " << solver.extract("x") << "\n";
+  } else std::cout << "unsat\n";
 }
 
 int main(int argc, char **argv) {
   opts = sys::parseArgs(argc, argv);
 
-  // Test for submodule: bitvector SMT solver, and CDCL SAT solver.
+  // Test for submodules: bitvector SMT solver, and CDCL SAT solver.
   if (opts.bv) {
-    bv();
+    bv(opts);
     return 0;
   }
-
   if (opts.sat) {
     sat();
     return 0;

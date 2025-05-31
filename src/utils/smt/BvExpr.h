@@ -8,7 +8,8 @@
 namespace smt {
 
 #define TYPES \
-  X(Var) X(Const) X(And) X(Or) X(Xor) X(Not) X(Add) X(Eq) X(Ne)
+  X(Var) X(Const) X(And) X(Or) X(Xor) X(Not) X(Add) X(Eq) X(Ne) X(Mul) X(Sub) \
+  X(LshI) X(RshI)
 
 class BvExpr {
 public:
@@ -31,6 +32,7 @@ public:
   BvExpr(Type ty): ty(ty) {}
   BvExpr(Type ty, int vi): ty(ty), vi(vi) {}
   BvExpr(Type ty, BvExpr *l): ty(ty), l(l) {}
+  BvExpr(Type ty, BvExpr *l, int vi): ty(ty), l(l), vi(vi) {}
   BvExpr(Type ty, BvExpr *l, BvExpr *r): ty(ty), l(l), r(r) {}
   BvExpr(Type ty, const std::string &name): ty(ty), name(name) {}
 

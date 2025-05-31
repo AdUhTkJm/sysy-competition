@@ -60,6 +60,7 @@ Options sys::parseArgs(int argc, char **argv) {
     PARSEOPT("-S", noLink);
     PARSEOPT("-v", verbose);
     PARSEOPT("--stats", stats);
+    PARSEOPT("-s", stats);
     PARSEOPT("--verify", verify);
     PARSEOPT("--bv", bv);
     PARSEOPT("--sat", sat);
