@@ -59,6 +59,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::RaiseToFor>();
   pm.addPass<sys::DCE>(/*elimBlocks=*/ false);
   pm.addPass<sys::ArrayAccess>();
+  pm.addPass<sys::Base>();
   pm.addPass<sys::Lower>();
 
   // ===== Flattened CFG =====

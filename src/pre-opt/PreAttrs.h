@@ -23,8 +23,18 @@ public:
   SubscriptAttr *clone() override { return new SubscriptAttr(subscript); }
 };
 
+class BaseAttr : public AttrImpl<BaseAttr, PREOPTLINE> {
+public:
+  Op *base;
+  BaseAttr(Op *base): base(base) {}
+  
+  std::string toString() override;
+  BaseAttr *clone() override { return new BaseAttr(base); }
+};
+
 }
 
 #define SUBSCRIPT(op) (op)->get<SubscriptAttr>()->subscript
+#define BASE(op) (op)->get<BaseAttr>()->base
 
 #endif

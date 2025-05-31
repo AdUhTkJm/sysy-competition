@@ -21,6 +21,17 @@ public:
   void run() override;
 };
 
+// Marks base of an array.
+class Base : public Pass {
+  void runImpl(Region *region);
+public:
+  Base(ModuleOp *module): Pass(module) {}
+    
+  std::string name() override { return "base"; };
+  std::map<std::string, int> stats() override { return {}; };
+  void run() override;
+};
+
 }
 
 #endif

@@ -91,8 +91,14 @@ void ArrayAccess::runImpl(Op *loop, std::vector<Op*> outer) {
           std::swap(x, y);
         else continue;
       }
-
-      op->add<SubscriptAttr>(lengthened(x, outer));
+      
+      auto vx = lengthened(x, outer);
+      if (y->has<SubscriptAttr>()) {
+        auto vy = lengthened(y, outer);
+        for (int i = 0; i < vx.size(); i++)
+          vx[i] += vy[i];
+      }
+      op->add<SubscriptAttr>(vx);
     }
   }
 }

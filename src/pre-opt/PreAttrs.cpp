@@ -13,3 +13,12 @@ std::string SubscriptAttr::toString() {
   ss << ">";
   return ss.str();
 }
+
+// Defined in OpBase.cpp.
+std::string getValueNumber(Value value);
+
+std::string BaseAttr::toString() {
+  std::stringstream ss;
+  ss << "<base = " << getValueNumber(base->getResult()) << ">";
+  return ss.str();
+}
