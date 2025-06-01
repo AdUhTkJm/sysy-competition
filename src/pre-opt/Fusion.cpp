@@ -77,15 +77,20 @@ void Fusion::runImpl(FuncOp *func) {
       if (!fusible(next, loop))
         return;
 
-      // TODO: Check dependency.
+      // We need a better way to check dependency.
+
+      auto entry = loop->getRegion()->getFirstBlock();
+      auto region = next->getRegion();
+      auto bb = region->getFirstBlock();
+
+      if (!good)
+        continue;
 
       // Hoist the ops between `next` and `loop` to before `loop`.
       for (auto op : hoisted)
         op->moveBefore(loop);
 
       // Move all ops in `next` to `loop`.
-      auto region = next->getRegion();
-      auto bb = region->getFirstBlock();
       bb->inlineToEnd(loop->getRegion()->getLastBlock());
 
       // The ops might still be referencing the induction variable of `next`.

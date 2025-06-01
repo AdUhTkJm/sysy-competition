@@ -51,6 +51,19 @@ std::vector<int> apply(const std::vector<int> &data, const std::vector<int> &per
   return result;
 }
 
+// Check whether `from` has been written to since `start`.
+bool writeless(Op *start, Op *from) {
+  for (auto runner = start; !runner->atBack();) {
+    runner = runner->nextOp();
+    if (isa<StoreOp>(runner) && BASE(runner->DEF(1)) == from)
+      return false;
+  }
+  // Check outer regions.
+  if (auto parent = start->getParentOp(); !isa<FuncOp>(parent))
+    return writeless(parent, from);
+  return true;
+}
+
 }
 
 // Identify memory views.
@@ -125,6 +138,10 @@ void View::runImpl(Op *func) {
 
     auto from = val->DEF();
     if (!from->has<SubscriptAttr>() || addr->getParent() != from->getParent())
+      continue;
+
+    // From shouldn't have been written to since this view is created.
+    if (!writeless(store, from))
       continue;
 
     // All subscripts must have the same size.

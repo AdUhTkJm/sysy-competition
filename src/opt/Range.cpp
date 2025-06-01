@@ -3,6 +3,8 @@
 
 using namespace sys;
 
+namespace {
+
 int clamp(int64_t x) {
   if (x > INT_MAX)
     return INT_MAX;
@@ -87,7 +89,7 @@ int maxmod(int a1, int b1, int a2, int b2) {
   return std::max(std::abs(a2), std::abs(b2)) - 1;
 }
 
-bool calculateRange(Op *op, bool widen) {
+bool calculateRange(Op *op) {
   if (isa<IntOp>(op)) {
     if (op->has<RangeAttr>())
       return false;
@@ -95,6 +97,16 @@ bool calculateRange(Op *op, bool widen) {
     int value = V(op);
     op->add<RangeAttr>(value, value);
     return true;
+  }
+  
+  if (isa<CallOp>(op)) {
+    // We know the semantics of external calls.
+    const auto &name = op->getName();
+    if (name == "getch")
+      op->add<RangeAttr>(1, 128);
+    if (name == "getarray" || name == "getfarray")
+      op->add<RangeAttr>(1, INT_MAX);
+    return false;
   }
 
   UPDATE_RANGE(AddIOp, ((int64_t) a1) + a2, ((int64_t) b1) + b2);
@@ -137,7 +149,9 @@ bool calculateRange(Op *op, bool widen) {
   return false;
 }
 
-void Range::runImpl(Region *region, const LoopForest &forest) {
+}
+
+void Range::postdom(Region *region) {
   // First make sure the region has only a single exit.
   std::vector<BasicBlock*> exits;
   for (auto bb : region->getBlocks()) {
@@ -170,13 +184,19 @@ void Range::runImpl(Region *region, const LoopForest &forest) {
 
   // Now we can calculate the post-domination tree.
   region->updatePDoms();
+}
 
-  // Convert to extended SSA.
-  // E-SSA is first described here: https://dl.acm.org/doi/pdf/10.1145/358438.349342
-  // Also refer to the SSA book, Chapter 13.
-  //
-  // First we need to find out the variables used for condition.
-  
+void Range::runImpl(Region *region, const LoopForest &forest) {
+  postdom(region);
+
+  bool changed;
+  do {
+    changed = false;
+    for (auto bb : region->getBlocks()) {
+      for (auto op : bb->getOps())
+        calculateRange(op);
+    }
+  } while (changed);
 }
 
 void Range::run() {

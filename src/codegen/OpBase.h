@@ -100,8 +100,7 @@ class BasicBlock {
   std::set<BasicBlock*> domFront;
   BasicBlock *idom = nullptr;
   // Similarly, post dominators.
-  std::set<BasicBlock*> postdoms;
-  std::set<BasicBlock*> postdomFront;
+  std::set<BasicBlock*> pdoms;
   // Immediate post dominator.
   BasicBlock *ipdom = nullptr;
   // Variable (results of the ops) alive at the beginning of this block.
@@ -130,8 +129,7 @@ public:
   Region *getParent() const { return parent; }
 
   const auto &getDominanceFrontier() const { return domFront; }
-  const auto &getPDoms() const { return postdoms; }
-  const auto &getPDomFrontier() const { return postdomFront; }
+  const auto &getPDoms() const { return pdoms; }
   const auto &getLiveIn() const { return liveIn; }
   const auto &getLiveOut() const { return liveOut; }
 
@@ -143,8 +141,8 @@ public:
 
   bool dominatedBy(const BasicBlock *bb) const;
   bool dominates(const BasicBlock *bb) const { return bb->dominatedBy(this); }
-  bool postDominatedBy(const BasicBlock *bb) const { return postdoms.count(const_cast<BasicBlock*>(bb)); }
-  bool postDominates(const BasicBlock *bb) const { return bb->postdoms.count(const_cast<BasicBlock*>(bb)); }
+  bool postDominatedBy(const BasicBlock *bb) const { return pdoms.count(const_cast<BasicBlock*>(bb)); }
+  bool postDominates(const BasicBlock *bb) const { return bb->pdoms.count(const_cast<BasicBlock*>(bb)); }
 
   // Inserts before `at`.
   void insert(iterator at, Op *op);

@@ -533,13 +533,23 @@ using UnionFind = BBMap;
 using Best = BBMap;
 
 int num = 0;
+int pnum = 0;
 
+// Dominators.
 DFN dfn;
 SDom sdom;
 Vertex vertex;
 Parent parents;
 UnionFind uf;
 Best best;
+// Post-dominators. Just a copy-paste.
+DFN pdfn;
+SDom psdom;
+Vertex pvertex;
+Parent pparents;
+UnionFind puf;
+Best pbest;
+
 
 void updateDFN(BasicBlock *current) {
   dfn[current] = num++;
@@ -548,6 +558,17 @@ void updateDFN(BasicBlock *current) {
     if (!dfn.count(v)) {
       parents[v] = current;
       updateDFN(v);
+    }
+  }
+}
+
+void updatePDFN(BasicBlock *current) {
+  pdfn[current] = pnum++;
+  pvertex.push_back(current);
+  for (auto v : current->preds) {
+    if (!pdfn.count(v)) {
+      pparents[v] = current;
+      updatePDFN(v);
     }
   }
 }
@@ -562,9 +583,24 @@ BasicBlock* find(BasicBlock *v) {
   return uf[v];
 }
 
+BasicBlock* pfind(BasicBlock* v) {
+  if (puf[v] != v) {
+    BasicBlock* u = pfind(puf[v]);
+    if (pdfn[psdom[pbest[puf[v]]]] < pdfn[psdom[pbest[v]]])
+      pbest[v] = pbest[puf[v]];
+    puf[v] = u;
+  }
+  return puf[v];
+}
+
+
 // Links `w` to `v` (setting the father of `w` to `v`).
 void link(BasicBlock *v, BasicBlock *w) {
   uf[w] = v;
+}
+
+void plink(BasicBlock *v, BasicBlock *w) {
+  puf[w] = v;
 }
 
 }
@@ -587,12 +623,11 @@ void Region::updateDoms() {
   sdom.clear();
   uf.clear();
   best.clear();
+  num = 1;
 
   // For each `u` as key, it contains all blocks that it semi-dominates.
   // 'b' for bucket.
   std::map<BasicBlock*, std::vector<BasicBlock*>> bsdom;
-
-  num = 1;
 
   auto entry = getFirstBlock();
   updateDFN(entry);
@@ -665,96 +700,73 @@ void Region::updateDomFront() {
 // A dual of updateDoms().
 void Region::updatePDoms() {
   updatePreds();
+
+  std::vector<BasicBlock*> exits;
   for (auto bb : bbs) {
-    bb->postdoms.clear();
+    if (isa<ReturnOp>(bb->getLastOp()))
+      exits.push_back(bb);
+  }
+
+  if (exits.size() != 1) {
+    std::cerr << "no single exit for pdom\n";
+    assert(false);
+  }
+
+  auto exit = exits[0];
+
+  for (auto bb : bbs) {
+    bb->pdoms.clear();
     bb->ipdom = nullptr;
-    bb->postdomFront.clear();
   }
 
-  for (auto x : bbs)
-    std::copy(bbs.begin(), bbs.end(), std::inserter(x->postdoms, x->postdoms.end()));
-  
-  // We assume the last block is the exit block.
-  auto end = getLastBlock();
-  assert(isa<ReturnOp>(end->getLastOp()));
-  end->postdoms.clear();
-  end->postdoms.insert(end);
+  pdfn.clear();
+  pvertex.clear();
+  pparents.clear();
+  psdom.clear();
+  puf.clear();
+  pbest.clear();
+  pnum = 1;
 
-  bool changed;
-  do {
-    changed = false;
-    for (auto x : bbs) {
-      if (x == end)
-        continue;
+  std::map<BasicBlock*, std::vector<BasicBlock*>> pbsdom;
 
-      // Don't forget to set the identity to the full bbs.
-      std::set<BasicBlock*> result;
-      std::copy(bbs.begin(), bbs.end(), std::inserter(result, result.end()));
-
-      // Duality: changed to successors in this function.
-      for (auto succ : x->succs) {
-        std::set<BasicBlock*> temp;
-        std::set_intersection(succ->postdoms.begin(), succ->postdoms.end(), result.begin(), result.end(),
-          std::inserter(temp, temp.end()));
-        result = std::move(temp);
-      }
-
-      result.insert(x);
-      if (x->postdoms != result) {
-        changed = true;
-        x->postdoms = result;
-      }
-    }
-  } while (changed);
+  updatePDFN(exit);
 
   for (auto bb : bbs) {
-    // Start block has no idom
-    if (bb == end)
-      continue;
-    
-    const auto &postdoms = bb->postdoms;
-    for (auto candidate : postdoms) {
-      if (candidate == bb)
-        continue;
+    psdom[bb] = bb;
+    puf[bb] = bb;
+    pbest[bb] = bb;
+  }
 
-      bool isIdom = true;
-      for (auto other : postdoms) {
-        if (other == bb || other == candidate)
-          continue;
-        if (other->postdoms.count(candidate)) { 
-          // `candidate` dominates another block, so not immediate
-          isIdom = false;
-          break;
-        }
+  for (auto it = pvertex.rbegin(); it != pvertex.rend(); ++it) {
+    auto bb = *it;
+    for (auto v : bb->succs) {
+      if (!pdfn.count(v))
+        continue;
+      BasicBlock *u;
+      if (pdfn[v] < pdfn[bb])
+        u = v;
+      else {
+        pfind(v);
+        u = pbest[v];
       }
-      if (isIdom) {
-        bb->ipdom = candidate;
-        break;
-      }
+      if (pdfn[psdom[u]] < pdfn[psdom[bb]])
+        psdom[bb] = psdom[u];
     }
-    // Only blocks without successors can have no idom.
-    // We must remove those blocks before calling `updateDoms`.
+
+    pbsdom[psdom[bb]].push_back(bb);
+    plink(pparents[bb], bb);
+
+    for (auto *v : pbsdom[pparents[bb]]) {
+      pfind(v);
+      v->ipdom = (psdom[pbest[v]] == psdom[v]) ? pparents[bb] : pbest[v];
+    }
+  }
+
+  for (size_t i = 1; i < pvertex.size(); ++i) {
+    auto bb = pvertex[i];
     assert(bb->ipdom);
-  }
-
-  // Update dominance frontier.
-  for (auto bb : bbs)
-    bb->postdomFront.clear();
-
-  // See https://en.wikipedia.org/wiki/Static_single-assignment_form#Computing_minimal_SSA_using_dominance_frontiers
-  // For each block, if it has at least 2 preds, then it must be at dominance frontier of all its `preds`,
-  // till its `idom`.
-  for (auto bb : bbs) {
-    if (bb->succs.size() < 2)
-      continue;
-
-    for (auto succ : bb->succs) {
-      auto runner = succ;
-      while (runner != bb->ipdom) {
-        runner->postdomFront.insert(bb);
-        runner = runner->ipdom;
-      }
-    }
+    if (bb->ipdom != psdom[bb])
+      bb->ipdom = bb->ipdom->ipdom;
   }
 }
 

@@ -61,6 +61,18 @@ public:
   void run() override;
 };
 
+// Loop unswitch.
+// Unswitch branches related to induction variable.
+class Unswitch : public Pass {
+  int unswitched = 0;
+public:
+  Unswitch(ModuleOp *module): Pass(module) {}
+
+  std::string name() override { return "unswitch"; }
+  std::map<std::string, int> stats() override;
+  void run() override;
+};
+
 // Lower operations back to its original form.
 class Lower : public Pass {
 public:

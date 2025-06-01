@@ -32,7 +32,7 @@ void LoopDCE::run() {
     changed = false;
     for (auto loop : loops) {
       if (pure(loop->getRegion()))
-        loop->erase(), changed = true;
+        loop->erase(), changed = true, erased++;
     }
   } while (changed);
 }
