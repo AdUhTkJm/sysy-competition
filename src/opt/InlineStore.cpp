@@ -9,6 +9,18 @@ std::map<std::string, int> InlineStore::stats() {
   };
 }
 
+namespace {
+
+bool hasStore(BasicBlock *bb) {
+  for (auto x : bb->getOps()) {
+    if (isa<StoreOp>(x))
+      return true;
+  }
+  return false;
+}
+
+}
+
 #define BAD { bad = true; break; }
 
 void InlineStore::run() {
@@ -21,7 +33,7 @@ void InlineStore::run() {
   for (auto get : gets)
     used[NAME(get)].insert(NAME(get->getParentOp()));
 
-  // Remove unused globals, and find out ones used in <once> functions.
+  // Remove unused globals, and find out ones only used in <once> functions.
   std::vector<std::string> queue;
   for (auto [k, v] : gMap) {
     if (used[k].empty())
@@ -32,6 +44,9 @@ void InlineStore::run() {
         queue.push_back(k);
     }
   }
+
+  for (auto [_, v] : fMap)
+    v->getRegion()->updateDoms();
 
   for (auto gname : queue) {
     auto funcname = *used[gname].begin();
@@ -45,6 +60,7 @@ void InlineStore::run() {
     bool bad = false;
 
     for (auto runner = entry; runner->succs.size();) {
+      std::cerr << bbmap[runner] << "\n";
       auto ops = runner->getOps();
       for (auto op : ops) {
         if (isa<LoadOp>(op)) {
@@ -114,7 +130,21 @@ void InlineStore::run() {
       auto term = runner->getLastOp();
       if (isa<GotoOp>(term) && TARGET(term)->preds.size() == 1)
         runner = TARGET(term);
-      else break;
+      else if (isa<BranchOp>(term)) {
+        // These globals behave as local variables.
+        // So if all successors of one branch doesn't have any stores,
+        // and it isn't a loop-back edge,
+        // then it's alright to inline stores in another branch.
+        auto ifso = TARGET(term);
+        auto ifnot = ELSE(term);
+        // Don't check too far (haven't thought of how to handle loops yet.)
+        // Just check the next block.
+        if (isa<ReturnOp>(ifnot->getLastOp()) && !hasStore(ifnot) && !ifso->dominates(runner))
+          runner = ifso;
+        else if (isa<ReturnOp>(ifso->getLastOp()) && !hasStore(ifso) && !ifnot->dominates(runner))
+          runner = ifnot;
+        else break;
+      } else break;
     }
 
     // Update allzero attribute.
