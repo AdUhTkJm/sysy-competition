@@ -28,14 +28,14 @@ void Lower::run() {
     for (auto op : terms) {
       builder.setBeforeOp(op);
       auto add = builder.create<AddIOp>({ iv, incr });
-      builder.create<StoreOp>({ add, ivAddr });
+      builder.create<StoreOp>({ add, ivAddr }, { new SizeAttr(4) });
     }
 
     // Also do it at the end.
     auto last = region->getLastBlock();
     builder.setToBlockEnd(last);
     auto add = builder.create<AddIOp>({ iv, incr });
-    builder.create<StoreOp>({ add, ivAddr });
+    builder.create<StoreOp>({ add, ivAddr }, { new SizeAttr(4) });
 
     // Create a while loop.
     builder.setBeforeOp(loop);
