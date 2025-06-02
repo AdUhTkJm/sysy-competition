@@ -570,6 +570,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   // Convert all operands to registers.
   LOWER(MlaOp, TERNARY);
   LOWER(MsubWOp, TERNARY);
+  LOWER(CselCmpZOp, TERNARY);
 
   LOWER(AddXOp, BINARY);
   LOWER(AddWOp, BINARY);

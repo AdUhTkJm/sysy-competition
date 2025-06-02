@@ -84,6 +84,7 @@ void Lower::run() {
   REPLACE(NeFOp, CsetNeFOp);
   REPLACE(LtFOp, CsetLtFOp);
   REPLACE(LeFOp, CsetLeFOp);
+  REPLACE(SelectOp, CselCmpZOp);
 
   runRewriter([&](FloatOp *op) {
     float value = F(op);

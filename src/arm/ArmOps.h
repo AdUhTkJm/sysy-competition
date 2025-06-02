@@ -126,8 +126,6 @@ ARMOPL(LsrXIOp); // Logical r-shift, accept immediate
 ARMOP(AsrWIOp); // Arithmetic r-shift, accept immediate
 ARMOPL(AsrXIOp); // Arithmetic r-shift, accept immediate
 
-ARMOP(CselOp); // xd = cond ? xn : xm
-
 // ====== CSET family ======
 // Read CPSR flags into a register. Each flag is a different op.
 // We don't allow CmpOp and similar to appear in itself.
@@ -155,9 +153,18 @@ ARMOP(CsetEqTstOp);
 ARMOP(CsetNeFcmpZOp);
 ARMOP(CsetEqFcmpZOp);
 
+// ====== CSEL family ======
+// Similar to CSET, CSEL also have different versions.
+
+ARMOP(CselCmpZOp); // Test if the condition equals to zero, then uses an `ne`.
+ARMOP(CselEqOp);
+ARMOP(CselNeOp);
+ARMOP(CselLtOp);
+ARMOP(CselLeOp);
+ARMOP(CselGtOp);
+ARMOP(CselGeOp);
+
 // ====== Branch family ======
-// Note all of them takes ONE argument. For B-series it's the CPSR flags given by CmpOp,
-// and for C-series it's the real argument.
 ARMOP(BgtOp);
 ARMOP(BleOp);
 ARMOP(BeqOp);

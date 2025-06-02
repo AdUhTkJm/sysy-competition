@@ -1,6 +1,8 @@
 #include "Passes.h"
+#include "../utils/smt/BvExpr.h"
 
 using namespace sys;
+using namespace smt;
 
 std::map<std::string, int> Superopt::stats() {
   return {
@@ -20,6 +22,24 @@ std::vector<int> inputs { 0, 1, -1, 20050704 };
 // keep the "recursive function" as a hole, and substitute it with
 // the synthesized expression when we try to evaluate or prove.
 // This is sound as long as at least one argument monotonically decreases.
+
+BvExprContext ctx;
+
+// Collect all values used by `op` and build a BvExpr.
+BvExpr *trace(Op *op) {
+  static std::unordered_map<int, BvExpr::Type> mapping = {
+    { AddIOp::id, BvExpr::Add },
+    { SubIOp::id, BvExpr::Sub },
+    { MulIOp::id, BvExpr::Mul },
+  };
+  switch (op->opid) {
+  case AddIOp::id: {
+    auto l = trace(op->DEF(0));
+    auto r = trace(op->DEF(1));
+    return ctx.create(BvExpr::Add, l, r);
+  }
+  }
+}
 
 }
 

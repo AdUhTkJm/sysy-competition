@@ -205,6 +205,10 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     os << "tst " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
     os << "cset " << wreg(RD(op)) << ", eq\n";
     break;
+  case CselCmpZOp::id:
+    os << "cmp " << wreg(RS(op)) << ", #0\n  ";
+    os << "csel " << wreg(RD(op)) << ", " << wreg(RS2(op)) << ", " << wreg(RS3(op)) << ", ne\n";
+    break;
   case RetOp::id:
     os << "ret \n";
     break;

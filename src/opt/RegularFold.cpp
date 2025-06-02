@@ -199,6 +199,7 @@ static Rule rules[] = {
   "(change (select 0 x y) y)",
   "(change (select c 1 0) (snz c))",
   "(change (select c 0 1) (not c))",
+  "(change (select c x x) x)",
 
   // float -> int
   "(change (f2i *a) (!cvt *a))",
