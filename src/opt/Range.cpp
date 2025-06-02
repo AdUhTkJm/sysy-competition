@@ -94,6 +94,8 @@ int maxmod(int a1, int b1, int a2, int b2) {
   return std::max(std::abs(a2), std::abs(b2)) - 1;
 }
 
+// Seems still have some problems.
+// Sometimes operations aren't properly updated.
 bool calculateRange(Op *op) {
   if (isa<IntOp>(op)) {
     if (op->has<RangeAttr>())
@@ -103,19 +105,30 @@ bool calculateRange(Op *op) {
     op->add<RangeAttr>(value, value);
     return true;
   }
+
+  if (isa<F2IOp>(op)) {
+    if (op->has<RangeAttr>())
+      return false;
+    
+    op->add<RangeAttr>(/*unknown*/);
+    return true;
+  }
   
   if (isa<CallOp>(op)) {
     // We know the semantics of external calls.
     const auto &name = op->getName();
     if (name == "getch")
       op->add<RangeAttr>(1, 128);
-    if (name == "getarray" || name == "getfarray")
+    else if (name == "getarray" || name == "getfarray")
       op->add<RangeAttr>(1, INT_MAX);
+    else if (!op->has<RangeAttr>())
+      op->add<RangeAttr>(/*unknown*/);
+
     return false;
   }
 
   UPDATE_RANGE(AddIOp, ((int64_t) a1) + a2, ((int64_t) b1) + b2);
-  UPDATE_RANGE(SubIOp, ((int64_t) a1) - a2, ((int64_t) b1) - b2);
+  UPDATE_RANGE(SubIOp, ((int64_t) a1) - b2, ((int64_t) a2) - b1);
   UPDATE_RANGE(MulIOp, minmul(a1, b1, a2, b2), maxmul(a1, b1, a2, b2));
   UPDATE_RANGE(DivIOp, mindiv(a1, b1, a2, b2), maxdiv(a1, b1, a2, b2));
   UPDATE_RANGE(ModIOp, minmod(a1, b1, a2, b2), maxmod(a1, b1, a2, b2));

@@ -398,7 +398,6 @@ void SCEV::run() {
     }
   }
 
-  // return;
   AggressiveDCE(module).run();
   for (auto func : funcs) {
     const auto &forest = forests[func];
