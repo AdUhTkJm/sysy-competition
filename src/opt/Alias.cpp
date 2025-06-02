@@ -53,8 +53,10 @@ void Alias::runImpl(Region *region) {
         if (isa<IntOp>(y)) {
           auto delta = V(y);
           for (auto &[_, offset] : alias->location) {
-            for (auto &value : offset)
-              value += delta;
+            for (auto &value : offset) {
+              if (value != -1)
+                value += delta;
+            }
           }
         } else {
           // Unknown offset. Set all offsets to -1.

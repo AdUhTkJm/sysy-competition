@@ -20,7 +20,7 @@ IRange join(IRange l, IRange r, bool widen) {
   auto [a2, b2] = r;
   if (widen)
     return std::make_pair(a2 < a1 ? INT_MIN : a1, b1 < b2 ? INT_MAX : b1);
-  return std::make_pair(std::max(a1, a2), std::max(b1, b2));
+  return std::make_pair(std::min(a1, a2), std::max(b1, b2));
 }
 
 #define UPDATE_RANGE(Ty, Low, High) \
@@ -33,11 +33,15 @@ IRange join(IRange l, IRange r, bool widen) {
       auto range = std::make_pair(clamp(Low), clamp(High)); \
       if (auto rangeAttr = op->find<RangeAttr>()) { \
         auto xrange = join(range, rangeAttr->range, false); \
-        if (xrange.first == range.first && xrange.second == range.second) \
+        if (xrange == rangeAttr->range) \
           return false; \
         op->remove<RangeAttr>(); \
-      } \
-      op->add<RangeAttr>(range); \
+        op->add<RangeAttr>(xrange); \
+      } else \
+        op->add<RangeAttr>(range); \
+      return true; \
+    } else if (!op->has<RangeAttr>()) { \
+      op->add<RangeAttr>(/*unknown*/); \
       return true; \
     } \
   }
@@ -46,6 +50,7 @@ IRange join(IRange l, IRange r, bool widen) {
   if (isa<Ty>(op)) { \
     if (!op->has<RangeAttr>()) { \
       op->add<RangeAttr>(0, 1); \
+      return true; \
     } \
   }
 
@@ -136,8 +141,9 @@ bool calculateRange(Op *op) {
       auto [a1, b1] = range->range;
       if (a1 == min && b1 == max)
         return false;
+      auto last = range->range;
       range->range = join(range->range, { min, max }, /*widen=*/true);
-      return true;
+      return range->range != last;
     }
     // Unknown.
     if (min == INT_MAX && max == INT_MIN)
@@ -187,14 +193,12 @@ void Range::postdom(Region *region) {
 }
 
 void Range::runImpl(Region *region, const LoopForest &forest) {
-  postdom(region);
-
   bool changed;
   do {
     changed = false;
     for (auto bb : region->getBlocks()) {
       for (auto op : bb->getOps())
-        calculateRange(op);
+        changed |= calculateRange(op);
     }
   } while (changed);
 }

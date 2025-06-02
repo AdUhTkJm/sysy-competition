@@ -98,6 +98,18 @@ public:
   void run() override;
 };
 
+class RangeAwareFold : public Pass {
+  int folded = 0;
+
+  void runImpl(Region *region);
+public:
+  RangeAwareFold(ModuleOp *module): Pass(module) {}
+
+  std::string name() override { return "range-aware-fold"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
+};
+
 }
 
 #endif

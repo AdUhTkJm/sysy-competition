@@ -60,7 +60,6 @@ void InlineStore::run() {
     bool bad = false;
 
     for (auto runner = entry; runner->succs.size();) {
-      std::cerr << bbmap[runner] << "\n";
       auto ops = runner->getOps();
       for (auto op : ops) {
         if (isa<LoadOp>(op)) {
