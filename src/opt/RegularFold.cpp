@@ -51,6 +51,10 @@ static Rule rules[] = {
   "(change (sub (div 'a x) (div 'b x)) (div (!sub 'a 'b) x))",
   "(change (sub (div x 'a) (div y 'a)) (div (sub x y) 'a))",
 
+  // Subtraction (64-bit)
+  "(change (subl x 0) x)",
+  "(change (subl (addl x 'a) x) 'a)",
+
   // FP subtraction
   "(change (fsub *a *b) (?sub *a *b))",
   "(change (fsub x *0) x)",

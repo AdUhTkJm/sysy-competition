@@ -4,6 +4,28 @@
 
 using namespace smt;
 
+void BvExpr::dump(std::ostream &os) {
+  if (ty == BvExpr::Const) {
+    os << vi;
+    return;
+  }
+  if (ty == BvExpr::Var) {
+    os << name;
+    return;
+  }
+
+  std::string x = names[ty];
+  x[0] = tolower(x[0]);
+  os << "(" << x;
+  if (l)
+    os << " " << l;
+  if (r)
+    os << " " << r;
+  os << ")";
+}
+
+BvSolver::BvSolver(): BvSolver(sys::Options {}) {}
+
 BvSolver::BvSolver(const sys::Options &opts): opts(opts) {
   _false = ctx.create();
   _true = ctx.create();
@@ -49,7 +71,15 @@ void BvSolver::addXor(Variable out, Variable a, Variable b) {
   reserve({ ctx.neg(a), ctx.pos(b), ctx.pos(out) });
 }
 
-Bitvector BvSolver::blastAdd(const Bitvector &a, const Bitvector &b) {
+void BvSolver::addNot(Variable out, Variable a) {
+  // Meaning:
+  //   a, out -> false
+  //   -> a, out
+  reserve({ ctx.neg(a), ctx.neg(out) });
+  reserve({ ctx.pos(a), ctx.pos(out) });
+}
+
+Bitvector BvSolver::blastAdd(const Bitvector &a, const Bitvector &b, bool withCin) {
   // Consider a CLA adder.
   //   g[i] = a[i] & b[i]: "Generate", means to generate a carry;
   //   p[i] = a[i] ^ b[i]: "Propagate", means the carry from prev. bit will propagate through.
@@ -67,7 +97,7 @@ Bitvector BvSolver::blastAdd(const Bitvector &a, const Bitvector &b) {
   // According to the meaning described above,
   // Carry c[i+1] = g[i] | (c[i] & p[i])
   Bitvector c(32);
-  c[0] = _false;
+  c[0] = withCin ? _true : _false;
   for (int i = 0; i < 31; i++) {
     Variable _and = ctx.create();
     c[i + 1] = ctx.create();
@@ -114,6 +144,42 @@ Bitvector BvSolver::blastAddL(const Bitvector &a, const Bitvector &b) {
   }
 
   return result;
+}
+
+Bitvector BvSolver::blastAnd(const Bitvector &a, const Bitvector &b) {
+  Bitvector c(32);
+  for (int i = 0; i < 32; i++) {
+    c[i] = ctx.create();
+    addAnd(c[i], a[i], b[i]);
+  }
+  return c;
+}
+
+Bitvector BvSolver::blastOr(const Bitvector &a, const Bitvector &b) {
+  Bitvector c(32);
+  for (int i = 0; i < 32; i++) {
+    c[i] = ctx.create();
+    addOr(c[i], a[i], b[i]);
+  }
+  return c;
+}
+
+Bitvector BvSolver::blastXor(const Bitvector &a, const Bitvector &b) {
+  Bitvector c(32);
+  for (int i = 0; i < 32; i++) {
+    c[i] = ctx.create();
+    addXor(c[i], a[i], b[i]);
+  }
+  return c;
+}
+
+Bitvector BvSolver::blastNot(const Bitvector &a) {
+  Bitvector c(32);
+  for (int i = 0; i < 32; i++) {
+    c[i] = ctx.create();
+    addNot(c[i], a[i]);
+  }
+  return c;
 }
 
 Bitvector BvSolver::blastConst(int vi) {
@@ -203,10 +269,30 @@ Bitvector BvSolver::blastOp(BvExpr *expr) {
     auto r = blastOp(expr->r);
     return blastAdd(l, r);
   }
+  case BvExpr::Sub: {
+    auto l = blastOp(expr->l);
+    auto r = blastOp(expr->r);
+    return blastAdd(l, blastNot(r), /*withCin=*/ true);
+  }
   case BvExpr::Mul: {
     auto l = blastOp(expr->l);
     auto r = blastOp(expr->r);
     return blastMulMod(l, r, 0);
+  }
+  case BvExpr::And: {
+    auto l = blastOp(expr->l);
+    auto r = blastOp(expr->r);
+    return blastAnd(l, r);
+  }
+  case BvExpr::Or: {
+    auto l = blastOp(expr->l);
+    auto r = blastOp(expr->r);
+    return blastOr(l, r);
+  }
+  case BvExpr::Xor: {
+    auto l = blastOp(expr->l);
+    auto r = blastOp(expr->r);
+    return blastXor(l, r);
   }
   case BvExpr::Const:
     return blastConst(expr->vi);
@@ -286,4 +372,47 @@ int BvSolver::extract(const std::string &name) {
   for (int i = 0; i < 32; i++)
     result |= (int(assignments[bv[i]]) << i);
   return int(result);
+}
+
+void BvSolver::assign(const std::string &name, int value) {
+  if (bindings.count(name)) {
+    std::cerr << "already assigned: " << name << "\n";
+    assert(false);
+  }
+
+  bindings[name] = blastConst(value);
+}
+
+int BvSolver::eval(BvExpr *expr, const std::unordered_map<std::string, int> &external) {
+  for (auto &[k, v] : external) {
+    Bitvector c(32);
+    for (int i = 0; i < 32; i++) {
+      c[i] = assignments.size();
+      assignments.push_back((v >> i) & 1);
+    }
+    bindings[k] = c;
+  }
+  return eval(expr);
+}
+
+int BvSolver::eval(BvExpr *expr) {
+  switch (expr->ty) {
+  case BvExpr::Const:
+    return expr->vi;
+  case BvExpr::Var:
+    return extract(expr->name);
+  case BvExpr::Add:
+    return eval(expr->l) + eval(expr->r);
+  case BvExpr::Sub:
+    return eval(expr->l) - eval(expr->r);
+  case BvExpr::And:
+    return eval(expr->l) & eval(expr->r);
+  case BvExpr::Or:
+    return eval(expr->l) | eval(expr->r);
+  case BvExpr::Xor:
+    return eval(expr->l) ^ eval(expr->r);
+  default:
+    std::cerr << "unsupported type " << expr->ty << "\n";
+    assert(false);
+  }
 }

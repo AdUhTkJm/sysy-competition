@@ -91,6 +91,7 @@ void Lower::run() {
   REPLACE(AddIOp, AddwOp);
   REPLACE(AddLOp, AddOp);
   REPLACE(SubIOp, SubwOp);
+  REPLACE(SubLOp, SubOp);
   REPLACE(MulIOp, MulwOp);
   REPLACE(MulLOp, MulOp);
   REPLACE(MulshOp, MulhOp);

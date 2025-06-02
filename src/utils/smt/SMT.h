@@ -43,15 +43,22 @@ class BvSolver {
   void addAnd(Variable o, Variable a, Variable b);
   void addOr (Variable o, Variable a, Variable b);
   void addXor(Variable o, Variable a, Variable b);
+  void addNot(Variable o, Variable a);
 
   // These blast functions will add clauses to solver.
   Bitvector blastConst(int vi);
   Bitvector blastVar(const std::string &name);
 
   // Add 32-bit numbers.
-  Bitvector blastAdd(const Bitvector &a, const Bitvector &b);
+  Bitvector blastAdd(const Bitvector &a, const Bitvector &b, bool withCin = false);
   // Add 64-bit numbers. Only used internally.
   Bitvector blastAddL(const Bitvector &a, const Bitvector &b);
+
+  // Bitwise operations.
+  Bitvector blastAnd(const Bitvector &a, const Bitvector &b);
+  Bitvector blastOr(const Bitvector &a, const Bitvector &b);
+  Bitvector blastXor(const Bitvector &a, const Bitvector &b);
+  Bitvector blastNot(const Bitvector &a);
   
   // Left shift by constant.
   Bitvector blastLsh(const Bitvector &a, int x);
@@ -71,12 +78,17 @@ class BvSolver {
   void blast(BvExpr *expr);
 
   void simplify(BvExpr *expr);
+  int eval(BvExpr *expr);
 public:
+  BvSolver();
   BvSolver(const sys::Options &opts);
 
   bool infer(BvExpr *expr);
   int extract(const std::string &name);
-  std::unordered_map<BvExpr*, int64_t> model();
+  bool has(const std::string &name) { return bindings.count(name); }
+  int eval(BvExpr *expr, const std::unordered_map<std::string, int> &external);
+  void assign(const std::string &name, int value);
+  void unassign() { bindings.clear(); }
 };
 
 }

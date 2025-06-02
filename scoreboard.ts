@@ -15,7 +15,6 @@ let page = "https://course.educg.net//pages/contest/contest_rank_more.jsp";
 let url = `${page}?contestID=${contest_id}&taskID=${task_id}`;
 
 async function fetch(url: string) {
-
   // Fetch the content.
   const response = await axios.get(url);
   const html: string = response.data;
@@ -35,7 +34,6 @@ async function fetch(url: string) {
 
   for (let [name, self, best] of result)
     console.log(`${name},${self},${best}`);
-
 }
 
 function parseLine(line: string): ScoreEntry | null {

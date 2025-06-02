@@ -26,6 +26,7 @@ parser.add_argument("-S", "--no-link", action="store_true")
 parser.add_argument("-O1", action="store_true")
 parser.add_argument("-r", "--run", action="store_true")
 parser.add_argument("--sat", action="store_true")
+parser.add_argument("--bv", action="store_true")
 parser.add_argument("-d", "--directory", type=str)
 parser.add_argument("--timeout", type=float, default=1)
 parser.add_argument("--asm", type=str)
@@ -425,6 +426,10 @@ if __name__ == "__main__":
     exit(0)
 
   build()
+
+  if args.bv:
+    proc.run([f"{BUILD_DIR}/sysc", "--bv"])
+    exit(0)
 
   if args.sat:
     test_sat()

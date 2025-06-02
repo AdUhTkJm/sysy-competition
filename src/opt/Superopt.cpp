@@ -1,4 +1,4 @@
-#include "Passes.h"
+#include "SMTPasses.h"
 #include "../utils/smt/BvExpr.h"
 
 using namespace sys;

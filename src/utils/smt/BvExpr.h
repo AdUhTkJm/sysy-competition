@@ -36,8 +36,13 @@ public:
   BvExpr(Type ty, BvExpr *l, BvExpr *r): ty(ty), l(l), r(r) {}
   BvExpr(Type ty, const std::string &name): ty(ty), name(name) {}
 
-  std::string dump(std::ostream &os = std::cerr);
+  void dump(std::ostream &os = std::cerr);
 };
+
+inline std::ostream &operator<<(std::ostream &os, BvExpr *expr) {
+  expr->dump(os);
+  return os;
+}
 
 #undef TYPES
 

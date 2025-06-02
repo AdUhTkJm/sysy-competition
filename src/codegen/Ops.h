@@ -59,6 +59,7 @@ OPF(MulFOp);
 OPF(DivFOp);
 OPF(ModFOp);
 OPL(AddLOp);
+OPL(SubLOp);
 OPL(MulLOp);
 OPL(ModLOp);
 OP(EqOp);

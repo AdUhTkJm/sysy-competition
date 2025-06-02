@@ -10,6 +10,7 @@
 #include "../opt/LoopPasses.h"
 #include "../opt/CleanupPasses.h"
 #include "../opt/LowerPasses.h"
+#include "../opt/SMTPasses.h"
 #include "../opt/Analysis.h"
 #include "../pre-opt/PrePasses.h"
 #include "../pre-opt/PreLoopPasses.h"
@@ -112,6 +113,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DLE>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::InlineStore>();
+  pm.addPass<sys::SynthConstArray>();
   pm.addPass<sys::GCM>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::RegularFold>();
@@ -183,14 +185,15 @@ void bv(const sys::Options &opts) {
   auto _3 = ctx.create(BvExpr::Mul, _1, _2);
 
   auto _4 = ctx.create(BvExpr::Var, "x");
-  auto _5 = ctx.create(BvExpr::Const, 2);
+  auto _5 = ctx.create(BvExpr::Var, "y");
   auto _6 = ctx.create(BvExpr::Mul, _4, _5);
   auto _7 = ctx.create(BvExpr::Eq, _3, _6);
 
+  solver.assign("x", 14);
   bool succ = solver.infer(_7);
   if (succ) {
     std::cout << "sat\n";
-    std::cout << "x = " << solver.extract("x") << "\n";
+    std::cout << "x = " << solver.extract("y") << "\n";
   } else std::cout << "unsat\n";
 }
 
