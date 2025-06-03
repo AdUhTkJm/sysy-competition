@@ -80,7 +80,7 @@ void Superopt::run() {
   std::vector<Op*> queue;
   // We optimize everything that:
   // 1) is used as the value of store;
-  // 2) is a return value of the function.
+  // 2) is used as a result calculated inside a loop.
   auto funcs = collectFuncs();
 
   for (auto func : funcs) {

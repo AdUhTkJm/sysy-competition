@@ -106,14 +106,30 @@ void RaiseToFor::run() {
       continue;
     
     // Now time to check for initial value of the induction variable.
-    // Go straight up and give up when the first if/while is found.
     Op *runner, *init;
     bool removable = true;
     for (runner = loop->prevOp(); !runner->atFront(); runner = runner->prevOp()) {
       // This checks while, for and if.
       if (runner->getRegionCount()) {
-        good = false;
-        break;
+        // Find all stores inside it.
+        // If ivAddr is stored inside it, we don't know the init. Give up.
+        auto stores = runner->findAll<StoreOp>();
+        for (auto store : stores) {
+          if (store->DEF(1) == ivAddr) {
+            good = false;
+            break;
+          }
+        }
+        // If the previous one is a ForOp storing to the same place,
+        // then the value of `ivAddr` is exactly the stop value.
+        if (isa<ForOp>(runner) && ivAddr == runner->DEF(3)) {
+          init = runner->DEF(1);
+          // Here `runner` will be pointing to the ForOp.
+          // Cannot remove it.
+          removable = false;
+          break;
+        }
+        continue;
       }
 
       // The value is found here.

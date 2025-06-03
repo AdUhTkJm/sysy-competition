@@ -43,6 +43,15 @@ public:
   void run() override;
 };
 
+class EarlyInline : public Pass {
+public:
+  EarlyInline(ModuleOp *module): Pass(module) {}
+    
+  std::string name() override { return "early-inline"; };
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
+};
+
 // Tail call optimization.
 class TCO : public Pass {
   int uncalled = 0;

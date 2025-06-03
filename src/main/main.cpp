@@ -59,6 +59,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::Remerge>();
   pm.addPass<sys::RaiseToFor>();
   pm.addPass<sys::DCE>(/*elimBlocks=*/ false);
+  pm.addPass<sys::EarlyInline>();
   pm.addPass<sys::ArrayAccess>();
   pm.addPass<sys::Base>();
   pm.addPass<sys::View>();
@@ -114,6 +115,8 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DCE>();
   pm.addPass<sys::InlineStore>();
   pm.addPass<sys::SynthConstArray>();
+  pm.addPass<sys::RegularFold>();
+  pm.addPass<sys::DCE>();
   pm.addPass<sys::GCM>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::RegularFold>();

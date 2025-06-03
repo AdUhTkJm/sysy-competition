@@ -240,6 +240,7 @@ bool Rule::matchExpr(Expr *expr, Op* op) {
   MATCH_BINARY("shr", RShiftOp);
   MATCH_BINARY("shrl", RShiftLOp);
   MATCH_BINARY("addl", AddLOp);
+  MATCH_BINARY("subl", SubLOp);
   MATCH_BINARY("mull", MulLOp);
   MATCH_BINARY("fadd", AddFOp);
   MATCH_BINARY("fsub", SubFOp);

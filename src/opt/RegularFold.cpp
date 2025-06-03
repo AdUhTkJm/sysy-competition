@@ -142,8 +142,8 @@ static Rule rules[] = {
   // Less than
   "(change (lt x x) 0)",
   "(change (lt 'a 'b) (!lt 'a 'b))",
-  "(change (lt (add x 'a) 'b) (lt x (!sub 'b 'a)))",
-  "(change (lt (sub x 'a) 'b) (lt x (!add 'b 'a)))",
+  // "(change (lt (add x 'a) 'b) (lt x (!sub 'b 'a)))",
+  // "(change (lt (sub x 'a) 'b) (lt x (!add 'b 'a)))",
   "(change (lt (mul x 'a) 'b) (!only-if (!and (!gt 'a 0) (!gt 'b 0)) (lt x (!div 'b 'a))))",
   "(change (lt (div x 'a) 'b) (!only-if (!and (!gt 'a 0) (!gt 'b 0)) (lt x (!mul 'b 'a))))",
   "(change (lt 'b (add x 'a)) (lt (!sub 'b 'a) x))",
