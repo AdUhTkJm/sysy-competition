@@ -116,11 +116,7 @@ void EarlyConstFold::run() {
         if (isa<LoadOp>(use))
           continue;
         
-        if (isa<StoreOp>(use)) {
-          if (store) {
-            good = false;
-            break;
-          }
+        if (isa<StoreOp>(use) && use->DEF(1) == alloca && !store) {
           store = use;
           continue;
         }
@@ -134,11 +130,11 @@ void EarlyConstFold::run() {
         continue;
   
       // Now this is a constant value.
-      Op *def = store->getOperand(0).defining;
+      Op *def = store->DEF(0);
   
       // We only propagate compiler-time constants.
       // Other things are better done in Mem2Reg.
-      if (!isa<IntOp>(def))
+      if (!isa<IntOp>(def) && !isa<AllocaOp>(def))
         continue;
       
       for (auto use : uses) {

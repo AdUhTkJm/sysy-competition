@@ -258,7 +258,6 @@ void SynthConstArray::run() {
       solver.assign("x", i);
       auto vi = ctx.create(BvExpr::Const, ptr[i]);
       auto eq = ctx.create(BvExpr::Eq, expr, vi);
-      std::cerr << "inferring " << eq << "\n";
 
       // Validate that every element is correct.
       if (!solver.infer(eq))
@@ -324,7 +323,6 @@ void SynthConstArray::run() {
         // This latchval should be an addition of fixed step.
         if (!constIncr.match(latchval))
           continue;
-        std::cerr << "latchval\n";
 
         auto step = V(constIncr.extract("'a"));
         
