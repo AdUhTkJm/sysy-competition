@@ -160,13 +160,13 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
           loop->step = V(step);
 
           // Try to identify the stop condition by looking at header.
-          auto term = header->getLastOp();
-          if (isa<GotoOp>(term)) {
+          auto term = latch->getLastOp();
+          if (isa<BranchOp>(term)) {
             // Already rotated. Check latch instead.
             // brRotated: (br (lt (add x 'a) y))
             term = latch->getLastOp();
             if (!brRotated.match(term,  { { "x", loop->induction } }))
-              break;
+              continue;
 
             loop->stop = brRotated.extract("y");
             break;
@@ -174,7 +174,7 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
 
           // br: (br (lt x y))
           if (!br.match(term, { { "x", loop->induction } }))
-            break;
+            continue;
 
           loop->stop = br.extract("y");
           break;

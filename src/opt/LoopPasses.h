@@ -167,6 +167,8 @@ class SCEV : public Pass {
   void rewrite(BasicBlock *bb, LoopInfo *info);
   void runImpl(LoopInfo *info);
   void discardIv(LoopInfo *info);
+  // Replace usages after the loop when possible.
+  void replaceAfter(LoopInfo *info);
 public:
   SCEV(ModuleOp *module): Pass(module) {}
 
@@ -190,6 +192,18 @@ public:
   LICM(ModuleOp *module): Pass(module) {}
 
   std::string name() override { return "licm"; }
+  std::map<std::string, int> stats() override;
+  void run() override;
+};
+
+class RemoveEmptyLoop : public Pass {
+  int removed = 0;
+
+  bool runImpl(LoopInfo *info);
+public:
+  RemoveEmptyLoop(ModuleOp *module): Pass(module) {}
+
+  std::string name() override { return "remove-empty-loop"; }
   std::map<std::string, int> stats() override;
   void run() override;
 };

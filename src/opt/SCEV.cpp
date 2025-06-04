@@ -1,5 +1,6 @@
 #include "LoopPasses.h"
 #include "CleanupPasses.h"
+#include "Passes.h"
 #include "../utils/Matcher.h"
 
 using namespace sys;
@@ -162,10 +163,8 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
     auto phi = builder.create<PhiOp>({ start[op] }, { new FromAttr(preheader) });
 
     auto amt = INCR(op)->amt;
-    if (amt.size() > 1) {
-      std::cerr << "cannot deal with amt.size() > 1\n";
-      assert(false);
-    }
+    if (amt.size() > 1)
+      continue;
 
     builder.setBeforeOp(op);
     auto vi = builder.create<IntOp>({ new IntAttr(amt[0]) });
@@ -199,7 +198,7 @@ void SCEV::runImpl(LoopInfo *info) {
   // Check rotated loops.
   if (!isa<BranchOp>(latch->getLastOp()))
     return;
-  if (isa<BranchOp>(header->getLastOp()))
+  if (isa<BranchOp>(header->getLastOp()) && header != latch)
     return;
 
   auto phis = header->getPhis();
@@ -236,6 +235,30 @@ void SCEV::runImpl(LoopInfo *info) {
       // The only use is the increment.
       if (usecnt == 1)
         mods.insert(phi);
+    }
+  }
+
+  // See if this phi comes from `x + <IncreaseAttr { a }>,
+  // If so, this is <IncreaseAttr { 0, a }>.
+  for (auto phi : phis) {
+    auto latchval = Op::getPhiFrom(phi, latch);
+    if (isa<AddIOp>(latchval) || isa<AddLOp>(latchval)) {
+      auto x = latchval->DEF(0);
+      auto y = latchval->DEF(1);
+      // Adding to self is taken into account before.
+      if (y == phi)
+        std::swap(x, y);
+      if (x != phi)
+        continue;
+
+      if (!x->has<IncreaseAttr>() && y->has<IncreaseAttr>()) {
+        auto incr = y->get<IncreaseAttr>();
+        // At this point, all IncreaseAttrs we've plugged in
+        // are all for induction variables.
+        assert(incr->amt.size() == 1);
+        std::vector val{ 0, incr->amt[0] };
+        phi->add<IncreaseAttr>(val);
+      }
     }
   }
 
@@ -294,6 +317,8 @@ void SCEV::runImpl(LoopInfo *info) {
     modl->pushOperand(v);
     mod->erase();
   }
+
+  replaceAfter(info);
 
   // Remove IncreaseAttr for other loops to analyze.
   for (auto bb : info->getBlocks()) {
@@ -378,6 +403,132 @@ void SCEV::discardIv(LoopInfo *info) {
   builder.setBeforeOp(term);
   auto cond = builder.create<LtOp>({ after, end });
   term->setOperand(0, cond);
+}
+
+#define CREATE_ADD(...) \
+  if (addl) \
+    replace = builder.create<AddLOp>({ __VA_ARGS__ }); \
+  else \
+    replace = builder.create<AddIOp>({ __VA_ARGS__ })
+
+void SCEV::replaceAfter(LoopInfo *info) {
+  if (!info->getInduction())
+    return;
+
+  auto header = info->getHeader();
+  auto preheader = info->getPreheader();
+  auto exit = info->getExit();
+  auto latch = info->getLatch();
+  auto phis = header->getPhis();
+
+  std::unordered_map<Op*, Op*> exitlatch;
+  auto exitphis = exit->getPhis();
+  for (auto phi : exitphis)
+    exitlatch[Op::getPhiFrom(phi, latch)] = phi;
+
+  auto start = info->getStart();
+  auto stop = info->getStop();
+  int step = info->getStep();
+
+  Builder builder;
+
+  // Add a block in between to ensure safety.
+  // This destroys LCSSA.
+  auto region = header->getParent();
+  auto interm = region->insertAfter(latch);
+  builder.setToBlockEnd(interm);
+  builder.create<GotoOp>({ new TargetAttr(exit) });
+  
+  // Now the phi's from `latch` at exit should go from `interm`.
+  for (auto phi : exitphis) {
+    for (auto attr : phi->getAttrs()) {
+      if (FROM(attr) == latch)
+        FROM(attr) = interm;
+    }
+  }
+
+  // The latch should go to interm.
+  auto term = latch->getLastOp();
+  if (TARGET(term) == exit)
+    TARGET(term) = interm;
+  if (ELSE(term) == exit)
+    ELSE(term) = interm;
+
+  // Now let's add things at the beginning of `interm`.
+  builder.setToBlockStart(interm);
+
+  for (auto phi : phis) {
+    if (!phi->has<IncreaseAttr>())
+      continue;
+    auto latchval = Op::getPhiFrom(phi, latch);
+    bool addl = isa<AddLOp>(latchval);
+
+    // Match sizes.
+    auto incr = phi->get<IncreaseAttr>();
+    auto vstart = Op::getPhiFrom(phi, preheader);
+    auto latchphi = exitlatch[latchval];
+    if (!latchphi)
+      continue;
+
+    if (incr->amt.size() == 1) {
+      // Final value:
+      //   vstart + ceil((stop - start) / step) * incr->amt
+      // = vstart + (stop - start + step - 1) / step * incr->amt
+      Value diff = builder.create<SubIOp>({ stop->getResult(), start });
+      if (step != 1) {
+        auto vi = builder.create<IntOp>({ new IntAttr(step - 1) });
+        auto vj = builder.create<IntOp>({ new IntAttr(step) });
+        auto add = builder.create<AddIOp>({ diff, vi });
+        diff = builder.create<DivIOp>({ add, vj });
+      }
+      if (incr->amt[0] != 1) {
+        auto vstep = builder.create<IntOp>({ new IntAttr(incr->amt[0]) });
+        diff = builder.create<MulIOp>({ diff, vstep });
+      }
+
+      Op *replace;
+      CREATE_ADD(vstart, diff);
+
+      latchphi->replaceOperand(latchval, replace);
+    }
+
+    if (incr->amt.size() == 2) {
+      // diff = ceil((stop - start) / step)
+      // final value =
+      //   vstart + diff * (diff - 1) / 2 * incr->amt[1] + diff * incr->amt[0]
+      
+      Value diff = builder.create<SubIOp>({ stop->getResult(), start });
+      if (step != 1) {
+        auto vi = builder.create<IntOp>({ new IntAttr(step - 1) });
+        auto vj = builder.create<IntOp>({ new IntAttr(step) });
+        auto add = builder.create<AddIOp>({ diff, vi });
+        diff = builder.create<DivIOp>({ add, vj });
+      }
+
+      Value replace = vstart;
+      // The `diff * incr->amt[0]` part
+      Value amt0 = diff;
+      if (incr->amt[0] != 1) {
+        auto vstep = builder.create<IntOp>({ new IntAttr(incr->amt[0]) });
+        amt0 = builder.create<MulIOp>({ amt0, vstep });
+      }
+      CREATE_ADD(replace, amt0);
+
+      // The `diff * (diff + 1) / 2` part
+      auto one = builder.create<IntOp>({ new IntAttr(1) });
+      auto add = builder.create<SubIOp>({ diff, one });
+      auto mul = builder.create<MulIOp>({ diff, add });
+      // It doesn't matter even if `diff < -1`, because no rounding is needed.
+      Value amt1 = builder.create<RShiftOp>({ mul, one });
+      if (incr->amt[1] != 1) {
+        auto vstep = builder.create<IntOp>({ new IntAttr(incr->amt[1]) });
+        amt1 = builder.create<MulIOp>({ amt1, vstep });
+      }
+      CREATE_ADD(replace, amt1);
+
+      latchphi->replaceOperand(latchval, replace);
+    }
+  }
 }
 
 void SCEV::run() {

@@ -1,0 +1,11 @@
+int main() {
+  int i = 0;
+  int sum = 0;
+  int n = getint();
+  while (i < n) {
+    sum = sum + i;
+    i = i + 1;
+  }
+  putint(sum);
+  return 0;
+}

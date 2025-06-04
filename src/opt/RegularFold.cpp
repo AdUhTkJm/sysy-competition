@@ -98,6 +98,10 @@ static Rule rules[] = {
   "(change (mod 0 x) 0)",
   "(change (mod 'a 'b) (!mod 'a 'b))",
 
+  // Shift
+  "(change (lshift 'a 'b) (!lshift 'a 'b))",
+  "(change (rshift 'a 'b) (!rshift 'a 'b))",
+
   // Minus
   "(change (minus 'a) (!sub 0 'a))",
   "(change (minus (add x 'a)) (sub (!sub 0 'a) x))",

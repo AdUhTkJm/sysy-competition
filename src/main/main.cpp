@@ -120,6 +120,17 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GCM>();
   pm.addPass<sys::GVN>();
+
+  // ===== Another round of loop optimization =====
+  for (int i = 0; i < 2; i++) {
+    pm.addPass<sys::CanonicalizeLoop>(/*lcssa=*/ true);
+    pm.addPass<sys::SCEV>();
+    pm.addPass<sys::RemoveEmptyLoop>();
+    pm.addPass<sys::GVN>();
+    pm.addPass<sys::RegularFold>();
+  }
+
+  // ===== Final cleanup =====
   pm.addPass<sys::RegularFold>();
   pm.addPass<sys::AggressiveDCE>();
   pm.addPass<sys::SimplifyCFG>();

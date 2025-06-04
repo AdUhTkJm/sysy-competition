@@ -247,6 +247,8 @@ bool Rule::matchExpr(Expr *expr, Op* op) {
   MATCH_BINARY("fmul", MulFOp);
   MATCH_BINARY("fdiv", DivFOp);
   MATCH_BINARY("store", StoreOp);
+  MATCH_BINARY("lshift", LShiftOp);
+  MATCH_BINARY("rshift", RShiftOp);
 
   MATCH_UNARY("not", NotOp);
   MATCH_UNARY("snz", SetNotZeroOp);
@@ -293,6 +295,8 @@ int Rule::evalExpr(Expr *expr) {
   EVAL_BINARY("ne", !=);
   EVAL_BINARY("and", &);
   EVAL_BINARY("or", |);
+  EVAL_BINARY("lshift", <<);
+  EVAL_BINARY("rshift", >>);
 
   EVAL_BINARY_F_OPERAND("feq", ==);
   EVAL_BINARY_F_OPERAND("fne", !=);

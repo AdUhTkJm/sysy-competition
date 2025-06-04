@@ -26,13 +26,22 @@ bool pure(Region *region) {
 }
 
 void LoopDCE::run() {
+  Builder builder;
   bool changed;
   do {
     auto loops = module->findAll<ForOp>();
     changed = false;
     for (auto loop : loops) {
-      if (pure(loop->getRegion()))
+      if (pure(loop->getRegion())) {
+        auto step = loop->DEF(2);
+        if (!isa<IntOp>(step) || V(step) != 1)
+          continue;
+        
+        // Replace with a store of `ivAddr`.
+        builder.setAfterOp(loop);
+        builder.create<StoreOp>({ loop->getOperand(1), loop->getOperand(3) }, { new SizeAttr(4) });
         loop->erase(), changed = true, erased++;
+      }
     }
   } while (changed);
 }
