@@ -517,7 +517,7 @@ void SCEV::replaceAfter(LoopInfo *info) {
       // The `diff * (diff + 1) / 2` part
       auto one = builder.create<IntOp>({ new IntAttr(1) });
       auto add = builder.create<SubIOp>({ diff, one });
-      auto mul = builder.create<MulIOp>({ diff, add });
+      auto mul = builder.create<MulLOp>({ diff, add });
       // It doesn't matter even if `diff < -1`, because no rounding is needed.
       Value amt1 = builder.create<RShiftOp>({ mul, one });
       if (incr->amt[1] != 1) {

@@ -2,15 +2,25 @@
 
 这个编译器受到了不少 MLIR 的启发。这里的 IR 就是模仿它设计的。
 
-这个编译器吸收了一些我的另一个编译器项目[Moonbit 编译器](https://github.com/AdUhTkJm/moonbit-mlir)的经验。这里的 `parse/TypeContext.h` 管理内存的方式就来自这个项目（不过实际上 interning 也是很常用的技术）。
-
 每个 Op 都有恰好一个返回值，不定数量的操作数（`Value`，对 `Op*` 的一层包装），一些子作用域 (`Region*`，实际上是基本块的容器)，以及一些属性 (`Attr*`)。Op 本身并不对任何东西进行检查，但 Pass 会假定某些 Op 具有特定的操作个数和属性（例如 `AddIOp` 有恰好两个操作数）。
 
 这样会让 Lowering 略微方便一些：比起将它转译为某种类似 MCInst 的东西，我可以直接利用已有的 Op 设施。不过我并不确定这是否是个好主意——或许使用 MCInst 反而会方便一些？
 
 # 编译器结构
 
-## Parser
+## 子工程
+
+### SMT 求解器
+
+在 `utils/smt` 中，我手工制作了一个简单的 SMT 求解器，可以求解不含量词的 bitvector 理论（QF_BV）。换言之，它可以判定两个涉及 32 位整数的算式是否相等，在相等时给出证明，不等时给出反例。
+
+首先，我实现了一个基于 CDCL 算法的 SAT 求解器。接下来，对于 32 位整数，只需要将其拆成 32 个独立的布尔变量，按照数字电路的方式组合，就可以实现基本的运算。这意味着这个 SMT 求解器几乎没有做任何优化，执行效率较低。好在 CDCL 非常迅速，可以轻松解决数千个子句的问题，而且编译器内调用它的次数有限，问题不大。
+
+## 本体
+
+编译器
+
+### Parser
 
 Lexer 和 Parser 是手写的，其中 Parser 是简单的递归下降。不用 ANTLR 的原因是我实在配不好环境—— C++ 真难用（确信）。
 
@@ -21,26 +31,22 @@ const int x[2] = { 1, 2 };
 const int y[x[1]] = ...;
 ```
 
-考虑到 `x[1]` 是编译期常量，这应当是合法的。为了正确产生 `y` 的类型，常量折叠是必要的。
+考虑到 `x[1]` 是编译期常量，这应当是合法的。为了正确产生 `y` 的类型，必须在这时就开始折叠。
 
 接下来是语义分析，主要是标记类型，并插入 int/float 转换的 AST 节点。
 
-## CodeGen
+### CodeGen
 
 CodeGen 所生成的 IR 参考了 MLIR 的 `scf` 方言的设计方式。作为一个例子，考虑这样的一段代码：
 
 ```cpp
 int main() {
-  int a = 7;
-  int count = 0;
-  while (a != 1) {
-    count = count + 1;
-    if (a % 2 == 0)
-      a = a / 2;
-    else
-      a = a * 3 + 1;
+  int i = 0, sum = 0, n = getint();
+  while (i < n) {
+    sum = sum + i;
+    i = i + 1;
   }
-  return count;
+  putint(sum);
 }
 ```
 
@@ -48,317 +54,326 @@ int main() {
 
 ```mlir
 %0 = module {
-  %1 = func <name = main> {
-    %2 = alloca <4>
-    %3 = int <7>
-    %4 = store %3 %2 <size = 4>
-    %5 = alloca <4>
-    %6 = int <0>
-    %7 = store %6 %5 <size = 4>
-    %8 = while {
-      %9 = load %2 <size = 4>
-      %10 = int <1>
-      %11 = ne %9 %10
-      %12 = proceed %11
+  %1 = func <name = main> <count = 0> {
+    %2 = alloca <size = 4>
+    %3 = alloca <size = 4>
+    %4 = alloca <size = 4>
+    %5 = int <0>
+    %6 = store %5 %2 <size = 4>
+    %7 = int <0>
+    %8 = store %7 %3 <size = 4>
+    %9 = call <name = getint>
+    %10 = store %9 %4 <size = 4>
+    %11 = while {
+      %12 = load %2 <size = 4>
+      %13 = load %4 <size = 4>
+      %14 = lt %12 %13
+      %15 = proceed %14
     }{
-      %13 = load %5 <size = 4>
-      %14 = int <1>
-      %15 = addi %13 %14
-      %16 = store %15 %5
+      %16 = load %3 <size = 4>
       %17 = load %2 <size = 4>
-      %18 = int <2>
-      %19 = modi %17 %18
-      %20 = int <0>
-      %21 = eq %19 %20
-      %22 = if %21 {
-        %23 = load %2 <size = 4>
-        %24 = int <2>
-        %25 = divi %23 %24
-        %26 = store %25 %2
-      }{
-        %27 = load %2 <size = 4>
-        %28 = int <3>
-        %29 = muli %27 %28
-        %30 = int <1>
-        %31 = addi %29 %30
-        %32 = store %31 %2
-      }
+      %18 = addi %16 %17
+      %19 = store %18 %3 <size = 4>
+      %20 = load %2 <size = 4>
+      %21 = int <1>
+      %22 = addi %20 %21
+      %23 = store %22 %2 <size = 4>
     }
-    %33 = load %5 <size = 4>
-    %34 = return %33
+    %24 = load %3 <size = 4>
+    %25 = call %24 <name = putint>
+    %26 = int <0>
+    %27 = return %26
   }
 }
 ```
 
-值得注意的是 IR 依旧保留了某种树形结构。其中类似 `module`, `func` 和 `if` 的 Op 形式上会返回一个值，但实际上没有任何地方会用到它们——写 `std::optional<Value>` 还是有点麻烦，反正这样做也无害，所以就这样了。
+这里的 IR 依旧保存了结构化控制流。虽然 `module`, `while` 等 Op 也有一个形式上的返回值，但它们实际上不会被使用。
 
 此外，在打印出的 IR 中以 `<>` 包裹的是属性（`Attr*`）。它们不属于操作数。
 
 这样的树形 IR 主要是为了方便代码生成。它会被 FlattenCFG 展平，形成和 LLVM IR 一样的模式。但如果将某些 Pass 放在 FlattenCFG 之前，它们会变得比较简单。
 
-## Pass
+### Pass
 
-### 整理
+完整的 Pass 管线在下面列出。截至 2025/6/4，此处共 81 个 Pass，其中不重复的有 49 个。点击对应的链接可以跳转到本文附录处，查看每个 Pass 的作用。
 
-CodeGen 生成的代码依旧有不正确之处。在运行其他 Pass 之前，需要先运行这些 Pass 来纠正它。
+1. [MoveAlloca](#MoveAlloca)
+1. [AtMostOnce](#AtMostOnce)
+1. [Localize](#Localize)
+1. [EarlyConstFold](#EarlyConstFold)
+1. [Pureness](#Pureness)
+1. [EarlyConstFold](#EarlyConstFold)
+1. [TCO](#TCO)
+1. [Remerge](#Remerge)
+1. [RaiseToFor](#RaiseToFor)
+1. [DCE](#DCE)
+1. [EarlyInline](#EarlyInline)
+1. [ArrayAccess](#ArrayAccess)
+1. [Base](#Base)
+1. [View](#View)
+1. [LoopDCE](#LoopDCE)
+1. [Fusion](#Fusion)
+1. [Unswitch](#Unswitch)
+1. [Lower](#Lower)
+1. [FlattenCFG](#FlattenCFG)
+1. [GVN](#GVN)
+1. [DCE](#DCE)
+1. [Inline](#Inline)
+1. [DCE](#DCE)
+1. [Localize](#Localize)
+1. [Globalize](#Globalize)
+1. [Mem2Reg](#Mem2Reg)
+1. [Alias](#Alias)
+1. [RegularFold](#RegularFold)
+1. [DCE](#DCE)
+1. [DAE](#DAE)
+1. [Alias](#Alias)
+1. [DSE](#DSE)
+1. [DLE](#DLE)
+1. [GVN](#GVN)
+1. [CanonicalizeLoop](#CanonicalizeLoop)
+1. [LoopRotate](#LoopRotate)
+1. [CanonicalizeLoop](#CanonicalizeLoop)
+1. [LICM](#LICM)
+1. [ConstLoopUnroll](#ConstLoopUnroll)
+1. [SCEV](#SCEV)
+1. [GVN](#GVN)
+1. [RegularFold](#RegularFold)
+1. [DCE](#DCE)
+1. [GVN](#GVN)
+1. [SimplifyCFG](#SimplifyCFG)
+1. [Alias](#Alias)
+1. [DAE](#DAE)
+1. [DSE](#DSE)
+1. [DLE](#DLE)
+1. [Select](#Select)
+1. [RegularFold](#RegularFold)
+1. [DCE](#DCE)
+1. [GCM](#GCM)
+1. [GVN](#GVN)
+1. [AggressiveDCE](#AggressiveDCE)
+1. [LateInline](#LateInline)
+1. [RegularFold](#RegularFold)
+1. [GVN](#GVN)
+1. [Alias](#Alias)
+1. [DSE](#DSE)
+1. [DLE](#DLE)
+1. [DCE](#DCE)
+1. [InlineStore](#InlineStore)
+1. [SynthConstArray](#SynthConstArray)
+1. [RegularFold](#RegularFold)
+1. [DCE](#DCE)
+1. [GCM](#GCM)
+1. [GVN](#GVN)
+1. [CanonicalizeLoop](#CanonicalizeLoop)
+1. [SCEV](#SCEV)
+1. [RemoveEmptyLoop](#RemoveEmptyLoop)
+1. [GVN](#GVN)
+1. [RegularFold](#RegularFold)
+1. [CanonicalizeLoop](#CanonicalizeLoop)
+1. [SCEV](#SCEV)
+1. [RemoveEmptyLoop](#RemoveEmptyLoop)
+1. [GVN](#GVN)
+1. [RegularFold](#RegularFold)
+1. [AggressiveDCE](#AggressiveDCE)
+1. [SimplifyCFG](#SimplifyCFG)
+1. [InstSchedule](#InstSchedule)
 
-**MoveAlloca**
+### 后端
 
-将函数里的所有 `alloca` 移到函数的最前方：不管原来这个 `alloca` 是处在 if 还是 while 中，它本来都应该只被执行一次。
+后端是纸糊的，差不多能跑。
 
-**FlattenCFG**
+寄存器分配和其他编译器内常见的策略不太一样。在分配的时候，phi 节点尚未被摧毁。下面我将详细描述整个流程。
 
-展平控制流。将 IfOp 和 WhileOp 展开，变为 Goto, Branch 和基本块。这类似于 MLIR 的 `scf` 到 `cf` 的转换。
+- 构建冲突图，并记录 phi 和它的操作数，将它们标记为“想要分配在一起”。
 
-它的前后都有不少 Pass。有些 Pass 喜欢结构化的控制流，有些喜欢基本块。
+- 分配着色优先级。初始时，有一个变量 `int priority = 0`。
+  - 遇到 phi 时，令它的优先级为 `priority + 1`, 它的所有操作数的优先级为 `priority`. 然后令 `priority` 永久 +2.
+  - 遇到 -2048-2047 内的 li 指令时，令它的优先级为 -2. 这是因为它如果被 spill，不必分配栈上空间，只需要一条指令就可以加载回来。
+  - 遇到不在上述范围内的 li 指令时，令它的优先级为 -1. 如果它被 spill，虽然不必分配栈上空间，但需要两条指令才能加载。
+  - 遇到 readreg/writereg 的伪指令时，令它的优先级为 1. 这是为了尽量早分配它，从而减少一条 mv 指令。
+  - 其他的指令的优先级为 0.
 
-在这个 Pass 结束后，除了 `module` 和 `func` 外的 Region 彻底消失，每个基本块都相互独立，可以随意移动了。
+- 开始着色。按照优先级的降序排列，如果相同则按照图中度数的降序排列。
+  - 遇到 phi 时，尽量不分配已知会和它操作数冲突的寄存器。
 
-### 分析
+- 移除所有 Op 的操作数，并用 `<rd = ...>` 等属性取代。至此，def-use chain 完全破裂。
 
-**CallGraph**
+- 移除 readreg/writereg 等伪指令，用 mv 代替。
 
-分析函数调用链。简单直接。
+- 拆除 phi。首先割开 critical edge，然后在 phi 的每个前驱补充一条 mv 指令。
+  - 需要先进行拓扑排序，保证 phi 拆除的顺序是正确的。
+  - 不考虑在同一个基本块内循环引用的 phi （所有的测试用例中都不会出现这样的 phi）。
 
-**Pureness**
+- 为 spill 出的变量添加 ld/sd 指令。
 
-分析函数是否是纯函数。给所有不纯（有副作用，或对同样的输入可能产生不同输出）的 FuncOp 打上 `<impure>`。
+# 附录
 
-在 SysY 中，由于不存在二级指针，一个函数不纯意味着以下三种情况之一：
-- 它访问了全局变量（无论读/写都算）；
-- 它访问了指针类型的参数所指向的值；
-- 它调用了另一个不纯的函数。
+## Pass 简介
 
-检查是否有 GetGlobalOp 即可检查第一点。在 IR 生成的时候，就给所有含有指针参数的函数都打上了 `<impure>`，因此无需检查第二点。
+此处按照字母顺序排序。
 
-至于第三点，这个 pass 会在调用图上传播是否有副作用的信息（当然，所有库函数都是不纯的）。
+### AggressiveDCE
 
-**AtMostOnce**
+死代码删除。它初始假定所有代码都不可达，然后进行数据流分析找到可达的代码。
 
-分析一个函数是否至多会被调用 1 次。如果是，就给它打上 `<once>`。
+这可以消除两个循环引用彼此的 phi，但普通的 DCE 认为它们的 use 都不为空，所以不会删除它们。
 
-它在 FlattenCFG 之前运作，因为这样“至多调用一次”的条件会变得非常简单。对于一个函数，只需要检测：
-- 仅被至多一个函数调用；
-- 在那个函数里的 CallOp 中，只有一个是指向它的；
-- 那个 CallOp 不在 WhileOp 里。
+### Alias
 
-**Alias**
+别名分析。分析一个地址来自哪个数组，以及它的偏移量是多少。
 
-别名分析。这是控制流不敏感的，但会在函数之间传播信息。这也意味着 AliasAttr 可以指向自身所在函数之外的 Op。
+它可以跨函数分析。
 
-SysY 不存在二级指针，这使得别名分析十分便利。
+### AtMostOnce
 
-我不准备处理 Phi；如果 Phi 的操作数都是指针，那么它只可能由 SCEV 产生，这说明它原本就在循环里，无法分析更具体的指向。
+分析某个函数是否只会被调用一次。结果会作为属性 `<once>` 添加到 FuncOp 上。
 
-**Range**
+### CallGraph
 
-TODO：分析整数范围。也许可以弄一个不需要 e-SSA 的形式，只考虑正负？
+构建调用图。结果会作为属性 `<caller = ...>` 添加到 FuncOp 上。
 
-**LoopAnalysis**
+### CanonicalizeLoop
 
-通过检测回边，识别函数中的循环结构。这也算是经典算法了。
+标准化循环。
 
-### 优化
+会保证循环有一个 preheader，同时可以选择是否构建 LCSSA。
 
-#### 清理型 (CleanupPasses.h)
+### DAE
 
-**RegularFold**
+删除无用的参数。这包括：
 
-利用 Lisp-like DSL 进行匹配与改写。这个 DSL 在编译器的其他地方也有运用，例如识别循环变量时，以及 ARM 后端中。
+- 通过跨函数分析得知必定为常量的参数；
+- 从未被用到的参数。
 
-举个比较复杂的例子：
+### DCE
+
+死代码删除。
+
+会删除不可达的基本块，未使用的指令和未调用的函数。
+
+### DLE
+
+删除无用的读取。如果我们知道上次写入这个地址的值，就无需再次读取。这只在一个基本块内生效。
+
+### DSE
+
+删除无用的写入。利用数据流分析在整个函数内生效。
+
+### FlattenCFG
+
+将结构化控制流展平。
+
+### GCM
+
+Global Code Motion. 将语句移动到尽可能深的 if 内，尽可能浅的循环外。
+
+### Globalize
+
+在安全的情况下，将局部数组提升至全局。
+
+### GVN
+
+Global Value Numbering。用来消除公共表达式。
+
+### HoistConstArray
+
+（未被使用）仍有 bug。
+
+### Inline
+
+函数内联，在 Mem2Reg 之前进行。内联条件是函数体内的指令数不超过 200 ，而且函数自身不递归。
+
+### InlineStore
+
+如果一个 StoreOp 向某个全局变量的确定位置写入，在安全的情况下，直接将它并入全局变量的初始化列表（`.data` 段）中。
+
+### InstSchedule
+
+指令重排。很玄学，不知道我这个重排究竟是否有优化。
+
+只在基本块内部进行，每次从可选的指令中挑出优先级最高的。优先级如下：
+
+- IntOp, GetGlobalOp 和 FloatOp 的优先级是 -3000.
+- 对于这个基本块内的 phi 的某个操作数，它的优先级是 -5000，也就是尽量留到最后。
+- 如果这条指令的操作数是一个 load，而且指令本身在 load 的 2 条指令之内，优先级是 -1.
+- 如果这条指令的操作数是一个 mul，而且指令本身在 mul 的 8 条指令之内，优先级是 -1.
+- 如果此时优先级小于零，那么不再进行下面的调整，直接返回优先级。
+- 如果这条指令是一个 load，优先级 +8.
+- 如果这条指令离自身最远的、在同一个基本块内的操作数的距离是 x, 那么优先级不会低于 x/3.
+
+### LateInline
+
+内联，和 Inline 效果一样，但在 Mem2Reg 之后进行。它需要特别处理 phi。
+
+### LICM
+
+Loop Invariant Code Motion. 虽然 GCM 可以把大部分东西都移走，但它无法搬动 load/store。LICM 就是专门来搬它们的。
+
+### LoopAnalysis
+
+识别循环结构，构造循环森林，并找出每个循环的归纳变量（如果有的话）。
+
+### LoopRotate
+
+循环旋转。相当于把 while 改为 if + do-while 的形式。
+
+### LoopUnroll
+
+循环展开。只会展开循环次数为常数的循环，而且要求展开之后的总指令数不能超过 1000.
+
+### Mem2Reg
+
+将一些 alloca 和它们的 load/store 转化为 phi。
+
+### Pureness
+
+分析函数是否是纯的。纯的函数应当没有副作用，而且对于相同的输入给出相同的输出。
+
+### Range
+
+（尚未使用）分析整数的取值范围。
+
+由于测试用例依赖整数溢出的未定义行为（它必须表现得像截断），这个 pass 暂时无法使用。
+
+### RangeAwareFold
+
+同上，暂时无法使用。
+
+### RegularFold
+
+根据编译器内部的一个 DSL 进行模式匹配与重写。
+
+举一个例子：
 ```lisp
-(change (eq (div x 'a) 'b) (!only-if (!gt 'a 0) (and (lt x (!mul (!add 'b 1) 'a)) (ge x (!mul 'b 'a)))))
+(change (sub x x) 0)
 ```
+意味着将 (x - x) 改为 0.
 
-这意味着匹配形如 `x / A = B` （其中 A, B 均为常数）的指令，并只在 A > 0 的时候将它改写为 `(x < (B + 1) * A) && (x >= B * A)`。
-
-这里的改写只会改写最外层的指令；例如在上面的那条规则中，x, A, B 都不会被改写。
-
-此外，条件固定为 0 或固定为 1 的分支也会被改写为 GotoOp。
-
-基于这个 Pass 衍生出了 EarlyConstFold，在 FlattenCFG 之前进行，会做更多不便用这种 DSL 描述的折叠（例如与数组有关的折叠）。
-
-**DCE**
-
-死代码删除。首先决定每个指令是否需要 `<impure>`，其中 CallOp 的结果根据 Pureness 打上的标记决定。
-
-接下来，所有 `getUses()` 为空的，而且没有被标记为 `<impure>` 的 Op 都会被删除。这包括一些具有 Region 的 Op，例如 `IfOp`。
-
-同时，这个 pass 还会分析不可达的函数和基本块，并删除它们。
-
-在 FlattenCFG 之前，基本块的末尾不一定有跳转指令，需要特别注意不能删除不可达的基本块。
-
-这不会删除循环引用的指令。它们要靠 AggressiveDCE 进行数据流分析后删除。
-
-**Inline**
-
-函数内联。放在 FlattenCFG 之后是因为 early return 基本上没法用 if 和 while 来表示，会破坏 Region* 的结构。
-
-目前的内联条件：
-- 不是递归函数 （TODO：对递归函数单独内联）；
-- 指令数 <= 200。
-
-这个 Pass 在 Mem2Reg 之前运行。在它之后还有 LateInline，会调整 Phi 的参数。
-
-**Mem2Reg**
-
-将 AllocaOp 转化为普通的 SSA 值。从未被赋值的 alloca 会被赋予 0 的初值（否则编译器会直接段错误）。
-
-**GVN**
-
-通过给 SSA 值标号进行公共子表达式删除。它能够删除的表达式是白名单的。
-
-值得注意的是，没有标记为 `<impure>` 的 CallOp 也是可以被合并的。
-
-这个 Pass 会把所有常量合在一块，会导致这样的代码（84_long_array.sy）产生巨大的寄存器压力：
-```c
-int b[4][1024] = { 1 };
-int c[1024][4] = { 2 };
+它还支持比这复杂得多的例子：
+```lisp
+(change (div (mul x 'a) 'b) (!only-if (!eq (!mod 'a 'b) 0) (mul x (!div 'a 'b))))
 ```
-因为在代码生成的时候，它实际上生成的是 `*(b + 0) = 1, *(b + 4) = 0` 等一共4096条指令。这4096个常数和 `*(c + 0) = 2` 中的常数完全一致，导致在为 `c` 初始化时有4000多个溢出的寄存器。
+只在 `a % b == 0` 时，将 `(x * a) / b` 改为 `x * (a / b)`.
 
-目前的缓解方法是运行 Globalize 这个 pass。虽然 rematerialization 可以解决这个问题，但它尚未提上日程。这主要是因为整个 spill 的处理都十分混乱。
+这个 DSL 只支持根据 def-use 的匹配，无法匹配基本块的走向等内容。
 
-**Localize**
+不过 RegularFold 确实会折叠条件已知的 branch。这不是依赖 DSL 的，而是普通的 C++ 代码。
 
-将全局变量变为局部变量。
+### RemoveEmptyLoop
 
-如果一个全局变量不是数组，而且只在某个 `<once>` 的函数（见 AtMostOnce）中被访问，那么它可以被改写为局部变量。
+顾名思义，删除空的循环。
 
-**Globalize**
+### SCEV
 
-将局部变量变为全局变量。
+针对循环的归纳变量进行分析。它比 LLVM 中的 SCEV 弱一些，不会尝试折叠类似 mul, div, smin, umin 之类的东西。
 
-如果一个局部变量是至少有 8 个元素的数组（对于太小的数组，或许还是放在栈上比较好），而且定义它的函数是 `<once>` 的，那么它可以被改写为全局变量。
+以 `for (int i = x; i < y; i += c)` 为例（它要求 `c` 是常量），它能做的事情包含：
+- 将循环外面对 `a = a + k` (k 是常数) 的使用替换为 `a = a0 + k * n`，其中 `n` 是循环次数；
+- 同理，将以“二阶”速度增加的 `a = a + k * i` 折叠为 `a = a0 + k * n(n + 1) / 2`，其中 `n` 是循环次数。
+- 将循环内部的 `a[i]` 替换为 `a = a+4`，如果这个替换使得 `i` 无用，它也可以删除 `i`；
+- 将循环内部的 `a = (a + x) % mod` 替换为 `a = a + x` （这里的加法是 64 位的），并在循环完成后再 `% mod`. 这不会溢出，因为循环至多进行 2^32 次，每次加的数也不会超过 2^31.
 
-这之后，顺次检查这个函数中所有的 StoreOp 和 LoadOp，直到遇到写入编译器不确定的地址或者 BranchOp 为止。如果这些 Store 是编译期常量，那么直接将它写入数组的初始数据中，否则记录下来，等待编译器能确定的 LoadOp 的读取。
+### Select
 
-这可以部分解决上述 GVN 提到的问题。
-
-**DSE**
-
-Dead Store Elimination。通过类似活跃变量分析的数据流方法，识别不会被读取的 StoreOp。
-
-它十分保守，只消除满足下列条件的 StoreOp：
-- Alias 不是 `<unknown>`；
-- 不可能指向任何一个全局变量；
-- 不可能指向任何一个不在自身函数内的变量（例如，函数的参数就可以指向函数外的变量）。
-
-**DLE**
-
-Dead (Redundant) Load Elimination。与 DSE 类似，但只局限于一个基本块之内。
-
-为了比较好的消除效果，这需要 SimplifyCFG 的辅助。
-
-**SimplifyCFG**
-
-将只有一个后继，而且那个后继也只有一个前驱的基本块跟它的后继合并。
-
-听起来很绕，但总之就是把“一条直线”上的基本块合成一个。
-
-**CanonicalizeLoop**
-
-将循环标准化。它本身并不做任何的优化，但是会为其它的优化 Pass 铺路。
-
-它首先会给循环生成 preheader。值得注意的是，这会导致 header 的 phi 几乎全部失效（不再指向前驱块），需要特别处理。后面的 Verify 会报错，但排查问题到底出现在哪个 Pass 还是非常繁琐的一件事情。
-
-接下来它生成 LCSSA 形式，为每个在循环之外使用的变量生成 PhiOp。这些额外的 phi 如果只有一个操作数，就会在 GVN 中消失。
-
-**LoopRotate**
-
-旋转循环。
-
-首先，确保每个循环只有一个 latch。将位于 header 的分支复制一份提前到 preheader，然后把原本那份移动到 latch。
-
-这本身也不算什么优化，但这之后的 RegularFold 可能可以消除一次判断。这也方便了接下来的循环展开。
-
-**LoopUnroll**
-
-循环展开，但只展开执行常数次的循环。
-
-TODO：更多的展开可能会在 FlattenCFG 前进行。
-
-**GCM**
-
-Global Code Motion。它会留下 load/store 和跳转指令不移动，然后将所有的指令按照如下规则移动两次：
-
-首先，将所有的指令尽可能提前，也就是首个被所有的操作数支配的块；然后，将所有的指令尽可能延后，也就是最后一个支配所有使用者的块。
-
-接下来，在支配树上，这两个块之间的路径上的所有块都是可选的。我们会选择尽可能靠后，但嵌套在最浅的循环中的块。
-
-## RISC-V 后端
-
-值得注意的是，后端依然与 IR 共用一套 Op 系统。这说明了 Op 设计的灵活性。
-
-**Lower**
-
-类似 LLVM 中的 legalization。将 IR 转化为汇编指令，并进行指令选择。
-
-**InstCombine**
-
-匹配并改写指令。虽然说是 combine，但其实也可以展开（虽然现在还没有展开）。
-
-被合并的指令包括：
-
-- li + add => addi （对 sub, and 同理）
-- addi + sw => sw （改变offset）
-- addi + lw => lw （改变offset）
-- 去除 `%2 = addi %1, 0`
-- `li %1, 0` => `%1 = rv.readreg <reg = zero>`
-
-**RegAlloc**
-
-寄存器分配。分配完成后，所有 Op 的操作数都被移除，取而代之的是一系列属性。例如对于操作 `%1 = rv.add %2 %3`, 在这个 pass 执行完毕后可能会转变为：
-
-```
-rv.add <rd = a0> <rs = a1> <rs2 = a2>
-```
-
-这也就意味着 use-def chain 破裂，pass 到此为止。
-
-同时，RegAlloc 还会将 PhiOp 降低到 `mv` 指令，并整理生成的汇编。
-
-这个 pass 是整个编译器里最复杂的一个 pass，它的具体执行方式如下：
-
-1. 在 CallOp 和 GetArgOp 周围插入已经填色的占位指令，用来标记它们所污染的寄存器。
-  - 对于 `getarg <8>` 及获取更后面参数的 GetArgOp，它们和 a0 - a7 都冲突。
-  - 对于 `getarg <7>` 及之前的 GetArgOp，它们直接在这里被改写为 ReadRegOp。
-
-2. 完成活跃变量分析，构建冲突图。
-  - 对于 WriteRegOp 和 ReadRegOp，它们偏好的寄存器会被记录下来，并获得 1 的优先级。
-  - 对于 PhiOp，它会获得 2 的优先级，而它的参数会获得 1 的优先级，并且会尽可能与 Phi 本身分配同一个寄存器。
-  - 其它的所有 Op 都是 0 优先级。
-
-3. 根据 (优先级, 冲突图中的度数) 的字典序排序，并分配寄存器。分配完成后，额外分配栈空间以满足 spilling 的需要。
-  - 两个寄存器 s11 和 t6 没有被分配，用来临时加载 spill 的变量。
-
-4. 将所有未被 spill 的 SSA 变量转化为 RdAttr 之类的属性。去除 1. 中引入的占位指令。
-
-5. 摧毁 PhiOp。
-  - 对于所有至少有两个后继的基本块，将 CFG 中对应的边切割开来。
-  - 将 Phi 转化为它前驱中的 mv 指令。
-  - 检测是否有循环赋值 (swap problem)。如果有，就利用 s11 正确完成交换。
-
-6. 将所有被 spill 的 SSA 变量转化为 `ld s11, OFFSET(sp)`（或者 t6 ，如果一条指令用了两个被 spill 的变量的话）。
-  - 对于 `OFFSET >= 2048` 的情况，这实际上是三条指令。（TODO：2048-4096之间可以变成两条）
-  - 在给需要超过8个参数的函数传递参数的时候，需要 `addi sp, sp, -<OFFSET2>`。这意味着之前算出来的 spill offset 也需要加上这个 OFFSET2。
-
-7. 记录每个函数使用了哪些寄存器。
-
-8. 产生函数的 prologue/epilogue。
-  - 再给 stack frame 扩大一点。在这里将大小变为 16 的倍数，而在前面扩大的时候并没有管对齐。
-
-9. 窥孔优化。
-  - 若有对同一个地址的 sw + lw，可以将 lw 改为 mv。
-  - 若有两个连续的 sw zero，可以改为 sd。这要求地址是 8 字节对齐的，所以只折叠了 sp（毕竟 sp 保证是 16 字节对齐的）。
-  - 去除 mv a0, a0。
-
-10. 简化控制流。
-  - 对于只有一条指令的基本块，如果那条指令是 j，就可以完全消除它。注意这可能会跳到另一个仅含有 j 的基本块，需要计算“跳转闭包”。
-  - 直到这里为止，所有的 b 系列（条件跳转）指令都还有一个 TargetAttr 和一个 ElseAttr。根据基本块现在的位置决定该如何消除其中一个 Attr。
-  - 删除跳到下一个基本块的 j 指令。
-
-**Dump**
-
-将 RegAlloc 生成的汇编输出。
+(README 尚未完工)

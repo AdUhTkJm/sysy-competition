@@ -77,12 +77,21 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DCE>();
   pm.addPass<sys::Localize>(/*beforeFlattenCFG=*/ false);
   pm.addPass<sys::Globalize>();
+
+  // ===== Mem2Reg =====
+
   pm.addPass<sys::Mem2Reg>();
   pm.addPass<sys::Alias>();
   pm.addPass<sys::RegularFold>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::DAE>();
+  pm.addPass<sys::Alias>();
+  pm.addPass<sys::DSE>();
+  pm.addPass<sys::DLE>();
   pm.addPass<sys::GVN>();
+
+  // ===== Loop Optimization =====
+
   pm.addPass<sys::CanonicalizeLoop>(/*lcssa=*/ true);
   pm.addPass<sys::LoopRotate>();
   pm.addPass<sys::CanonicalizeLoop>(/*lcssa=*/ false);
@@ -90,6 +99,9 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::ConstLoopUnroll>();
   pm.addPass<sys::SCEV>();
   pm.addPass<sys::GVN>();
+  
+  // ===== Misc =====
+
   pm.addPass<sys::RegularFold>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GVN>();
@@ -122,6 +134,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::GVN>();
 
   // ===== Another round of loop optimization =====
+
   for (int i = 0; i < 2; i++) {
     pm.addPass<sys::CanonicalizeLoop>(/*lcssa=*/ true);
     pm.addPass<sys::SCEV>();
@@ -130,12 +143,11 @@ void initPipeline(sys::PassManager &pm) {
     pm.addPass<sys::RegularFold>();
   }
 
-  // ===== Final cleanup =====
-  pm.addPass<sys::RegularFold>();
+  // ===== Final Cleanup =====
+
   pm.addPass<sys::AggressiveDCE>();
   pm.addPass<sys::SimplifyCFG>();
   pm.addPass<sys::InstSchedule>();
-  pm.addPass<sys::Verify>();
 
   if (opts.arm)
     initArmPipeline(pm);
