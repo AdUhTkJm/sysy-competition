@@ -55,8 +55,16 @@ std::vector<int> apply(const std::vector<int> &data, const std::vector<int> &per
 bool writeless(Op *start, Op *from) {
   for (auto runner = start; !runner->atBack();) {
     runner = runner->nextOp();
-    if (isa<StoreOp>(runner) && BASE(runner->DEF(1)) == from)
+    if (isa<StoreOp>(runner) && BASE(runner->DEF(1)) == BASE(from))
       return false;
+    // Also check for impurities.
+    if (isa<CallOp>(runner) && runner->has<ImpureAttr>()) {
+      for (auto operand : runner->getOperands()) {
+        auto def = operand.defining;
+        if (def->has<BaseAttr>() && BASE(def) == BASE(from))
+          return false;
+      }
+    }
   }
   // Check outer regions.
   if (auto parent = start->getParentOp(); !isa<FuncOp>(parent))
@@ -141,7 +149,7 @@ void View::runImpl(Op *func) {
       continue;
 
     // From shouldn't have been written to since this view is created.
-    if (!writeless(store, from))
+    if (!writeless(store, from) || !writeless(store, addr))
       continue;
 
     // All subscripts must have the same size.

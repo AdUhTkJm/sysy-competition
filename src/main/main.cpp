@@ -63,9 +63,9 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::ArrayAccess>();
   pm.addPass<sys::Base>();
   pm.addPass<sys::View>();
-  pm.addPass<sys::LoopDCE>();
-  pm.addPass<sys::Fusion>();
-  pm.addPass<sys::Unswitch>();
+  // pm.addPass<sys::LoopDCE>();
+  // pm.addPass<sys::Fusion>();
+  // pm.addPass<sys::Unswitch>();
   pm.addPass<sys::Lower>();
 
   // ===== Flattened CFG =====
