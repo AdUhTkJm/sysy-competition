@@ -47,8 +47,9 @@ class BvSolver {
 
   // Add 32-bit numbers.
   Bitvector blastAdd(const Bitvector &a, const Bitvector &b, bool withCin = false);
-  // Add 64-bit numbers. Only used internally.
-  Bitvector blastAddL(const Bitvector &a, const Bitvector &b);
+
+  // Subtract with borrow bit `c[n]`.
+  Bitvector blastSubBorrowed(const Bitvector &a, const Bitvector &b, Variable borrow);
 
   // Bitwise operations.
   Bitvector blastAnd(const Bitvector &a, const Bitvector &b);
@@ -68,6 +69,11 @@ class BvSolver {
   Bitvector blastFullMul(const Bitvector &a, const Bitvector &b);
   // This gives a 64-bit long vector, and performs signed multiplication.
   Bitvector blastFullSMul(const Bitvector &a, const Bitvector &b);
+
+  // Unsigned division.
+  Bitvector blastDiv(const Bitvector &a, const Bitvector &b);
+  // Signed division.
+  Bitvector blastSDiv(const Bitvector &a, const Bitvector &b);
 
   // This gives a full multiplication and then modulus constant x.
   // When `x` is zero, this modulus is 2^32, i.e. take the least significant 32 bits.

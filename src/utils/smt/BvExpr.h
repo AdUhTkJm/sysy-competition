@@ -9,7 +9,7 @@ namespace smt {
 
 #define TYPES \
   X(Var) X(Const) X(And) X(Or) X(Xor) X(Not) X(Add) X(Eq) X(Ne) X(Mul) X(Sub) \
-  X(Lsh) X(Rsh) X(Div) X(Mod) X(Ite) X(Hole) X(Le) X(Lt)
+  X(Lsh) X(Rsh) X(Div) X(Mod) X(Ite) X(Hole) X(Le) X(Lt) X(Abs) X(Minus) X(MulMod)
 
 class BvExpr {
 public:

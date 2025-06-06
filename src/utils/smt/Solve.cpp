@@ -87,9 +87,10 @@ Bitvector BvSolver::blastAdd(const Bitvector &a, const Bitvector &b, bool withCi
   //   p[i] = a[i] ^ b[i]: "Propagate", means the carry from prev. bit will propagate through.
   // Refer to Cambridge Part IA, Digital Electronics.
   // (Perhaps I need some revision.)
-  Bitvector g(32), p(32), result(32);
+  int n = a.size();
+  Bitvector g(n), p(n), result(n);
 
-  for (int i = 0; i < 32; i++) {
+  for (int i = 0; i < n; i++) {
     g[i] = ctx.create();
     p[i] = ctx.create();
     addAnd(g[i], a[i], b[i]);
@@ -98,9 +99,9 @@ Bitvector BvSolver::blastAdd(const Bitvector &a, const Bitvector &b, bool withCi
 
   // According to the meaning described above,
   // Carry c[i+1] = g[i] | (c[i] & p[i])
-  Bitvector c(32);
+  Bitvector c(n);
   c[0] = withCin ? _true : _false;
-  for (int i = 0; i < 31; i++) {
+  for (int i = 0; i < n - 1; i++) {
     Variable _and = ctx.create();
     c[i + 1] = ctx.create();
     addAnd(_and, c[i], p[i]);
@@ -108,39 +109,7 @@ Bitvector BvSolver::blastAdd(const Bitvector &a, const Bitvector &b, bool withCi
   }
 
   // result[i] = p[i] ^ c[i]
-  for (int i = 0; i < 32; i++) {
-    result[i] = ctx.create();
-    addXor(result[i], p[i], c[i]);
-  }
-
-  return result;
-}
-
-Bitvector BvSolver::blastAddL(const Bitvector &a, const Bitvector &b) {
-  // Still a CLA adder.
-  // Just that the length is changed into 64.
-  Bitvector g(64), p(64), result(64);
-
-  for (int i = 0; i < 64; i++) {
-    g[i] = ctx.create();
-    p[i] = ctx.create();
-    addAnd(g[i], a[i], b[i]);
-    addXor(p[i], a[i], b[i]);
-  }
-
-  // According to the meaning described above,
-  // Carry c[i+1] = g[i] | (c[i] & p[i])
-  Bitvector c(64);
-  c[0] = _false;
-  for (int i = 0; i < 63; i++) {
-    Variable _and = ctx.create();
-    c[i + 1] = ctx.create();
-    addAnd(_and, c[i], p[i]);
-    addOr(c[i + 1], _and, g[i]);
-  }
-
-  // result[i] = p[i] ^ c[i]
-  for (int i = 0; i < 64; i++) {
+  for (int i = 0; i < n; i++) {
     result[i] = ctx.create();
     addXor(result[i], p[i], c[i]);
   }
@@ -158,8 +127,9 @@ Bitvector BvSolver::blastAnd(const Bitvector &a, const Bitvector &b) {
 }
 
 Bitvector BvSolver::blastOr(const Bitvector &a, const Bitvector &b) {
-  Bitvector c(32);
-  for (int i = 0; i < 32; i++) {
+  int n = a.size();
+  Bitvector c(n);
+  for (int i = 0; i < n; i++) {
     c[i] = ctx.create();
     addOr(c[i], a[i], b[i]);
   }
@@ -167,8 +137,9 @@ Bitvector BvSolver::blastOr(const Bitvector &a, const Bitvector &b) {
 }
 
 Bitvector BvSolver::blastXor(const Bitvector &a, const Bitvector &b) {
-  Bitvector c(32);
-  for (int i = 0; i < 32; i++) {
+  int n = a.size();
+  Bitvector c(n);
+  for (int i = 0; i < n; i++) {
     c[i] = ctx.create();
     addXor(c[i], a[i], b[i]);
   }
@@ -176,8 +147,9 @@ Bitvector BvSolver::blastXor(const Bitvector &a, const Bitvector &b) {
 }
 
 Bitvector BvSolver::blastNot(const Bitvector &a) {
-  Bitvector c(32);
-  for (int i = 0; i < 32; i++) {
+  int n = a.size();
+  Bitvector c(n);
+  for (int i = 0; i < n; i++) {
     c[i] = ctx.create();
     addNot(c[i], a[i]);
   }
@@ -215,6 +187,7 @@ Bitvector BvSolver::blastLsh(const Bitvector &a, int x) {
 }
 
 Bitvector BvSolver::blastFullMul(const Bitvector &a, const Bitvector &b) {
+  assert(a.size() == 32 && b.size() == 32);
   Bitvector c(64);  
   for (int i = 0; i < 32; i++) {
     // Represent (a << i).
@@ -228,7 +201,7 @@ Bitvector BvSolver::blastFullMul(const Bitvector &a, const Bitvector &b) {
       addAnd(masked[j], s[j], b[i]);
     }
 
-    c = blastAddL(c, masked);
+    c = blastAdd(c, masked);
   }
   return c;
 }
@@ -238,7 +211,7 @@ Bitvector BvSolver::blastFullSMul(const Bitvector &a, const Bitvector &b) {
   auto babs = blastAbs(b);
 
   // Sign bits.
-  auto sa = a[31], sb = b[31];
+  auto sa = a.back(), sb = b.back();
   // Whether the final result is negative.
   auto neg = ctx.create();
   addXor(neg, sa, sb);
@@ -247,20 +220,110 @@ Bitvector BvSolver::blastFullSMul(const Bitvector &a, const Bitvector &b) {
   return blastIte(neg, blastMinus(umul), umul);
 }
 
+Bitvector BvSolver::blastSubBorrowed(const Bitvector &a, const Bitvector &b, Variable borrow) {
+  // Now this can adapt to both 32 and 64 bit.
+  int n = a.size();
+  Bitvector nb(n);
+  for (int i = 0; i < n; i++) {
+    nb[i] = ctx.create();
+    addNot(nb[i], b[i]);
+  }
+
+  // Exact the full adder in `blastAdd`.
+  Bitvector result(n), g(n), p(n), c(n + 1);
+  for (int i = 0; i < n; ++i) {
+    g[i] = ctx.create();
+    p[i] = ctx.create();
+
+    addAnd(g[i], a[i], nb[i]);
+    addXor(p[i], a[i], nb[i]);
+  }
+
+  c[0] = _true;
+  for (int i = 0; i < n; ++i) {
+    Variable tmp = ctx.create();
+    c[i + 1] = ctx.create();
+    addAnd(tmp, c[i], p[i]);
+    addOr(c[i + 1], tmp, g[i]);
+  }
+  
+  for (int i = 0; i < n; i++) {
+    result[i] = ctx.create();
+    addXor(result[i], p[i], c[i]);
+  }
+
+  addNot(borrow, c[n]);
+  return result;
+}
+
+Bitvector BvSolver::blastDiv(const Bitvector &a, const Bitvector &_b) {
+  // Sign-extend `b`.
+  int n = a.size();
+  assert(n >= _b.size());
+
+  Bitvector b(n);
+  std::copy(_b.begin(), _b.end(), b.begin());
+  for (int i = _b.size(); i < n; i++)
+    b[i] = _b.back();
+
+  Bitvector quotient(n);
+  Bitvector remainder(n + 1, _false);
+
+  for (int i = n - 1; i >= 0; i--) {
+    for (int j = n - 1; j > 0; j--)
+      remainder[j] = remainder[j - 1];
+    remainder[0] = a[i];
+
+    Variable borrow = ctx.create();
+    Bitvector tmpRem = blastSubBorrowed(remainder, b, borrow);
+
+    quotient[i] = ctx.create();
+    addNot(quotient[i], borrow);
+
+    for (int j = 0; j < n; ++j) {
+      auto tmp = ctx.create();
+      auto _and = ctx.create();
+      auto _and2 = ctx.create();
+
+      addAnd(_and, remainder[j], borrow);
+      addAndNot(_and2, tmpRem[j], borrow);
+      addOr(tmp, _and, _and2);
+      remainder[j] = tmp;
+    }
+  }
+
+  return quotient;
+}
+
+Bitvector BvSolver::blastSDiv(const Bitvector &a, const Bitvector &b) {
+  auto aabs = blastAbs(a);
+  auto babs = blastAbs(b);
+
+  // Sign bits.
+  auto sa = a.back(), sb = b.back();
+  // Whether the final result is negative.
+  auto neg = ctx.create();
+  addXor(neg, sa, sb);
+
+  auto udiv = blastDiv(aabs, babs);
+  return blastIte(neg, blastMinus(udiv), udiv);
+}
+
 // -a = ~a+1
 Bitvector BvSolver::blastMinus(const Bitvector &a) {
-  Bitvector zero(32, _false);
+  Bitvector zero(a.size(), _false);
   auto _not = blastNot(a);
-  return blastAdd(a, zero, /*withCin=*/ true);
+  return blastAdd(_not, zero, /*withCin=*/ true);
 }
 
 Bitvector BvSolver::blastAbs(const Bitvector &a) {
-  return blastIte(a[31], blastMinus(a), a);
+  return blastIte(a.back(), blastMinus(a), a);
 }
 
 Bitvector BvSolver::blastIte(Variable c, const Bitvector &a, const Bitvector &b) {
-  Bitvector d(32);
-  for (int i = 0; i < 32; i++) {
+  int n = a.size();
+  Bitvector d(n);
+  for (int i = 0; i < n; i++) {
     d[i] = ctx.create();
     auto _and = ctx.create();
     auto _and2 = ctx.create();
@@ -388,6 +451,11 @@ Bitvector BvSolver::blastOp(BvExpr *expr) {
     auto r = blastOp(expr->r);
     return blastMulMod(l, r, 0);
   }
+  case BvExpr::Div: {
+    auto l = blastOp(expr->l);
+    auto r = blastOp(expr->r);
+    return blastSDiv(l, r);
+  }
   case BvExpr::And: {
     auto l = blastOp(expr->l);
     auto r = blastOp(expr->r);
@@ -408,6 +476,14 @@ Bitvector BvSolver::blastOp(BvExpr *expr) {
     auto l = blastOp(expr->l);
     auto r = blastOp(expr->r);
     return blastIte(c, l, r);
+  }
+  case BvExpr::Abs: {
+    auto l = blastOp(expr->l);
+    return blastAbs(l);
+  }
+  case BvExpr::Minus: {
+    auto l = blastOp(expr->l);
+    return blastMinus(l);
   }
   case BvExpr::Const:
     return blastConst(expr->vi);

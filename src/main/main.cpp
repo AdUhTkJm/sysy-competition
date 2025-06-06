@@ -217,7 +217,7 @@ void bv(const sys::Options &opts) {
 
   // Test: x = (x == 1) ? 2x : x + 1
   // > unsat 
-  if (true) {
+  if (false) {
     BvSolver solver(opts);
     BvExprContext ctx;
 
@@ -236,7 +236,7 @@ void bv(const sys::Options &opts) {
   // Test: 1089 * 2256 = 74448 * (x - 16)
   // > sat, x = 1879048241 (signed wrap)
   // (Note that x = 49 is the obvious solution.)
-  if (true) {
+  if (false) {
     BvSolver solver(opts);
     BvExprContext ctx;
 
@@ -251,6 +251,22 @@ void bv(const sys::Options &opts) {
     auto _9 = ctx.create(BvExpr::Eq, _6, _8);
 
     infer(solver, _9);
+  }
+  
+  // Test: 7 / x = -2
+  // > sat, x = -3
+  // Note: very expensive, ~0.2s
+  if (true) {
+    BvSolver solver(opts);
+    BvExprContext ctx;
+
+    auto _1 = ctx.create(BvExpr::Const, 7);
+    auto _2 = ctx.create(BvExpr::Var, "x");
+    auto _3 = ctx.create(BvExpr::Div, _1, _2);
+    auto _4 = ctx.create(BvExpr::Const, -2);
+    auto _5 = ctx.create(BvExpr::Eq, _4, _3);
+
+    infer(solver, _5);
   }
 }
 

@@ -14,16 +14,20 @@ class Superopt : public Pass {
   std::unordered_map<Op*, smt::BvExpr*> cache;
   std::unordered_map<BasicBlock*, smt::BvExpr*> blockpred;
 
+  std::vector<smt::BvExpr*> candidates_1;
+  std::vector<smt::BvExpr*> candidates_2;
+
   int optimized = 0;
 
   // True for success.
   bool fillPredicate(Region *region);
+  smt::BvExpr *fillHole(smt::BvExpr *expr, smt::BvExpr *candidate);
 
   smt::BvExpr *trace(Op *op);
   void rewireExit(Region *region);
   void runImpl(Op *op);
 public:
-  Superopt(ModuleOp *module): Pass(module) {}
+  Superopt(ModuleOp *module);
     
   std::string name() override { return "verify"; };
   std::map<std::string, int> stats() override;

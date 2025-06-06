@@ -1,5 +1,7 @@
 #include "SMTPasses.h"
 #include "LoopPasses.h"
+#include "../auto-gen/fn-1.h"
+#include "../auto-gen/fn-2.h"
 #include "../utils/smt/BvExpr.h"
 
 using namespace sys;
@@ -17,6 +19,8 @@ namespace {
 // Try these inputs on the synthesized expression to obtain constants.
 // When that fails, the candidate fails;
 // otherwise materialize the constants and try to prove it with SMT.
+//
+// NOTE: Currently this is NOT done because there might be more than one argument.
 std::vector<int> inputs { 0, 1, -1, 20050704 };
 
 // For recursive functions & loops, we do the following:
@@ -27,6 +31,10 @@ std::vector<int> inputs { 0, 1, -1, 20050704 };
 // The current function name.
 std::string fname;
 
+}
+
+Superopt::Superopt(ModuleOp *module): Pass(module) {
+  
 }
 
 bool Superopt::fillPredicate(Region *region) {
@@ -201,9 +209,13 @@ void Superopt::run() {
   LoopAnalysis analysis(module);
 
   for (auto func : funcs) {
-    // Currently we only test for function with <= 3 arguments.
-    // That's because one BvExpr can hold at most 3 sub-expressions.
-    if (func->get<ArgCountAttr>()->count > 3)
+    // Currently we only test for function with <= 2 arguments.
+    // For 2 arguments there'll be ~3500 expression to try,
+    // whereas for 3 arguments this gets to ~12000, so it's unmanageable.
+    int argcnt = func->get<ArgCountAttr>()->count;
+    if (argcnt > 2)
+      continue;
+    if (func->has<ImpureAttr>())
       continue;
 
     // If the function contains loop we'll treat them separately.
@@ -216,6 +228,9 @@ void Superopt::run() {
 
     auto last = region->getLastBlock();
     auto ret = last->getLastOp();
+    if (!ret->getOperandCount())
+      continue;
+    
     assert(isa<ReturnOp>(ret));
     queue.push_back(ret);
 
@@ -225,9 +240,23 @@ void Superopt::run() {
       continue;
 
     auto expr = trace(ret->DEF());
-    if (expr)
-      std::cerr << expr << "\n";
-    else
-      std::cerr << nullptr << "\n";
+    if (!expr)
+      continue;
+    // No need for things this simple.
+    if (isa<IntOp>(expr))
+      continue;
+
+    std::cerr << expr << "\n";
+
+    const std::vector<BvExpr*> &candidates = argcnt == 1 ? candidates_1 : candidates_2;
+    for (auto candidate : candidates) {
+      BvSolver solver;
+      auto filled = fillHole(expr, candidate);
+      auto eq = ctx.create(BvExpr::Eq, filled, candidate);
+      solver.infer(eq);
+
+      // Extract a model and prove equality.
+      // TODO
+    }
   }
 }
