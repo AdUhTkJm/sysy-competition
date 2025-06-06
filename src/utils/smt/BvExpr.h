@@ -9,7 +9,7 @@ namespace smt {
 
 #define TYPES \
   X(Var) X(Const) X(And) X(Or) X(Xor) X(Not) X(Add) X(Eq) X(Ne) X(Mul) X(Sub) \
-  X(Lsh) X(Rsh) X(Div) X(Mod)
+  X(Lsh) X(Rsh) X(Div) X(Mod) X(Ite) X(Hole) X(Le) X(Lt)
 
 class BvExpr {
 public:
@@ -25,7 +25,7 @@ public:
   };
   #undef X
 
-  BvExpr *l = nullptr, *r = nullptr;
+  BvExpr *l = nullptr, *r = nullptr, *cond = nullptr;
   int vi = 0;
   std::string name;
 
@@ -34,6 +34,7 @@ public:
   BvExpr(Type ty, BvExpr *l): ty(ty), l(l) {}
   BvExpr(Type ty, BvExpr *l, int vi): ty(ty), l(l), vi(vi) {}
   BvExpr(Type ty, BvExpr *l, BvExpr *r): ty(ty), l(l), r(r) {}
+  BvExpr(Type ty, BvExpr *cond, BvExpr *l, BvExpr *r): ty(ty), l(l), r(r), cond(cond) {}
   BvExpr(Type ty, const std::string &name): ty(ty), name(name) {}
 
   void dump(std::ostream &os = std::cerr);

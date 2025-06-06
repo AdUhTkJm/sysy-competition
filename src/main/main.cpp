@@ -63,9 +63,9 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::ArrayAccess>();
   pm.addPass<sys::Base>();
   pm.addPass<sys::View>();
-  // pm.addPass<sys::LoopDCE>();
-  // pm.addPass<sys::Fusion>();
-  // pm.addPass<sys::Unswitch>();
+  pm.addPass<sys::LoopDCE>();
+  pm.addPass<sys::Fusion>();
+  pm.addPass<sys::Unswitch>();
   pm.addPass<sys::Lower>();
 
   // ===== Flattened CFG =====
@@ -128,6 +128,8 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DCE>();
   pm.addPass<sys::InlineStore>();
   pm.addPass<sys::SynthConstArray>();
+  pm.addPass<sys::RegularFold>();
+  pm.addPass<sys::Superopt>();
   pm.addPass<sys::RegularFold>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GCM>();
@@ -205,23 +207,51 @@ void sat() {
 }
 
 void bv(const sys::Options &opts) {
-  BvSolver solver(opts);
-  BvExprContext ctx;
-  auto _1 = ctx.create(BvExpr::Const, 7);
-  auto _2 = ctx.create(BvExpr::Const, 4);
-  auto _3 = ctx.create(BvExpr::Mul, _1, _2);
+  const auto &infer = [&](BvSolver &solver, BvExpr *x) {
+    bool succ = solver.infer(x);
+    if (succ) {
+      std::cout << "sat\n";
+      std::cout << "x = " << solver.extract("x") << "\n";
+    } else std::cout << "unsat\n";
+  };
 
-  auto _4 = ctx.create(BvExpr::Var, "x");
-  auto _5 = ctx.create(BvExpr::Var, "y");
-  auto _6 = ctx.create(BvExpr::Mul, _4, _5);
-  auto _7 = ctx.create(BvExpr::Eq, _3, _6);
+  // Test: x = (x == 1) ? 2x : x + 1
+  // > unsat 
+  if (true) {
+    BvSolver solver(opts);
+    BvExprContext ctx;
 
-  solver.assign("x", 14);
-  bool succ = solver.infer(_7);
-  if (succ) {
-    std::cout << "sat\n";
-    std::cout << "x = " << solver.extract("y") << "\n";
-  } else std::cout << "unsat\n";
+    auto _1 = ctx.create(BvExpr::Const, 1);
+    auto _2 = ctx.create(BvExpr::Const, 2);
+    auto _3 = ctx.create(BvExpr::Var, "x");
+    auto _4 = ctx.create(BvExpr::Eq, _3, _1);
+    auto _5 = ctx.create(BvExpr::Add, _3, _1);
+    auto _6 = ctx.create(BvExpr::Mul, _3, _2);
+    auto _7 = ctx.create(BvExpr::Ite, _4, _6, _5);
+    auto _8 = ctx.create(BvExpr::Eq, _3, _7);
+
+    infer(solver, _8);
+  }
+
+  // Test: 1089 * 2256 = 74448 * (x - 16)
+  // > sat, x = 1879048241 (signed wrap)
+  // (Note that x = 49 is the obvious solution.)
+  if (true) {
+    BvSolver solver(opts);
+    BvExprContext ctx;
+
+    auto _1 = ctx.create(BvExpr::Var, "x");
+    auto _2 = ctx.create(BvExpr::Const, 16);
+    auto _3 = ctx.create(BvExpr::Const, 1089);
+    auto _4 = ctx.create(BvExpr::Const, 2256);
+    auto _5 = ctx.create(BvExpr::Const, 74448);
+    auto _6 = ctx.create(BvExpr::Mul, _3, _4);
+    auto _7 = ctx.create(BvExpr::Sub, _1, _2);
+    auto _8 = ctx.create(BvExpr::Mul, _7, _5);
+    auto _9 = ctx.create(BvExpr::Eq, _6, _8);
+
+    infer(solver, _9);
+  }
 }
 
 int main(int argc, char **argv) {

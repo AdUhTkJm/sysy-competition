@@ -183,7 +183,8 @@ def build():
 
   total = len(tasks)
   file_prompt = "file" if total == 1 else "files"
-  print(f"Compiling {total} {file_prompt}")
+  if total > 0:
+    print(f"Compiling {total} {file_prompt}")
   with mp.Pool() as pool:
     pool.starmap(compile_cpp, tasks)
   
@@ -200,8 +201,6 @@ def build():
     need_archive = folder_changed.get(folder, False) or not lib_path.exists()
     if need_archive:
       archive_objects(objs, lib_path)
-    else:
-      print(f"Skipping archive {lib_path}, no changes")
     lib_files.append(lib_path)
 
   # Step 3: Link all .a's into final binary
@@ -428,7 +427,12 @@ if __name__ == "__main__":
   build()
 
   if args.bv:
-    proc.run([f"{BUILD_DIR}/sysc", "--bv"])
+    commands = [f"{BUILD_DIR}/sysc", "--bv"]
+    if args.stats:
+      commands.append("-s")
+    if args.verbose:
+      commands.append("-v")
+    proc.run(commands)
     exit(0)
 
   if args.sat:

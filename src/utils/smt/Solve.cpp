@@ -17,6 +17,8 @@ void BvExpr::dump(std::ostream &os) {
   std::string x = names[ty];
   x[0] = tolower(x[0]);
   os << "(" << x;
+  if (cond)
+    os << " " << cond;
   if (l)
     os << " " << l;
   if (r)
@@ -39,32 +41,18 @@ BvSolver::BvSolver(const sys::Options &opts): opts(opts) {
 // Note all these are bidirectional encodings.
 
 void BvSolver::addAnd(Variable out, Variable a, Variable b) {
-  // Meaning:
-  //   out -> a
-  //   out -> b
-  //   a & b -> out
   reserve({ ctx.neg(a), ctx.neg(b), ctx.pos(out) });
   reserve({ ctx.pos(a), ctx.neg(out) });
   reserve({ ctx.pos(b), ctx.neg(out) });
 }
 
 void BvSolver::addOr(Variable out, Variable a, Variable b) {
-  // Meaning:
-  //   out -> a | b
-  //   a -> out
-  //   b -> out
   reserve({ ctx.pos(a), ctx.pos(b), ctx.neg(out) });
   reserve({ ctx.neg(a), ctx.pos(out) });
   reserve({ ctx.neg(b), ctx.pos(out) });
 }
 
 void BvSolver::addXor(Variable out, Variable a, Variable b) {
-  // Meaning:
-  //   out, a, b -> false
-  //   out -> a | b
-  //   b -> a | out
-  //   a -> b | out
-  // (A bit mind-bending.)
   reserve({ ctx.neg(a), ctx.neg(b), ctx.neg(out) });
   reserve({ ctx.pos(a), ctx.pos(b), ctx.neg(out) });
   reserve({ ctx.pos(a), ctx.neg(b), ctx.pos(out) });
@@ -72,13 +60,27 @@ void BvSolver::addXor(Variable out, Variable a, Variable b) {
 }
 
 void BvSolver::addNot(Variable out, Variable a) {
-  // Meaning:
-  //   a, out -> false
-  //   -> a, out
   reserve({ ctx.neg(a), ctx.neg(out) });
   reserve({ ctx.pos(a), ctx.pos(out) });
 }
 
+// Equivalent to (a & !b).
+// Just change the polarity of `b` in addAnd.
+void BvSolver::addAndNot(Variable out, Variable a, Variable b) {
+  reserve({ ctx.neg(a), ctx.pos(b), ctx.pos(out) });
+  reserve({ ctx.pos(a), ctx.neg(out) });
+  reserve({ ctx.neg(b), ctx.neg(out) });
+}
+
+void BvSolver::addXnor(Variable out, Variable a, Variable b) {
+  reserve({ ctx.neg(out), ctx.pos(a), ctx.neg(b) });
+  reserve({ ctx.neg(out), ctx.neg(a), ctx.pos(b) });
+  reserve({ ctx.pos(out), ctx.pos(a), ctx.pos(b) });
+  reserve({ ctx.pos(out), ctx.neg(a), ctx.neg(b) });
+}
+
+// Both serial (ripple-carry) adders and CLA adders need 2 and, 1 or and 2 xors.
+// So I'll just choose the CLA one.
 Bitvector BvSolver::blastAdd(const Bitvector &a, const Bitvector &b, bool withCin) {
   // Consider a CLA adder.
   //   g[i] = a[i] & b[i]: "Generate", means to generate a carry;
@@ -212,7 +214,6 @@ Bitvector BvSolver::blastLsh(const Bitvector &a, int x) {
   return c;
 }
 
-// Simply shift-and-add.
 Bitvector BvSolver::blastFullMul(const Bitvector &a, const Bitvector &b) {
   Bitvector c(64);  
   for (int i = 0; i < 32; i++) {
@@ -232,8 +233,47 @@ Bitvector BvSolver::blastFullMul(const Bitvector &a, const Bitvector &b) {
   return c;
 }
 
+Bitvector BvSolver::blastFullSMul(const Bitvector &a, const Bitvector &b) {
+  auto aabs = blastAbs(a);
+  auto babs = blastAbs(b);
+
+  // Sign bits.
+  auto sa = a[31], sb = b[31];
+  // Whether the final result is negative.
+  auto neg = ctx.create();
+  addXor(neg, sa, sb);
+
+  auto umul = blastFullMul(aabs, babs);
+  return blastIte(neg, blastMinus(umul), umul);
+}
+
+// -a = ~a+1
+Bitvector BvSolver::blastMinus(const Bitvector &a) {
+  Bitvector zero(32, _false);
+  auto _not = blastNot(a);
+  return blastAdd(a, zero, /*withCin=*/ true);
+}
+
+Bitvector BvSolver::blastAbs(const Bitvector &a) {
+  return blastIte(a[31], blastMinus(a), a);
+}
+
+Bitvector BvSolver::blastIte(Variable c, const Bitvector &a, const Bitvector &b) {
+  Bitvector d(32);
+  for (int i = 0; i < 32; i++) {
+    d[i] = ctx.create();
+    auto _and = ctx.create();
+    auto _and2 = ctx.create();
+
+    addAnd(_and, a[i], c);
+    addAndNot(_and2, b[i], c);
+    addOr(d[i], _and, _and2);
+  }
+  return d;
+}
+
 Bitvector BvSolver::blastMulMod(const Bitvector &a, const Bitvector &b, int x) {
-  Bitvector c = blastFullMul(a, b);
+  Bitvector c = blastFullSMul(a, b);
   if (x == 0) {
     c.resize(32);
     return c;
@@ -260,6 +300,75 @@ void BvSolver::blastNe(const Bitvector &a, const Bitvector &b) {
   for (int i = 0; i < 32; i++)
     c[i] = ctx.pos(c[i]);
   reserve(c);
+}
+
+Variable BvSolver::blastCond(BvExpr *expr) {
+  switch (expr->ty) {
+  case BvExpr::Const:
+    return expr->vi ? _true : _false;
+  case BvExpr::And: {
+    auto l = blastCond(expr->l);
+    auto r = blastCond(expr->r);
+    // Const fold.
+    if (l == _true)
+      return r;
+    if (l == _false)
+      return _false;
+    
+    auto _and = ctx.create();
+    addAnd(_and, l, r);
+    return _and;
+  }
+  case BvExpr::Not: {
+    auto l = blastCond(expr->l);
+    // Const fold.
+    if (l == _true)
+      return _false;
+    if (l == _false)
+      return _true;
+
+    auto _not = ctx.create();
+    addNot(_not, l);
+    return _not;
+  }
+  case BvExpr::Eq: {
+    auto l = blastOp(expr->l);
+    auto r = blastOp(expr->r);
+
+    Variable c = ctx.create();
+    addXnor(c, l[0], r[0]);
+
+    for (int i = 1; i < 32; ++i) {
+      Variable _xnor = ctx.create();
+      Variable _and = ctx.create();
+      addXnor(_xnor, l[i], r[i]);
+      addAnd(_and, c, _xnor);
+      c = _and;
+    }
+
+    return c;
+  }
+  // Simply flip the signs of Eq above.
+  case BvExpr::Ne: {
+    auto l = blastOp(expr->l);
+    auto r = blastOp(expr->r);
+
+    Variable c = _false;
+
+    for (int i = 0; i < 32; ++i) {
+      Variable _xor = ctx.create();
+      Variable _or = ctx.create();
+      addXor(_xor, l[i], r[i]);
+      addOr(_or, c, _xor);
+      c = _or;
+    }
+
+    return c;
+  }
+  default:
+    std::cerr << "not a condition: " << expr;
+    assert(false);
+  }
 }
 
 Bitvector BvSolver::blastOp(BvExpr *expr) {
@@ -294,10 +403,27 @@ Bitvector BvSolver::blastOp(BvExpr *expr) {
     auto r = blastOp(expr->r);
     return blastXor(l, r);
   }
+  case BvExpr::Ite: {
+    auto c = blastCond(expr->cond);
+    auto l = blastOp(expr->l);
+    auto r = blastOp(expr->r);
+    return blastIte(c, l, r);
+  }
   case BvExpr::Const:
     return blastConst(expr->vi);
   case BvExpr::Var:
     return blastVar(expr->name);
+  case BvExpr::Eq:
+  case BvExpr::Ne:
+  case BvExpr::Not:
+  case BvExpr::Lt:
+  case BvExpr::Le: {
+    // Extend it to 32-bit.
+    Variable d = blastCond(expr);
+    Bitvector c(32, _false);
+    c[0] = d;
+    return c;
+  }
   default:
     assert(false);
   }

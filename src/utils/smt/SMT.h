@@ -12,17 +12,6 @@ namespace smt {
 // Bitvector[0] is the least significant bit.
 using Bitvector = std::vector<Variable>;
 
-class UnionFind {
-  std::unordered_map<Variable, int> parent;
-  std::unordered_map<Variable, int> rank;
-
-public:
-  bool has(Variable x);
-  Variable find(Variable x);
-  void link(Variable x, Variable y);
-  bool equiv(Variable x, Variable y);
-};
-
 class BvSolver {
   using Clause = std::vector<Atomic>;
 
@@ -40,10 +29,17 @@ class BvSolver {
   void reserve(const Clause &clause) { reserved.push_back(clause); }
 
   // This means that `o` is `a op b`.
-  void addAnd(Variable o, Variable a, Variable b);
-  void addOr (Variable o, Variable a, Variable b);
-  void addXor(Variable o, Variable a, Variable b);
-  void addNot(Variable o, Variable a);
+  void addAnd(Variable out, Variable a, Variable b);
+  void addOr (Variable out, Variable a, Variable b);
+  void addXor(Variable out, Variable a, Variable b);
+  void addNot(Variable out, Variable a);
+
+  // Combined operations.
+
+  // a & !b
+  void addAndNot(Variable out, Variable a, Variable b);
+  // !(a ^ b)
+  void addXnor  (Variable out, Variable a, Variable b);
 
   // These blast functions will add clauses to solver.
   Bitvector blastConst(int vi);
@@ -62,12 +58,23 @@ class BvSolver {
   
   // Left shift by constant.
   Bitvector blastLsh(const Bitvector &a, int x);
+
+  // Absolute value.
+  Bitvector blastAbs(const Bitvector &a);
+  // Minus.
+  Bitvector blastMinus(const Bitvector &a);
   
-  // This gives a length-64 bit vector.
+  // This gives a 64-bit long vector.
   Bitvector blastFullMul(const Bitvector &a, const Bitvector &b);
+  // This gives a 64-bit long vector, and performs signed multiplication.
+  Bitvector blastFullSMul(const Bitvector &a, const Bitvector &b);
+
   // This gives a full multiplication and then modulus constant x.
   // When `x` is zero, this modulus is 2^32, i.e. take the least significant 32 bits.
   Bitvector blastMulMod(const Bitvector &a, const Bitvector &b, int x);
+
+  // If-then-else.
+  Bitvector blastIte(Variable c, const Bitvector &a, const Bitvector &b);
 
   void blastEq(const Bitvector &a, const Bitvector &b);
   void blastNe(const Bitvector &a, const Bitvector &b);
@@ -76,8 +83,9 @@ class BvSolver {
   Bitvector blastOp(BvExpr *expr);
   // Blast operators that don't have a value. This means it's top-level.
   void blast(BvExpr *expr);
+  // Blast boolean-valued operators.
+  Variable blastCond(BvExpr *expr);
 
-  void simplify(BvExpr *expr);
   int eval(BvExpr *expr);
 public:
   BvSolver();

@@ -1,4 +1,5 @@
 #include "SMTPasses.h"
+#include "LoopPasses.h"
 #include "../utils/smt/BvExpr.h"
 
 using namespace sys;
@@ -23,24 +24,138 @@ std::vector<int> inputs { 0, 1, -1, 20050704 };
 // the synthesized expression when we try to evaluate or prove.
 // This is sound as long as at least one argument monotonically decreases.
 
-BvExprContext ctx;
+// The current function name.
+std::string fname;
 
-// Collect all values used by `op` and build a BvExpr.
-BvExpr *trace(Op *op) {
+}
+
+bool Superopt::fillPredicate(Region *region) {
+  std::vector<BasicBlock*> worklist;
+  std::unordered_set<BasicBlock*> visited;
+
+  // Constant 1 represents true. This needs special treatment in BvExpr.
+  // (It only accepts single-bit variable.)
+  auto entry = region->getFirstBlock();
+  blockpred[entry] = ctx.create(BvExpr::Const, 1);
+  worklist.push_back(entry);
+
+  const auto &propagate = [&](BasicBlock *bb, BvExpr *incoming) {
+    auto &existing = blockpred[bb];
+    if (!existing)
+      existing = incoming;
+    else
+      existing = ctx.create(BvExpr::Or, existing, incoming);
+
+    worklist.push_back(bb);
+  };
+
+  while (!worklist.empty()) {
+    auto bb = worklist.back();
+    worklist.pop_back();
+
+    if (visited.count(bb))
+      continue;
+    visited.insert(bb);
+
+    BvExpr *pred = blockpred[bb];
+    auto term = bb->getLastOp();
+
+    if (isa<GotoOp>(term))
+      propagate(TARGET(term), pred);
+    
+    if (isa<BranchOp>(term)) {
+      BvExpr *cond = trace(term->DEF());
+      if (!cond && std::cerr << term->DEF())
+        return false;
+
+      propagate(TARGET(term), ctx.create(BvExpr::And, pred, cond));
+      propagate(ELSE(term), ctx.create(BvExpr::And, pred, ctx.create(BvExpr::Not, cond)));
+    }
+  }
+  return true;
+}
+
+BvExpr *Superopt::trace(Op *op) {
+  // Memoization.
+  if (cache.count(op))
+    return cache[op];
+
   static std::unordered_map<int, BvExpr::Type> mapping = {
     { AddIOp::id, BvExpr::Add },
     { SubIOp::id, BvExpr::Sub },
     { MulIOp::id, BvExpr::Mul },
+    { DivIOp::id, BvExpr::Div },
+    { ModIOp::id, BvExpr::Mod },
+    { EqOp::id, BvExpr::Eq },
+    { NeOp::id, BvExpr::Ne },
+    { LeOp::id, BvExpr::Le },
+    { LtOp::id, BvExpr::Lt },
   };
-  switch (op->opid) {
-  case AddIOp::id: {
+
+  // Handle basic binary operations.
+  if (mapping.count(op->opid)) {
     auto l = trace(op->DEF(0));
     auto r = trace(op->DEF(1));
-    return ctx.create(BvExpr::Add, l, r);
-  }
-  }
-}
+    if (!l || !r)
+      return nullptr;
 
+    auto expr = ctx.create(mapping[op->opid], l, r);
+    return cache[op] = expr;
+  }
+
+  // Handle call operations; only consider self-recursion, and deny all other calls
+  if (isa<CallOp>(op)) {
+    const auto &name = NAME(op);
+    if (fname == name) {
+      auto hole = ctx.create(BvExpr::Hole);
+      int argcnt = op->getOperandCount();
+      if (argcnt >= 1)
+        hole->cond = trace(op->DEF(0));
+      if (argcnt >= 2)
+        hole->l = trace(op->DEF(1));
+      if (argcnt >= 3)
+        hole->r = trace(op->DEF(2));
+
+      return cache[op] = hole;
+    }
+
+    return nullptr;
+  }
+
+  // Handle phi nodes
+  if (isa<PhiOp>(op)) {
+    std::vector<std::pair<BvExpr*, BvExpr*>> cases; // (condition, value)
+
+    for (int i = 0; i < op->getOperandCount(); ++i) {
+      auto def = op->DEF(i);
+      BasicBlock *bb = FROM(op->getAttrs()[i]);
+      BvExpr *val = trace(def);
+      if (!val)
+        return nullptr;
+
+      cases.emplace_back(blockpred[bb], val);
+    }
+
+    // Build nested ITEs: ite(cond0, val0, ite(cond1, val1, ...))
+    BvExpr *expr = cases.back().second;
+    for (int i = (int)cases.size() - 2; i >= 0; --i) {
+      auto [cond, val] = cases[i];
+      expr = ctx.create(BvExpr::Ite, cond, val, expr);
+    }
+
+    return cache[op] = expr;
+  }
+
+  // Handle constant.
+  if (isa<IntOp>(op))
+    return cache[op] = ctx.create(BvExpr::Const, V(op));
+  
+  // Handle parameters.
+  if (isa<GetArgOp>(op))
+    return cache[op] = ctx.create(BvExpr::Var, "arg" + std::to_string(V(op)));
+
+  // Unsupported.
+  return nullptr;
 }
 
 // Make sure the region has a single exit.
@@ -83,8 +198,20 @@ void Superopt::run() {
   // 2) is used as a result calculated inside a loop.
   auto funcs = collectFuncs();
 
+  LoopAnalysis analysis(module);
+
   for (auto func : funcs) {
+    // Currently we only test for function with <= 3 arguments.
+    // That's because one BvExpr can hold at most 3 sub-expressions.
+    if (func->get<ArgCountAttr>()->count > 3)
+      continue;
+
+    // If the function contains loop we'll treat them separately.
     auto region = func->getRegion();
+    auto forest = analysis.runImpl(region);
+    if (forest.getLoops().size())
+      continue;
+
     rewireExit(region);
 
     auto last = region->getLastBlock();
@@ -92,20 +219,15 @@ void Superopt::run() {
     assert(isa<ReturnOp>(ret));
     queue.push_back(ret);
 
-    auto stores = func->findAll<StoreOp>();
-    for (auto store : stores) {
-      // Do basic filtering.
-      auto def = store->DEF(0);
+    fname = NAME(func);
+    blockpred.clear();
+    if (!fillPredicate(region))
+      continue;
 
-      // Simple operations don't need optimization.
-      if (isa<IntOp>(def))
-        continue;
-
-      // FP operations aren't supported.
-      if (def->getResultType() != Value::i32)
-        continue;
-
-      queue.push_back(store->DEF(0));
-    }
+    auto expr = trace(ret->DEF());
+    if (expr)
+      std::cerr << expr << "\n";
+    else
+      std::cerr << nullptr << "\n";
   }
 }

@@ -10,8 +10,16 @@ namespace sys {
 
 // Use SMT solver to super-optimize.
 class Superopt : public Pass {
+  smt::BvExprContext ctx;
+  std::unordered_map<Op*, smt::BvExpr*> cache;
+  std::unordered_map<BasicBlock*, smt::BvExpr*> blockpred;
+
   int optimized = 0;
 
+  // True for success.
+  bool fillPredicate(Region *region);
+
+  smt::BvExpr *trace(Op *op);
   void rewireExit(Region *region);
   void runImpl(Op *op);
 public:
