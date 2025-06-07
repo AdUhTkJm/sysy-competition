@@ -221,6 +221,7 @@ def run_asm(file: str):
 
   # Run the file.
   qemu = "qemu-aarch64-static" if args.arm else "qemu-riscv64-static"
+  buffer = b""
   if args.input:
     with open(args.input, "r") as f:
       buffer = f.read().encode('utf-8')

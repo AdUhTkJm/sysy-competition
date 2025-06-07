@@ -188,7 +188,8 @@ Bitvector BvSolver::blastLsh(const Bitvector &a, int x) {
 
 Bitvector BvSolver::blastFullMul(const Bitvector &a, const Bitvector &b) {
   assert(a.size() == 32 && b.size() == 32);
-  Bitvector c(64);  
+  Bitvector c(64);
+
   for (int i = 0; i < 32; i++) {
     // Represent (a << i).
     Bitvector s(64, _false);
@@ -206,6 +207,27 @@ Bitvector BvSolver::blastFullMul(const Bitvector &a, const Bitvector &b) {
   return c;
 }
 
+Bitvector BvSolver::blastFullLMul(const Bitvector &a, const Bitvector &b) {
+  assert(a.size() == 64 && b.size() == 64);
+  Bitvector c(64);
+
+  for (int i = 0; i < 64; i++) {
+    Bitvector s(64, _false);
+    for (int j = 0; j < 64 - i; j++)
+      s[i + j] = a[j];
+
+    Bitvector masked(64, _false);
+    for (int j = i; j < 64; j++) {
+      masked[j] = ctx.create();
+      addAnd(masked[j], s[j], b[i]);
+    }
+
+    c = blastAdd(c, masked);
+  }
+
+  return c;
+}
+
 Bitvector BvSolver::blastFullSMul(const Bitvector &a, const Bitvector &b) {
   auto aabs = blastAbs(a);
   auto babs = blastAbs(b);
@@ -220,7 +242,22 @@ Bitvector BvSolver::blastFullSMul(const Bitvector &a, const Bitvector &b) {
   return blastIte(neg, blastMinus(umul), umul);
 }
 
+Bitvector BvSolver::blastFullSLMul(const Bitvector &a, const Bitvector &b) {
+  auto aabs = blastAbs(a);
+  auto babs = blastAbs(b);
+
+  // Sign bits.
+  auto sa = a.back(), sb = b.back();
+  // Whether the final result is negative.
+  auto neg = ctx.create();
+  addXor(neg, sa, sb);
+
+  auto umul = blastFullLMul(aabs, babs);
+  return blastIte(neg, blastMinus(umul), umul);
+}
+
 Bitvector BvSolver::blastSubBorrowed(const Bitvector &a, const Bitvector &b, Variable borrow) {
+  assert(a.size() == b.size());
   // Now this can adapt to both 32 and 64 bit.
   int n = a.size();
   Bitvector nb(n);
@@ -257,17 +294,17 @@ Bitvector BvSolver::blastSubBorrowed(const Bitvector &a, const Bitvector &b, Var
 }
 
 Bitvector BvSolver::blastDiv(const Bitvector &a, const Bitvector &_b) {
-  // Sign-extend `b`.
   int n = a.size();
   assert(n >= _b.size());
 
+  // Sign-extend `b`.
   Bitvector b(n);
   std::copy(_b.begin(), _b.end(), b.begin());
   for (int i = _b.size(); i < n; i++)
     b[i] = _b.back();
 
   Bitvector quotient(n);
-  Bitvector remainder(n + 1, _false);
+  Bitvector remainder(n, _false);
 
   for (int i = n - 1; i >= 0; i--) {
     for (int j = n - 1; j > 0; j--)
@@ -428,9 +465,18 @@ Variable BvSolver::blastCond(BvExpr *expr) {
 
     return c;
   }
-  default:
-    std::cerr << "not a condition: " << expr;
-    assert(false);
+  default: {
+    // OR everything together.
+    auto bv = blastOp(expr);
+    assert(bv.size() == 32);
+    Variable c = _false;
+    for (int i = 0; i < 32; i++) {
+      Variable tmp = ctx.create();
+      addOr(tmp, c, bv[i]);
+      c = tmp;
+    }
+    return c;
+  }
   }
 }
 
@@ -455,6 +501,31 @@ Bitvector BvSolver::blastOp(BvExpr *expr) {
     auto l = blastOp(expr->l);
     auto r = blastOp(expr->r);
     return blastSDiv(l, r);
+  }
+  case BvExpr::Mod: {
+    auto l = blastOp(expr->l);
+    auto r = blastOp(expr->r);
+    auto div = blastSDiv(l, r);
+    auto divmul = blastMulMod(div, r, 0);
+    return blastAdd(div, blastNot(divmul), /*withCin=*/ true);
+  }
+  case BvExpr::MulMod: {
+    auto l = blastOp(expr->l);
+    auto r = blastOp(expr->r);
+    auto cond = blastOp(expr->cond);
+    // (cond * l) % r
+    auto mul = blastFullSMul(cond, l);
+    auto div = blastSDiv(mul, r);
+
+    // Sign-extend `r` to 64 bit.
+    r.resize(64);
+    for (int i = 32; i < 64; i++)
+      r[i] = r[31];
+
+    auto divmul = blastFullSLMul(div, r);
+    auto sub = blastAdd(mul, blastNot(divmul), /*withCin=*/ true);
+    sub.resize(32);
+    return sub;
   }
   case BvExpr::And: {
     auto l = blastOp(expr->l);
@@ -501,6 +572,7 @@ Bitvector BvSolver::blastOp(BvExpr *expr) {
     return c;
   }
   default:
+    std::cerr << "unknown op: " << expr << "\n";
     assert(false);
   }
 }
@@ -617,4 +689,11 @@ int BvSolver::eval(BvExpr *expr) {
     std::cerr << "unsupported type " << expr->ty << "\n";
     assert(false);
   }
+}
+
+BvSolver::Model BvSolver::model() {
+  Model result;
+  for (const auto &[name, _] : bindings)
+    result[name] = extract(name);
+  return result;
 }

@@ -31,24 +31,45 @@ std::vector<int> inputs { 0, 1, -1, 20050704 };
 // The current function name.
 std::string fname;
 
+const char *argname[] = {
+  "x", "y", "z"
+};
+
 }
 
 Superopt::Superopt(ModuleOp *module): Pass(module) {
-  
+  // tsgen_push_1(ctx, candidates_1);
+  // tsgen_push_2(ctx, candidates_2);
+  auto _x = ctx.create(BvExpr::Var, "x");
+  auto _y = ctx.create(BvExpr::Var, "y");
+  auto _c = ctx.create(BvExpr::Var, "c");
+  candidates_2.push_back(ctx.create(BvExpr::MulMod, _x, _y, _c));
 }
 
-void Superopt::fillHole(BvExpr *expr, BvExpr *candidate) {
+BvExpr *Superopt::fillHole(BvExpr *expr, BvExpr *candidate) {
   static const auto &fill = [&](BvExpr *&p) {
     if (!p)
-      return;
-    if (p->ty == BvExpr::Hole)
-      p = candidate;
-    else
-      fillHole(p, candidate);
+      return p;
+    return p->ty == BvExpr::Hole ? candidate : fillHole(p, candidate);
   };
-  fill(expr->l);
-  fill(expr->r);
-  fill(expr->cond);
+  auto bvexpr = ctx.create(expr->ty, fill(expr->cond), fill(expr->l), fill(expr->r));
+  bvexpr->vi = expr->vi;
+  bvexpr->name = expr->name;
+  return bvexpr;
+}
+
+BvExpr *Superopt::solidify(BvExpr *expr, BvSolver::Model &model) {
+  static const auto &fill = [&](BvExpr *&p) {
+    if (!p)
+      return p;
+    return p->ty == BvExpr::Var && p->name[0] == 'c'
+      ? ctx.create(BvExpr::Const, model[p->name])
+      : solidify(p, model);
+  };
+  auto bvexpr = ctx.create(expr->ty, fill(expr->cond), fill(expr->l), fill(expr->r));
+  bvexpr->vi = expr->vi;
+  bvexpr->name = expr->name;
+  return bvexpr;
 }
 
 bool Superopt::fillPredicate(Region *region) {
@@ -87,7 +108,7 @@ bool Superopt::fillPredicate(Region *region) {
     
     if (isa<BranchOp>(term)) {
       BvExpr *cond = trace(term->DEF());
-      if (!cond && std::cerr << term->DEF())
+      if (!cond)
         return false;
 
       propagate(TARGET(term), ctx.create(BvExpr::And, pred, cond));
@@ -174,7 +195,7 @@ BvExpr *Superopt::trace(Op *op) {
   
   // Handle parameters.
   if (isa<GetArgOp>(op))
-    return cache[op] = ctx.create(BvExpr::Var, "arg" + std::to_string(V(op)));
+    return cache[op] = ctx.create(BvExpr::Var, argname[V(op)]);
 
   // Unsupported.
   return nullptr;
@@ -264,14 +285,33 @@ void Superopt::run() {
 
     const std::vector<BvExpr*> &candidates = argcnt == 1 ? candidates_1 : candidates_2;
     for (auto candidate : candidates) {
-      BvSolver solver;
-      // TODO: clone the `expr`, otherwise it'll get changed.
-      fillHole(expr, candidate);
-      auto eq = ctx.create(BvExpr::Eq, expr, candidate);
-      solver.infer(eq);
-
+      BvSolver::Model model;
+        auto filled = fillHole(expr, candidate);
+      {
+        BvSolver solver;
+        solver.opts.stats = true;
+        auto eq = ctx.create(BvExpr::Eq, filled, candidate);
+        std::cerr << eq << "\n";
+        bool succ = solver.infer(eq);
+        if (!succ)
+          continue;
+        std::cerr << "sat\n";
+        model = solver.model();
+      }
       // Extract a model and prove equality.
-      // TODO
+      // Change variables to constants.
+      {
+        BvSolver solver;
+        solver.opts.stats = true;
+        auto worked = solidify(filled, model);
+        auto ne = ctx.create(BvExpr::Ne, worked, candidate);
+        std::cerr << ne << "\n";
+        // Sadly, we can't reuse a solver.
+        bool unsat = !solver.infer(ne);
+        if (!unsat)
+          continue;
+        std::cerr << "unsat\n";
+      }
     }
   }
 }

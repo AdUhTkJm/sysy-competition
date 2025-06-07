@@ -6,10 +6,8 @@ inline void tsgen_push_2(BvExprContext &ctx, std::vector<BvExpr*> &candidates) {
   candidates.reserve(3169);
   auto _x = ctx.create(BvExpr::Var, "x");
   auto _y = ctx.create(BvExpr::Var, "y");
-  auto _c = ctx.create(BvExpr::Var, "c");
   auto _c0 = ctx.create(BvExpr::Var, "c0");
   auto _c1 = ctx.create(BvExpr::Var, "c1");
-  auto _c2 = ctx.create(BvExpr::Var, "c2");
   candidates.push_back(ctx.create(BvExpr::Minus, _x));
   candidates.push_back(ctx.create(BvExpr::Minus, _y));
   candidates.push_back(ctx.create(BvExpr::Not, _x));

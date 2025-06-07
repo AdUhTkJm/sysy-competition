@@ -21,7 +21,10 @@ class Superopt : public Pass {
 
   // True for success.
   bool fillPredicate(Region *region);
-  void fillHole(smt::BvExpr *expr, smt::BvExpr *candidate);
+  smt::BvExpr *fillHole(smt::BvExpr *expr, smt::BvExpr *candidate);
+
+  // Replaces all variables whose value have been worked out to concrete constants.
+  smt::BvExpr *solidify(smt::BvExpr *expr, smt::BvSolver::Model &model);
 
   smt::BvExpr *trace(Op *op);
   void rewireExit(Region *region);

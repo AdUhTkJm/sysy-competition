@@ -5,10 +5,8 @@ using namespace smt;
 inline void tsgen_push_1(BvExprContext &ctx, std::vector<BvExpr*> &candidates) {
   candidates.reserve(577);
   auto _x = ctx.create(BvExpr::Var, "x");
-  auto _c = ctx.create(BvExpr::Var, "c");
   auto _c0 = ctx.create(BvExpr::Var, "c0");
   auto _c1 = ctx.create(BvExpr::Var, "c1");
-  auto _c2 = ctx.create(BvExpr::Var, "c2");
   candidates.push_back(ctx.create(BvExpr::Minus, _x));
   candidates.push_back(ctx.create(BvExpr::Not, _x));
   candidates.push_back(ctx.create(BvExpr::Add, _x, _x));

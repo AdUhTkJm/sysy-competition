@@ -17,7 +17,6 @@ class BvSolver {
 
   SATContext ctx;
   Solver solver;
-  sys::Options opts;
   std::unordered_map<std::string, Bitvector> bindings;
   std::vector<Clause> reserved;
   std::vector<signed char> assignments;
@@ -69,6 +68,10 @@ class BvSolver {
   Bitvector blastFullMul(const Bitvector &a, const Bitvector &b);
   // This gives a 64-bit long vector, and performs signed multiplication.
   Bitvector blastFullSMul(const Bitvector &a, const Bitvector &b);
+  // Multiplies 64-bit vectors and get lower 64-bits.
+  Bitvector blastFullLMul(const Bitvector &a, const Bitvector &b);
+  // Multiplies 64-bit vectors and get lower 64-bits, and performs signed multiplication.
+  Bitvector blastFullSLMul(const Bitvector &a, const Bitvector &b);
 
   // Unsigned division.
   Bitvector blastDiv(const Bitvector &a, const Bitvector &b);
@@ -94,8 +97,11 @@ class BvSolver {
 
   int eval(BvExpr *expr);
 public:
+  using Model = std::unordered_map<std::string, int>;
+
   BvSolver();
   BvSolver(const sys::Options &opts);
+  sys::Options opts;
 
   bool infer(BvExpr *expr);
   int extract(const std::string &name);
@@ -103,6 +109,7 @@ public:
   int eval(BvExpr *expr, const std::unordered_map<std::string, int> &external);
   void assign(const std::string &name, int value);
   void unassign() { bindings.clear(); }
+  Model model();
 };
 
 }

@@ -777,7 +777,6 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       CREATE_MV(fp, header, tmp);
     }
   }
-  module->dump();
 
   // Erase all phi's properly. There might be cross-reference across blocks,
   // so we need to remove all operands first.

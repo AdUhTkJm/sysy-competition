@@ -179,8 +179,10 @@ console.log(`inline void tsgen_push_${variables.length - 1}(BvExprContext &ctx, 
 let total = nodeIndex[0].length + nodeIndex[1].length + nodeIndex[2].length;
 console.log(`  candidates.reserve(${total});`);
 
-for (let varname of [...variables, "c0", "c1", "c2"])
-  console.log(`  auto _${varname} = ctx.create(BvExpr::Var, "${varname}");`);
+for (let varname of [...variables, "c0", "c1"]) {
+  if (varname != 'c')
+    console.log(`  auto _${varname} = ctx.create(BvExpr::Var, "${varname}");`);
+}
 
 // Generate all expressions with 0 to maxNodes internal nodes.
 for (let n = 1; n <= 2; n++) {
