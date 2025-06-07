@@ -129,8 +129,8 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::InlineStore>();
   pm.addPass<sys::SynthConstArray>();
   pm.addPass<sys::RegularFold>();
-  // pm.addPass<sys::Superopt>();
-  // pm.addPass<sys::RegularFold>();
+  pm.addPass<sys::Superopt>();
+  pm.addPass<sys::RegularFold>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GCM>();
   pm.addPass<sys::GVN>();
@@ -214,6 +214,9 @@ void bv(const sys::Options &opts) {
       std::cout << "x = " << solver.extract("x") << "\n";
     } else std::cout << "unsat\n";
   };
+
+  BvExprContext ctx;
+  assert(ctx.create(BvExpr::Var, "x") == ctx.create(BvExpr::Var, "x"));
 
   // Test: x = (x == 1) ? 2x : x + 1
   // > unsat 

@@ -112,6 +112,8 @@ public:
   Model model();
 };
 
+BvExpr *simplify(BvExpr *expr, BvExprContext &ctx);
+
 }
 
 #endif

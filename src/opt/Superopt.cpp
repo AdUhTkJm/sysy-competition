@@ -52,9 +52,7 @@ BvExpr *Superopt::fillHole(BvExpr *expr, BvExpr *candidate) {
       return p;
     return p->ty == BvExpr::Hole ? candidate : fillHole(p, candidate);
   };
-  auto bvexpr = ctx.create(expr->ty, fill(expr->cond), fill(expr->l), fill(expr->r));
-  bvexpr->vi = expr->vi;
-  bvexpr->name = expr->name;
+  auto bvexpr = ctx.create(expr->ty, expr->vi, expr->name, fill(expr->cond), fill(expr->l), fill(expr->r));
   return bvexpr;
 }
 
@@ -66,9 +64,7 @@ BvExpr *Superopt::solidify(BvExpr *expr, BvSolver::Model &model) {
       ? ctx.create(BvExpr::Const, model[p->name])
       : solidify(p, model);
   };
-  auto bvexpr = ctx.create(expr->ty, fill(expr->cond), fill(expr->l), fill(expr->r));
-  bvexpr->vi = expr->vi;
-  bvexpr->name = expr->name;
+  auto bvexpr = ctx.create(expr->ty, expr->vi, expr->name, fill(expr->cond), fill(expr->l), fill(expr->r));
   return bvexpr;
 }
 
@@ -292,6 +288,7 @@ void Superopt::run() {
         solver.opts.stats = true;
         auto eq = ctx.create(BvExpr::Eq, filled, candidate);
         std::cerr << eq << "\n";
+        eq = simplify(eq, ctx);
         bool succ = solver.infer(eq);
         if (!succ)
           continue;
@@ -306,6 +303,7 @@ void Superopt::run() {
         auto worked = solidify(filled, model);
         auto ne = ctx.create(BvExpr::Ne, worked, candidate);
         std::cerr << ne << "\n";
+        ne = simplify(ne, ctx);
         // Sadly, we can't reuse a solver.
         bool unsat = !solver.infer(ne);
         if (!unsat)

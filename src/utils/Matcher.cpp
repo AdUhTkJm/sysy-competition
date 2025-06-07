@@ -236,9 +236,6 @@ bool Rule::matchExpr(Expr *expr, Op* op) {
   MATCH_BINARY("and", AndIOp);
   MATCH_BINARY("or", OrIOp);
   MATCH_BINARY("xor", XorIOp);
-  MATCH_BINARY("shl", LShiftOp);
-  MATCH_BINARY("shr", RShiftOp);
-  MATCH_BINARY("shrl", RShiftLOp);
   MATCH_BINARY("addl", AddLOp);
   MATCH_BINARY("subl", SubLOp);
   MATCH_BINARY("mull", MulLOp);

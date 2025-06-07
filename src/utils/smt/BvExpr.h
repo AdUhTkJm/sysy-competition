@@ -4,6 +4,7 @@
 #include <string>
 #include <iostream>
 #include <unordered_set>
+#include <cstdint>
 
 namespace smt {
 
@@ -36,6 +37,8 @@ public:
   BvExpr(Type ty, BvExpr *l, BvExpr *r): ty(ty), l(l), r(r) {}
   BvExpr(Type ty, BvExpr *cond, BvExpr *l, BvExpr *r): ty(ty), l(l), r(r), cond(cond) {}
   BvExpr(Type ty, const std::string &name): ty(ty), name(name) {}
+  BvExpr(Type ty, int vi, const std::string &name, BvExpr *cond, BvExpr *l, BvExpr *r):
+    ty(ty), l(l), r(r), cond(cond), vi(vi), name(name) {}
 
   void dump(std::ostream &os = std::cerr);
 };
@@ -50,7 +53,7 @@ inline std::ostream &operator<<(std::ostream &os, BvExpr *expr) {
 class BvExprContext {
   struct Eq {
     bool operator()(BvExpr *a, BvExpr *b) const {
-      return a->ty == b->ty && a->l == b->l && a->r == b->r && a->name == b->name && a->vi == b->vi;
+      return a->ty == b->ty && a->l == b->l && a->r == b->r && a->cond == b->cond && a->name == b->name && a->vi == b->vi;
     }
   };
 
@@ -64,9 +67,11 @@ class BvExprContext {
       size_t result = a->ty;
       hash_combine(result, a->vi);
       if (a->l)
-        hash_combine(result, Hash()(a->l));
+        hash_combine(result, (uintptr_t) (a->l));
       if (a->r)
-        hash_combine(result, Hash()(a->r));
+        hash_combine(result, (uintptr_t) (a->r));
+      if (a->cond)
+        hash_combine(result, (uintptr_t) (a->cond));
       if (a->ty == BvExpr::Var)
         hash_combine(result, std::hash<std::string>()(a->name));
       return result;
