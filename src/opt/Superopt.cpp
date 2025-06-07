@@ -37,6 +37,20 @@ Superopt::Superopt(ModuleOp *module): Pass(module) {
   
 }
 
+void Superopt::fillHole(BvExpr *expr, BvExpr *candidate) {
+  static const auto &fill = [&](BvExpr *&p) {
+    if (!p)
+      return;
+    if (p->ty == BvExpr::Hole)
+      p = candidate;
+    else
+      fillHole(p, candidate);
+  };
+  fill(expr->l);
+  fill(expr->r);
+  fill(expr->cond);
+}
+
 bool Superopt::fillPredicate(Region *region) {
   std::vector<BasicBlock*> worklist;
   std::unordered_set<BasicBlock*> visited;
@@ -239,11 +253,11 @@ void Superopt::run() {
     if (!fillPredicate(region))
       continue;
 
+    // No need for things this simple.
+    if (isa<IntOp>(ret->DEF()))
+      continue;
     auto expr = trace(ret->DEF());
     if (!expr)
-      continue;
-    // No need for things this simple.
-    if (isa<IntOp>(expr))
       continue;
 
     std::cerr << expr << "\n";
@@ -251,8 +265,9 @@ void Superopt::run() {
     const std::vector<BvExpr*> &candidates = argcnt == 1 ? candidates_1 : candidates_2;
     for (auto candidate : candidates) {
       BvSolver solver;
-      auto filled = fillHole(expr, candidate);
-      auto eq = ctx.create(BvExpr::Eq, filled, candidate);
+      // TODO: clone the `expr`, otherwise it'll get changed.
+      fillHole(expr, candidate);
+      auto eq = ctx.create(BvExpr::Eq, expr, candidate);
       solver.infer(eq);
 
       // Extract a model and prove equality.

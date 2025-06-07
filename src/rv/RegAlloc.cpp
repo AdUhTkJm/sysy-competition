@@ -751,11 +751,33 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     if (members.empty())
       continue;
 
-    // Looks like still buggy? No idea why.
-    // Anyway, disable it for now.
-    std::cerr << "remark: cycle detected\n";
-    assert(false);
+    std::cerr << "remark: cycle detected at bb" << bbmap[bb] << "\n";
+    for (auto header : headers) {
+      const auto &cycle = members[header];
+      assert(!cycle.empty());
+
+      // Move the header's value to temp.
+      Reg headerSrc = moveGraph[header];
+      auto mv = revMap[bb][{ header, headerSrc }];
+      bool fp = isFP(header);
+      Reg tmp = fp ? fspillReg2 : spillReg2;
+      RD(mv) = tmp;
+      mv->moveBefore(term);
+
+      // For the rest of the cycle, perform the moves in order.
+      Reg curr = headerSrc;
+      while (curr != header) {
+        Reg nextSrc = moveGraph[curr];
+        revMap[bb][{ curr, nextSrc }]->moveBefore(term);
+        curr = nextSrc;
+      }
+
+      // Move from temp into the header.
+      builder.setBeforeOp(term);
+      CREATE_MV(fp, header, tmp);
+    }
   }
+  module->dump();
 
   // Erase all phi's properly. There might be cross-reference across blocks,
   // so we need to remove all operands first.

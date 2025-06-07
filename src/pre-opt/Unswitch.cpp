@@ -13,6 +13,7 @@ namespace {
 
 Rule cmpmod("(eq (mod x 'a) 'b)");
 Rule addmod("(mod (add x 'a) 'b)");
+Rule cmplt("(lt x y)");
 
 // It's guaranteed that the induction variable will be a multiple of `vi`
 // at the beginning of the loop.
@@ -137,54 +138,195 @@ void unroll(Op *loop, int vi) {
   }
 }
 
-void Unswitch::run() {
-  auto loops = module->findAll<ForOp>();
+bool Unswitch::cmpmod(Op *loop, Op *cond) {
+  int vi;
+  if (!::cmpmod.match(cond, { { "x", loop } }))
+    return false;
+  else
+    vi = V(::cmpmod.extract("'a"));
 
-  for (auto loop : loops) {
-    // The step must be a constant.
-    if (!isa<IntOp>(loop->DEF(2)))
-      continue;
+  vi = std::abs(vi);
+  if (vi > 16 || vi <= 1)
+    return false;
 
-    // Find an "if" that is related to the induction variable.
-    Op *branch = nullptr;
-    auto region = loop->getRegion();
-    auto entry = region->getFirstBlock();
-    for (auto op : entry->getOps()) {
-      if (isa<IfOp>(op)) {
-        branch = op;
-        break;
-      }
+  // If `start` is not a constant,
+  // we wouldn't be able to pre-calculate the mod value.
+  if (!isa<IntOp>(loop->DEF(0)))
+    return false;
+
+  // Unroll the loop `vi` times.
+  unroll(loop, vi);
+  // Check `mod`s inside the loop and erase them when possible.
+  tidymod(loop, vi);
+  unswitched++;
+  return true;
+}
+
+bool Unswitch::ltconst(Op *loop, Op *cond) {
+  // Big strides might cause the second loop to not start at `limit`.
+  // To make thing simpler we just disable this.
+  if (V(loop->DEF(2)) != 1)
+    return false;
+
+  if (!cmplt.match(cond, { { "x", loop } }))
+    return false;
+  
+  auto limit = cmplt.extract("y");
+  // Check whether it's a constant.
+  if (limit->inside(loop) && !isa<IntOp>(limit))
+    return false;
+
+  if (isa<LoadOp>(limit)) {
+    if (!limit->has<BaseAttr>())
+      return false;
+
+    // Check if there's any store to this limit.
+    auto stores = loop->findAll<StoreOp>();
+    for (auto store : stores) {
+      if (!store->has<BaseAttr>() || BASE(store) == limit)
+        return false;
     }
-    if (!branch)
-      continue;
-
-    auto cond = branch->DEF();
-
-    // Situation 1. comparison of a mod
-    int vi;
-    if (!cmpmod.match(cond, { { "x", loop } }))
-      goto situation2;
-    else
-      vi = V(cmpmod.extract("'a"));
-
-    vi = std::abs(vi);
-    if (vi > 16 || vi <= 1)
-      continue;
-
-    // If `start` is not a constant,
-    // we wouldn't be able to pre-calculate the mod value.
-    if (!isa<IntOp>(loop->DEF(0)))
-      continue;
-
-    // Unroll the loop `vi` times.
-    unroll(loop, vi);
-    // Check `mod`s inside the loop and erase them when possible.
-    tidymod(loop, vi);
-    unswitched++;
-
-    continue;
-    // Situation 2. comparison of constant
-    situation2:
-      ; // TODO
   }
+
+  if (isa<IntOp>(limit) && limit->inside(loop))
+    limit->moveBefore(loop);
+
+  // Now it's safe. Split the loop into two.
+  Builder builder;
+  builder.setBeforeOp(loop);
+
+  // Start from the original start to the new limit.
+  auto stop = loop->getOperand(1);
+  auto step = loop->getOperand(2);
+  auto ivAddr = loop->getOperand(3);
+
+  // Create a min of `limit` and `stop`.
+  // min = (stop < limit) ? stop : limit
+  auto lt = builder.create<LtOp>({ stop, limit });
+  auto min = builder.create<SelectOp>({ lt, stop, limit });
+
+  auto floop = builder.create<ForOp>({ loop->getOperand(0), min, step, ivAddr });
+  loop->setOperand(0, limit);
+
+  // Copy the operations into that new loop.
+  auto region = loop->getRegion();
+  auto entry = region->getFirstBlock();
+
+  std::list<Op*> body = entry->getOps();
+  std::unordered_map<Op*, Op*> opmap;
+
+  const std::function<void (Op*)> copy = [&](Op *x) {
+    auto copied = builder.copy(x);
+    opmap[x] = copied;
+
+    for (auto r : x->getRegions()) {
+      Builder::Guard guard(builder);
+      
+      auto cr = copied->appendRegion();
+
+      auto entry = r->getFirstBlock();
+      auto cEntry = cr->appendBlock();
+      builder.setToBlockStart(cEntry);
+      for (auto op : entry->getOps())
+        copy(op);
+    }
+  };
+
+  auto fregion = floop->appendRegion();
+  auto fentry = fregion->appendBlock();
+  builder.setToBlockEnd(fentry);
+  opmap[loop] = floop;
+
+  for (auto x : body)
+    copy(x);
+
+  // Rewire operands.
+  for (auto [_, v] : opmap) {
+    for (int i = 0; i < v->getOperandCount(); i++) {
+      auto def = v->DEF(i);
+      v->setOperand(i, opmap.count(def) ? opmap[def] : def);
+    }
+  }
+
+  // Look for the if for the newly created loop.
+  auto fcond = opmap[cond];
+  const auto &fuses = fcond->getUses();
+  for (auto use : fuses) {
+    if (!isa<IfOp>(use))
+      continue;
+
+    // Move all ops in the "true" region outside the if.
+    auto ifso = use->getRegion(0);
+    ifso->getFirstBlock()->inlineBefore(use);
+  }
+  // Remove all if's.
+  for (auto it = fuses.begin(); it != fuses.end();) {
+    auto next = it; next++;
+    if (isa<IfOp>(*it))
+      (*it)->erase();
+    it = next;
+  }
+
+  // Similarly do it for the other side.
+  const auto &uses = cond->getUses();
+  for (auto use : uses) {
+    if (!isa<IfOp>(use))
+      continue;
+
+    // Move all ops in the "false" region outside the if,
+    // only if that region is present.
+    if (use->getRegionCount() > 1) {
+      auto ifnot = use->getRegion(1);
+      ifnot->getFirstBlock()->inlineBefore(use);
+    }
+  }
+  // Remove all if's.
+  for (auto it = uses.begin(); it != uses.end();) {
+    auto next = it; next++;
+    if (isa<IfOp>(*it))
+      (*it)->erase();
+    it = next;
+  }
+
+  unswitched++;
+  return true;
+}
+
+bool Unswitch::runImpl(Op *loop) {
+  // Erased loop, but yet to be deleted.
+  if (!loop->getOperandCount())
+    return false;
+
+  // The step must be a constant.
+  if (!isa<IntOp>(loop->DEF(2)))
+    return false;
+
+  // Find an "if" that is related to the induction variable.
+  Op *branch = nullptr;
+  auto region = loop->getRegion();
+  auto entry = region->getFirstBlock();
+  for (auto op : entry->getOps()) {
+    if (isa<IfOp>(op)) {
+      branch = op;
+      break;
+    }
+  }
+  if (!branch)
+    return false;
+
+  auto cond = branch->DEF();
+
+  return 
+    cmpmod(loop, cond) ||
+    ltconst(loop, cond);
+}
+
+void Unswitch::run() {
+  bool changed;
+  do {
+    changed = false;
+    auto loops = module->findAll<ForOp>();
+    for (auto loop : loops)
+      changed |= runImpl(loop);
+  } while (changed);
 }

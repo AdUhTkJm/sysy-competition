@@ -21,7 +21,7 @@ class Superopt : public Pass {
 
   // True for success.
   bool fillPredicate(Region *region);
-  smt::BvExpr *fillHole(smt::BvExpr *expr, smt::BvExpr *candidate);
+  void fillHole(smt::BvExpr *expr, smt::BvExpr *candidate);
 
   smt::BvExpr *trace(Op *op);
   void rewireExit(Region *region);

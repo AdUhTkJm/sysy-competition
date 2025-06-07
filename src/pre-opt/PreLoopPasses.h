@@ -65,6 +65,11 @@ public:
 // Unswitch branches related to induction variable.
 class Unswitch : public Pass {
   int unswitched = 0;
+
+  bool runImpl(Op *loop);
+  bool cmpmod(Op *loop, Op *cond);
+  bool ltconst(Op *loop, Op *cond);
+  bool gtconst(Op *loop, Op *cond);
 public:
   Unswitch(ModuleOp *module): Pass(module) {}
 

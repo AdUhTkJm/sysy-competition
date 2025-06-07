@@ -229,7 +229,7 @@ bool ConstLoopUnroll::runImpl(LoopInfo *loop) {
   if (lower && upper && isa<IntOp>(lower) && isa<IntOp>(upper)) {
     int low = V(lower);
     int high = V(upper);
-    if (high - low <= 1000 / loopsize)
+    if (high - low <= 200 / loopsize)
       unroll = high - low;
   }
   // Not a constant loop.

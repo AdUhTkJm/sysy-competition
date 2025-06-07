@@ -1,0 +1,14 @@
+int main() {
+  int i = 0;
+  int n = getint();
+  int sum = 0;
+  while (i < n) {
+    if (i < 30)
+      sum = sum + i;
+    
+    sum = sum + i * 2;
+    i = i + 1;
+  }
+  putint(sum);
+  return 0;
+}
