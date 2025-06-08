@@ -188,7 +188,7 @@ bool ConstLoopUnroll::runImpl(LoopInfo *loop) {
 
   // Not every loop can be unrolled, even not all constant-bounded loops.
   // See 65_color.sy, where we are attempting to unroll a nested loop with a total of 18^5*7 = 13226976 iterations.
-  if (loopsize > 300)
+  if (loopsize > 1000)
     return false;
 
   auto phis = header->getPhis();
