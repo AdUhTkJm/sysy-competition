@@ -56,11 +56,11 @@ BvExpr *Superopt::fillHole(BvExpr *expr, BvExpr *candidate) {
   return bvexpr;
 }
 
-BvExpr *Superopt::solidify(BvExpr *expr, BvSolver::Model &model) {
+BvExpr *Superopt::solidify(BvExpr *expr, BvSolver::Model &model, bool allowX) {
   static const auto &fill = [&](BvExpr *&p) {
     if (!p)
       return p;
-    return p->ty == BvExpr::Var && p->name[0] == 'c'
+    return p->ty == BvExpr::Var && (allowX ^ (p->name[0] == 'c'))
       ? ctx.create(BvExpr::Const, model[p->name])
       : solidify(p, model);
   };
@@ -286,7 +286,11 @@ void Superopt::run() {
       {
         BvSolver solver;
         solver.opts.stats = true;
-        auto eq = ctx.create(BvExpr::Eq, filled, candidate);
+        // Use just some random bits to find a good `c`.
+        BvSolver::Model model = { { "x", -519782519 }, { "y", 1373081924 } };
+        auto sfilled = solidify(filled, model, true);
+        auto scand = solidify(candidate, model, true);
+        auto eq = ctx.create(BvExpr::Eq, sfilled, scand);
         std::cerr << eq << "\n";
         eq = simplify(eq, ctx);
         bool succ = solver.infer(eq);

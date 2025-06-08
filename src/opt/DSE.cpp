@@ -142,7 +142,7 @@ void DSE::removeUnread(Op *op, const std::vector<Op*> &gets) {
 
     for (auto use : back->getUses()) {
       // Cannot remove.
-      if (isa<LoadOp>(use))
+      if (isa<LoadOp>(use) || isa<CallOp>(use))
         return;
       if (isa<StoreOp>(use)) {
         stores.push_back(use);

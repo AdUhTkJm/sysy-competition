@@ -18,6 +18,7 @@ class BvSolver {
   SATContext ctx;
   Solver solver;
   std::unordered_map<std::string, Bitvector> bindings;
+  std::unordered_map<BvExpr*, Bitvector> cache;
   std::vector<Clause> reserved;
   std::vector<signed char> assignments;
 

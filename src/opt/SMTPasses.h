@@ -24,7 +24,8 @@ class Superopt : public Pass {
   smt::BvExpr *fillHole(smt::BvExpr *expr, smt::BvExpr *candidate);
 
   // Replaces all variables whose value have been worked out to concrete constants.
-  smt::BvExpr *solidify(smt::BvExpr *expr, smt::BvSolver::Model &model);
+  // Configurable whether `x`, `y` etc. are allowed to be substituted.
+  smt::BvExpr *solidify(smt::BvExpr *expr, smt::BvSolver::Model &model, bool allowX = false);
 
   smt::BvExpr *trace(Op *op);
   void rewireExit(Region *region);

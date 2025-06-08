@@ -481,33 +481,36 @@ Variable BvSolver::blastCond(BvExpr *expr) {
 }
 
 Bitvector BvSolver::blastOp(BvExpr *expr) {
+  if (cache.count(expr))
+    return cache[expr];
+
   switch (expr->ty) {
   case BvExpr::Add: {
     auto l = blastOp(expr->l);
     auto r = blastOp(expr->r);
-    return blastAdd(l, r);
+    return cache[expr] = blastAdd(l, r);
   }
   case BvExpr::Sub: {
     auto l = blastOp(expr->l);
     auto r = blastOp(expr->r);
-    return blastAdd(l, blastNot(r), /*withCin=*/ true);
+    return cache[expr] = blastAdd(l, blastNot(r), /*withCin=*/ true);
   }
   case BvExpr::Mul: {
     auto l = blastOp(expr->l);
     auto r = blastOp(expr->r);
-    return blastMulMod(l, r, 0);
+    return cache[expr] = blastMulMod(l, r, 0);
   }
   case BvExpr::Div: {
     auto l = blastOp(expr->l);
     auto r = blastOp(expr->r);
-    return blastSDiv(l, r);
+    return cache[expr] = blastSDiv(l, r);
   }
   case BvExpr::Mod: {
     auto l = blastOp(expr->l);
     auto r = blastOp(expr->r);
     auto div = blastSDiv(l, r);
     auto divmul = blastMulMod(div, r, 0);
-    return blastAdd(div, blastNot(divmul), /*withCin=*/ true);
+    return cache[expr] = blastAdd(l, blastNot(divmul), /*withCin=*/ true);
   }
   case BvExpr::MulMod: {
     auto l = blastOp(expr->l);
@@ -525,36 +528,36 @@ Bitvector BvSolver::blastOp(BvExpr *expr) {
     auto divmul = blastFullSLMul(div, r);
     auto sub = blastAdd(mul, blastNot(divmul), /*withCin=*/ true);
     sub.resize(32);
-    return sub;
+    return cache[expr] = sub;
   }
   case BvExpr::And: {
     auto l = blastOp(expr->l);
     auto r = blastOp(expr->r);
-    return blastAnd(l, r);
+    return cache[expr] = blastAnd(l, r);
   }
   case BvExpr::Or: {
     auto l = blastOp(expr->l);
     auto r = blastOp(expr->r);
-    return blastOr(l, r);
+    return cache[expr] = blastOr(l, r);
   }
   case BvExpr::Xor: {
     auto l = blastOp(expr->l);
     auto r = blastOp(expr->r);
-    return blastXor(l, r);
+    return cache[expr] = blastXor(l, r);
   }
   case BvExpr::Ite: {
     auto c = blastCond(expr->cond);
     auto l = blastOp(expr->l);
     auto r = blastOp(expr->r);
-    return blastIte(c, l, r);
+    return cache[expr] = blastIte(c, l, r);
   }
   case BvExpr::Abs: {
     auto l = blastOp(expr->l);
-    return blastAbs(l);
+    return cache[expr] = blastAbs(l);
   }
   case BvExpr::Minus: {
     auto l = blastOp(expr->l);
-    return blastMinus(l);
+    return cache[expr] = blastMinus(l);
   }
   case BvExpr::Lsh: {
     auto l = blastOp(expr->l);
@@ -564,14 +567,22 @@ Bitvector BvSolver::blastOp(BvExpr *expr) {
       int vi = expr->r->vi;
       for (int i = vi; i < c.size(); i++)
         c[i] = l[i - vi];
-      return c;
+      return cache[expr] = c;
     };
     assert(false && "lsh nyi");
   }
+  case BvExpr::Extr: {
+    // Zero-extend.
+    auto l = blastOp(expr->l);
+    int n = l.size();
+    Bitvector c(n, _false);
+    c[0] = l[expr->vi];
+    return cache[expr] = c;
+  }
   case BvExpr::Const:
-    return blastConst(expr->vi);
+    return cache[expr] = blastConst(expr->vi);
   case BvExpr::Var:
-    return blastVar(expr->name);
+    return cache[expr] = blastVar(expr->name);
   case BvExpr::Eq:
   case BvExpr::Ne:
   case BvExpr::Not:
@@ -581,7 +592,7 @@ Bitvector BvSolver::blastOp(BvExpr *expr) {
     Variable d = blastCond(expr);
     Bitvector c(32, _false);
     c[0] = d;
-    return c;
+    return cache[expr] = c;
   }
   default:
     std::cerr << "unknown op: " << expr << "\n";
@@ -601,6 +612,13 @@ void BvSolver::blast(BvExpr *expr) {
     auto l = blastOp(expr->l);
     auto r = blastOp(expr->r);
     blastNe(l, r);
+    break;
+  }
+  case BvExpr::And: {
+    auto l = blastCond(expr->l);
+    auto r = blastCond(expr->r);
+    reserve({ ctx.pos(l) });
+    reserve({ ctx.pos(r) });
     break;
   }
   default:

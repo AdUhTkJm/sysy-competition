@@ -23,17 +23,25 @@ using namespace sys;
     return matchExpr(list->elements[1], bvexpr->l); \
   }
 
-#define EVAL_BINARY(opcode, bvexpr) \
+#define EVAL_TERNARY(opcode, expr) \
   if (opname == "!" opcode) { \
     int a = evalExpr(list->elements[1]); \
     int b = evalExpr(list->elements[2]); \
-    return a bvexpr b; \
+    int c = evalExpr(list->elements[3]); \
+    return expr; \
   }
 
-#define EVAL_UNARY(opcode, bvexpr) \
+#define EVAL_BINARY(opcode, expr) \
   if (opname == "!" opcode) { \
     int a = evalExpr(list->elements[1]); \
-    return bvexpr a; \
+    int b = evalExpr(list->elements[2]); \
+    return a expr b; \
+  }
+
+#define EVAL_UNARY(opcode, expr) \
+  if (opname == "!" opcode) { \
+    int a = evalExpr(list->elements[1]); \
+    return expr a; \
   }
 
 #define BUILD_TERNARY(opcode, Ty) \
@@ -220,6 +228,8 @@ int BvRule::evalExpr(Expr *expr) {
 
   auto head = dyn_cast<Atom>(list->elements[0]);
   std::string_view opname = head->value;
+
+  EVAL_TERNARY("mulmod", ((int64_t) a * (int64_t) b) % c);
 
   EVAL_BINARY("add", +);
   EVAL_BINARY("sub", -);
