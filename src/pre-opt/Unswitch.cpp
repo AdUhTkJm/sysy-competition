@@ -12,6 +12,7 @@ std::map<std::string, int> Unswitch::stats() {
 namespace {
 
 Rule cmpmod("(eq (mod x 'a) 'b)");
+Rule cmpmod0("(mod x 'a)");
 Rule addmod("(mod (add x 'a) 'b)");
 Rule cmplt("(lt x y)");
 
@@ -140,9 +141,13 @@ void unroll(Op *loop, int vi) {
 
 bool Unswitch::cmpmod(Op *loop, Op *cond) {
   int vi;
-  if (!::cmpmod.match(cond, { { "x", loop } }))
-    return false;
-  else
+  if (!::cmpmod.match(cond, { { "x", loop } })) {
+    if (!cmpmod0.match(cond, { { "x", loop } }))
+      return false;
+    // This means (x % 'a) != 0.
+    // The procedure also works.
+    vi = V(cmpmod0.extract("'a"));
+  } else
     vi = V(::cmpmod.extract("'a"));
 
   vi = std::abs(vi);

@@ -78,6 +78,7 @@ class DSE : public Pass {
 
   void dfs(BasicBlock *current, DomTree &dom, std::set<Op*> live);
   void runImpl(Region *region);
+  void removeUnread(Op *op, const std::vector<Op*> &gets);
 public:
   DSE(ModuleOp *module): Pass(module) {}
 

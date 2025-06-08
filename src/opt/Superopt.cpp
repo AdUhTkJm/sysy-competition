@@ -300,8 +300,9 @@ void Superopt::run() {
       {
         BvSolver solver;
         solver.opts.stats = true;
-        auto worked = solidify(filled, model);
-        auto ne = ctx.create(BvExpr::Ne, worked, candidate);
+        auto sfilled = solidify(filled, model);
+        auto scand = solidify(candidate, model);
+        auto ne = ctx.create(BvExpr::Ne, sfilled, scand);
         std::cerr << ne << "\n";
         ne = simplify(ne, ctx);
         // Sadly, we can't reuse a solver.

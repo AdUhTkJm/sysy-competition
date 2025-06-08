@@ -1,6 +1,7 @@
 #include "LowerPasses.h"
 #include "../codegen/CodeGen.h"
 #include "../codegen/Attrs.h"
+#include "../pre-opt/PreAttrs.h"
 #include <vector>
 
 using namespace sys;
@@ -248,6 +249,15 @@ void tidy(FuncOp *func) {
   }
 
   body->updatePreds();
+
+  // Remove subscript and base attributes from pre-opt stage.
+  auto region = func->getRegion();
+  for (auto bb : region->getBlocks()) {
+    for (auto op : bb->getOps()) {
+      op->remove<SubscriptAttr>();
+      op->remove<BaseAttr>();
+    }
+  }
 }
 
 void FlattenCFG::run() {

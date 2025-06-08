@@ -1,6 +1,7 @@
 #include "CleanupPasses.h"
 #include "Analysis.h"
 #include <deque>
+#include <unordered_set>
 
 using namespace sys;
 
@@ -121,6 +122,43 @@ void DSE::runImpl(Region *region) {
   }
 }
 
+void DSE::removeUnread(Op *op, const std::vector<Op*> &gets) {
+  std::unordered_set<Op*> addrs;
+  std::vector<Op*> queue;
+  const auto &name = NAME(op);
+  for (auto x : gets) {
+    if (NAME(x) == name)
+      queue.push_back(x);
+  }
+
+  std::vector<Op*> stores;
+  while (!queue.empty()) {
+    auto back = queue.back();
+    queue.pop_back();
+
+    if (addrs.count(back))
+      continue;
+    addrs.insert(back);
+
+    for (auto use : back->getUses()) {
+      // Cannot remove.
+      if (isa<LoadOp>(use))
+        return;
+      if (isa<StoreOp>(use)) {
+        stores.push_back(use);
+        continue;
+      }
+
+      // Might be a phi or an AddL. Anyway, must mark them.
+      queue.push_back(use);
+    }
+  }
+
+  // Hasn't been read; all stores can be removed.
+  for (auto x : stores)
+    x->erase();
+}
+
 void DSE::run() {
   Alias(module).run();
   
@@ -128,4 +166,10 @@ void DSE::run() {
 
   for (auto func : funcs)
     runImpl(func->getRegion());
+
+  // Look at globals that have only been stored but not read.
+  auto globs = collectGlobals();
+  auto gets = module->findAll<GetGlobalOp>();
+  for (auto glob : globs)
+    removeUnread(glob, gets);
 }

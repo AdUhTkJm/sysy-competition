@@ -556,6 +556,18 @@ Bitvector BvSolver::blastOp(BvExpr *expr) {
     auto l = blastOp(expr->l);
     return blastMinus(l);
   }
+  case BvExpr::Lsh: {
+    auto l = blastOp(expr->l);
+    if (expr->r->ty == BvExpr::Const) {
+      int n = l.size();
+      Bitvector c(n);
+      int vi = expr->r->vi;
+      for (int i = vi; i < c.size(); i++)
+        c[i] = l[i - vi];
+      return c;
+    };
+    assert(false && "lsh nyi");
+  }
   case BvExpr::Const:
     return blastConst(expr->vi);
   case BvExpr::Var:

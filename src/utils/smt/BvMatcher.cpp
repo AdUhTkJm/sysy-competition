@@ -234,8 +234,8 @@ int BvRule::evalExpr(Expr *expr) {
   EVAL_BINARY("ne", !=);
   EVAL_BINARY("and", &);
   EVAL_BINARY("or", |);
-  EVAL_BINARY("lshift", <<);
-  EVAL_BINARY("rshift", >>);
+  EVAL_BINARY("lsh", <<);
+  EVAL_BINARY("rsh", >>);
 
   EVAL_UNARY("not", !);
 
