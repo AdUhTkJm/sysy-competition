@@ -83,9 +83,9 @@ void InstSchedule::runImpl(BasicBlock *bb) {
       }
 
       // Wait 8 instructions for multiplication.
-      if ((isa<MulIOp>(def) || isa<MulLOp>(def)) && index - time[def] <= 8) {
-        result--;
-      }
+      // if ((isa<MulIOp>(def) || isa<MulLOp>(def)) && index - time[def] <= 8) {
+      //   result--;
+      // }
     }
 
     if (result < 0)

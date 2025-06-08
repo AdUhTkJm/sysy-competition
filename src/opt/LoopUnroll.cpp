@@ -107,6 +107,7 @@ BasicBlock *ConstLoopUnroll::copyLoop(LoopInfo *loop, BasicBlock *bb, int unroll
         // to find the inherited value.
         value = prevLatch[latchvalue];
 
+      cloneMap[origphi] = value;
       copiedphi->replaceAllUsesWith(value);
       copiedphi->erase();
     }
@@ -188,10 +189,14 @@ bool ConstLoopUnroll::runImpl(LoopInfo *loop) {
 
   // Not every loop can be unrolled, even not all constant-bounded loops.
   // See 65_color.sy, where we are attempting to unroll a nested loop with a total of 18^5*7 = 13226976 iterations.
-  if (loopsize > 1000)
+  if (loopsize > 300)
     return false;
 
   auto phis = header->getPhis();
+  // Phis will give immense register pressure. Don't unroll when there are too many.
+  if (phis.size() >= 5)
+    return false;
+
   // Ensure that every phi at header is either from preheader or from the latch.
   // Also, finds the value of each phi from latch.
   phiMap.clear();
@@ -229,7 +234,7 @@ bool ConstLoopUnroll::runImpl(LoopInfo *loop) {
   if (lower && upper && isa<IntOp>(lower) && isa<IntOp>(upper)) {
     int low = V(lower);
     int high = V(upper);
-    if (high - low <= 200 / loopsize)
+    if (high - low <= 1000 / loopsize)
       unroll = high - low;
   }
   // Not a constant loop.

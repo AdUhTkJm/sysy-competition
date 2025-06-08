@@ -37,6 +37,7 @@ static Rule rules[] = {
   // Subtraction
   "(change (sub x 0) x)",
   "(change (sub x x) 0)",
+  "(change (sub 0 x) (minus x))",
   "(change (sub 'a 'b) (!sub 'a 'b))",
   "(change (sub (add x y) x) y)",
   "(change (sub (add x y) y) x)",
