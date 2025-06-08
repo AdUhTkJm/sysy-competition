@@ -1,0 +1,299 @@
+#include "ArmPasses.h"
+#include "Regs.h"
+
+using namespace sys::arm;
+using namespace sys;
+
+
+#define REPLACE_BRANCH(T1, T2, ...) \
+  REPLACE_BRANCH_IMPL(T1, T2, __VA_ARGS__); \
+  REPLACE_BRANCH_IMPL(T2, T1, __VA_ARGS__)
+
+// Say the before is `blt`, then we might see
+//   blt %1 %2 <target = bb1> <else = bb2>
+// which means `if (%1 < %2) goto bb1 else goto bb2`.
+//
+// If the next block is just <bb1>, then we flip it to bge, and make the target <bb2>.
+// if the next block is <bb2>, then we make the target <bb2>.
+// otherwise, make the target <bb1>, and add another `j <bb2>`.
+#define REPLACE_BRANCH_IMPL(BeforeTy, AfterTy, ...) \
+  runRewriter(funcOp, [&](BeforeTy *op) { \
+    if (!op->has<ElseAttr>()) \
+      return false; \
+    auto &target = TARGET(op); \
+    auto ifnot = ELSE(op); \
+    auto me = op->getParent(); \
+    /* If there's no "next block", then give up */ \
+    if (me == me->getParent()->getLastBlock()) { \
+      GENERATE_J; \
+      END_REPLACE; \
+    } \
+    if (me->nextBlock() == target) { \
+      builder.replace<AfterTy>(op, { \
+        new TargetAttr(ifnot), \
+        __VA_ARGS__ \
+      }); \
+      return true; \
+    } \
+    if (me->nextBlock() == ifnot) { \
+      /* No changes needed. */\
+      return false; \
+    } \
+    GENERATE_J; \
+    END_REPLACE; \
+  })
+
+// Don't touch `target`.
+#define GENERATE_J \
+  builder.setAfterOp(op); \
+  builder.create<BOp>({ new TargetAttr(ifnot) })
+
+#define END_REPLACE \
+  op->remove<ElseAttr>(); \
+  return true
+
+#define UNARY_BRANCH RSC(RS(op))
+#define BINARY_BRANCH RSC(RS(op)), RS2C(RS2(op))
+
+#define CREATE_MV(fp, rd, rs) \
+  if (!fp) \
+    builder.create<MovROp>({ RDC(rd), RSC(rs) }); \
+  else \
+    builder.create<FmovOp>({ RDC(rd), RSC(rs) });
+
+int RegAlloc::latePeephole(Op *funcOp) {
+  Builder builder;
+
+  int converted = 0;
+
+  runRewriter(funcOp, [&](StrWOp *op) {
+    if (op == op->getParent()->getLastOp())
+      return false;
+
+    //   sw a0, N(addr)
+    //   lw a1, N(addr)
+    // becomes
+    //   sw a0, N(addr)
+    //   mv a1, a0
+    auto next = op->nextOp();
+    if (isa<LdrWOp>(next) &&
+        RS(next) == RS2(op) && V(next) == V(op) && SIZE(next) == SIZE(op)) {
+      converted++;
+      builder.setBeforeOp(next);
+      CREATE_MV(isFP(RD(next)), RD(next), RS(op));
+      next->erase();
+      return true;
+    }
+
+    return false;
+  });
+
+  // Eliminate useless MovROp.
+  runRewriter(funcOp, [&](MovROp *op) {
+    if (RD(op) == RS(op)) {
+      converted++;
+      op->erase();
+      return true;
+    }
+    return false;
+  });
+
+  runRewriter(funcOp, [&](FmovOp *op) {
+    if (RD(op) == RS(op)) {
+      converted++;
+      op->erase();
+      return true;
+    }
+    return false;
+  });
+
+  return converted;
+}
+
+void RegAlloc::tidyup(Region *region) {
+  Builder builder;
+  auto funcOp = region->getParent();
+  region->updatePreds();
+
+  int converted;
+  do {
+    converted = latePeephole(funcOp);
+    convertedTotal += converted;
+  } while (converted);
+
+  // Replace blocks with only a single `j` as terminator.
+  std::map<BasicBlock*, BasicBlock*> jumpTo;
+  for (auto bb : region->getBlocks()) {
+    if (bb->getOpCount() == 1 && isa<BOp>(bb->getLastOp())) {
+      auto target = bb->getLastOp()->get<TargetAttr>()->bb;
+      jumpTo[bb] = target;
+    }
+  }
+
+  // Calculate jump-to closure.
+  bool changed;
+  do {
+    changed = false;
+    for (auto [k, v] : jumpTo) {
+      if (jumpTo.count(v)) {
+        jumpTo[k] = jumpTo[v];
+        changed = true;
+      }
+    }
+  } while (changed);
+
+  for (auto bb : region->getBlocks()) { 
+    auto term = bb->getLastOp();
+    if (auto target = term->find<TargetAttr>()) {
+      if (jumpTo.count(target->bb))
+        target->bb = jumpTo[target->bb];
+    }
+
+    if (auto ifnot = term->find<ElseAttr>()) {
+      if (jumpTo.count(ifnot->bb))
+        ifnot->bb = jumpTo[ifnot->bb];
+    }
+  }
+
+  // Erase all those single-j's.
+  region->updatePreds();
+  for (auto [bb, v] : jumpTo)
+    bb->erase();
+
+  // Now branches are still having both TargetAttr and ElseAttr.
+  // Replace them (perform split when necessary), so that they only have one target.
+  REPLACE_BRANCH(BltOp, BgeOp, BINARY_BRANCH);
+  REPLACE_BRANCH(BleOp, BgtOp, BINARY_BRANCH);
+  REPLACE_BRANCH(BeqOp, BneOp, BINARY_BRANCH);
+  REPLACE_BRANCH(CbzOp, CbnzOp, UNARY_BRANCH);
+
+  // Also, eliminate useless BOp.
+  runRewriter(funcOp, [&](BOp *op) {
+    auto &target = TARGET(op);
+    auto me = op->getParent();
+    if (me == me->getParent()->getLastBlock())
+      return false;
+
+    if (me->nextBlock() == target) {
+      op->erase();
+      return true;
+    }
+    return false;
+  });
+}
+
+void save(Builder builder, const std::vector<Reg> &regs, int offset) {
+  for (auto reg : regs) {
+    offset -= 8;
+    bool fp = isFP(reg);
+    if (fp)
+      builder.create<StrFOp>({ RSC(reg), RS2C(Reg::sp), new IntAttr(offset) });
+    else
+      builder.create<StrXOp>({ RSC(reg), RS2C(Reg::sp), new IntAttr(offset) });
+  }
+}
+
+void load(Builder builder, const std::vector<Reg> &regs, int offset) {
+  for (auto reg : regs) {
+    offset -= 8;
+    bool fp = isFP(reg);
+    if (fp)
+      builder.create<LdrFOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
+    else
+      builder.create<LdrXOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
+  }
+}
+
+void RegAlloc::proEpilogue(FuncOp *funcOp, bool isLeaf) {
+  Builder builder;
+  auto usedRegs = usedRegisters[funcOp];
+  auto region = funcOp->getRegion();
+
+  // Preserve return address if this calls another function.
+  std::vector<Reg> preserve;
+  for (auto x : usedRegs) {
+    if (calleeSaved.count(x))
+      preserve.push_back(x);
+  }
+  if (!isLeaf)
+    preserve.push_back(Reg::x30);
+
+  // If there's a SubSpOp, then it must be at the top of the first block.
+  int &offset = STACKOFF(funcOp);
+  offset += 8 * preserve.size();
+
+  // Round op to the nearest multiple of 16.
+  // This won't be entered in the special case where offset == 0.
+  if (offset % 16 != 0)
+    offset = offset / 16 * 16 + 16;
+
+  // Add function prologue, preserving the regs.
+  auto entry = region->getFirstBlock();
+  builder.setToBlockStart(entry);
+  if (offset != 0)
+    builder.create<SubSpOp>({ new IntAttr(offset) });
+  
+  save(builder, preserve, offset);
+
+  // Similarly add function epilogue.
+  if (offset != 0) {
+    auto rets = funcOp->findAll<RetOp>();
+    auto bb = region->appendBlock();
+    for (auto ret : rets)
+      builder.replace<BOp>(ret, { new TargetAttr(bb) });
+
+    builder.setToBlockStart(bb);
+
+    load(builder, preserve, offset);
+    builder.create<SubSpOp>({ new IntAttr(-offset) });
+    builder.create<RetOp>();
+  }
+
+  // Caller preserved registers are marked correctly as interfered,
+  // because of the placeholders.
+
+  // Deal with remaining GetArg.
+  // The arguments passed by registers have already been eliminated.
+  // Now all remaining ones are passed on stack; sort them according to index.
+  auto remainingGets = funcOp->findAll<GetArgOp>();
+  std::sort(remainingGets.begin(), remainingGets.end(), [](Op *a, Op *b) {
+    return V(a) < V(b);
+  });
+  std::map<Op*, int> argOffsets;
+  int argOffset = 0;
+
+  for (auto op : remainingGets) {
+    argOffsets[op] = argOffset;
+    argOffset += 8;
+  }
+
+  runRewriter(funcOp, [&](GetArgOp *op) {
+    auto value = V(op);
+    assert(value >= 8);
+
+    // `sp + offset` is the base pointer.
+    // We read past the base pointer (starting from 0):
+    //    <arg 8> bp + 0
+    //    <arg 9> bp + 8
+    // ...
+    assert(argOffsets.count(op));
+    int myoffset = offset + argOffsets[op];
+    builder.setBeforeOp(op);
+    bool fp = isFP(RD(op));
+
+    if (fp)
+      builder.replace<LdrFOp>(op, { RDC(RD(op)), RSC(Reg::sp), new IntAttr(myoffset) });
+    else
+      builder.replace<LdrXOp>(op, { RDC(RD(op)), RSC(Reg::sp), new IntAttr(myoffset) });
+    return false;
+  });
+
+  //   subsp <4>
+  // becomes
+  //   addi <rd = sp> <rs = sp> <-4>
+  runRewriter(funcOp, [&](SubSpOp *op) {
+    int offset = V(op);
+    builder.replace<AddXIOp>(op, { RDC(Reg::sp), RSC(Reg::sp), new IntAttr(-offset) });
+    return true;
+  });
+}

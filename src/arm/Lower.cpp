@@ -60,8 +60,8 @@ void Lower::run() {
   REPLACE(DivIOp, SdivWOp);
   REPLACE(LShiftLOp, LslXOp);
   REPLACE(LShiftOp, LslWOp);
-  REPLACE(RShiftLOp, AsrXIOp);
-  REPLACE(RShiftOp, AsrWIOp);
+  REPLACE(RShiftLOp, AsrXOp);
+  REPLACE(RShiftOp, AsrWOp);
   REPLACE(AndIOp, AndOp);
   REPLACE(OrIOp, OrOp);
   REPLACE(XorIOp, EorOp);
@@ -211,7 +211,7 @@ void Lower::run() {
     
     for (int i = 0; i < spilled.size(); i++) {
       auto sp = builder.create<ReadRegOp>({ new RegAttr(Reg::sp) });
-      builder.create<StoreOp>({ spilled[i], sp }, { new SizeAttr(8), new IntAttr(i * 8) });
+      builder.create<StrXOp>({ spilled[i], sp }, { new SizeAttr(8), new IntAttr(i * 8) });
     }
 
     builder.create<BlOp>(argsNew, { 

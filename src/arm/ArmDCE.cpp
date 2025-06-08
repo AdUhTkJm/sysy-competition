@@ -33,6 +33,7 @@ bool ArmDCE::isImpure(Op *op) {
     IMPURE(CbnzOp)
     IMPURE(BOp)
     IMPURE(WriteRegOp)
+    IMPURE(SubSpOp)
   ;
 }
 

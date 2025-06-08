@@ -96,10 +96,13 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   TERNARY_W(MlaOp, "mla");
   TERNARY_W(MsubWOp, "msub");
 
+  TERNARY_X(MsubXOp, "msub");
+
   BINARY_W(AddWOp, "add");
   BINARY_W(SubWOp, "sub");
   BINARY_W(MulWOp, "mul");
   BINARY_W(SdivWOp, "sdiv");
+  BINARY_W(AsrWOp, "asr");
 
   BINARY_F(FaddOp, "fadd");
   BINARY_F(FsubOp, "fsub");
@@ -108,8 +111,11 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
 
   BINARY_X(AddXOp, "add");
   BINARY_X(MulXOp, "mul");
+  BINARY_X(SdivXOp, "sdiv");
+  BINARY_X(AsrXOp, "asr");
 
   UNARY_I_W(AddWIOp, "add");
+  UNARY_I_W(AsrWIOp, "asr");
 
   UNARY_I_X(AddXIOp, "add");
 
