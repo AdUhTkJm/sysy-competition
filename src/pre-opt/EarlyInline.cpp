@@ -44,7 +44,7 @@ void EarlyInline::run() {
       continue;
 
     // Inline very small functions only.
-    if (opcount(region) >= 64)
+    if (opcount(region) >= 200)
       continue;
 
     // Don't inline recursive functions.

@@ -52,10 +52,11 @@ void GCM::scheduleLate(Op *op) {
     // We consider Phi to be from the previous block, just as we did in CanonicalizeLoop.
     BasicBlock *usebb = use->getParent();
     if (isa<PhiOp>(use)) {
+      usebb = nullptr;
+      // Each phi can have multiple operands.
       for (size_t i = 0; i < use->getOperands().size(); i++) {
-        if (use->getOperand(i).defining == op) {
-          usebb = cast<FromAttr>(use->getAttrs()[i])->bb;
-          break;
+        if (use->DEF(i) == op) {
+          usebb = this->lca(cast<FromAttr>(use->getAttrs()[i])->bb, usebb);
         }
       }
     }
@@ -71,6 +72,10 @@ void GCM::scheduleLate(Op *op) {
     // Try to enumerate the path between `lca` and `parent`,
     // and find the outermost loop.
     BasicBlock *result = lca;
+    if (this->lca(lca, parent) == lca && lca != parent) {
+      std::cerr << module << bbmap[lca] << " " << bbmap[parent] << " " << op << "\n";
+      assert(false);
+    }
     while (lca != parent) {
       lca = lca->getIdom();
       if (loopDepth[lca] < loopDepth[result])

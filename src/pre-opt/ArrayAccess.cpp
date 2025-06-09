@@ -27,6 +27,16 @@ AffineExpr lengthened(Op *op, const std::vector<Op*> &outer) {
   return val;
 }
 
+void remove(Region *region) {
+  for (auto bb : region->getBlocks()) {
+    for (auto op : bb->getOps()) {
+      op->remove<SubscriptAttr>();
+      for (auto r : op->getRegions())
+        remove(r);
+    }
+  }
+}
+
 }
 
 void ArrayAccess::runImpl(Op *loop, std::vector<Op*> outer) {
@@ -116,6 +126,9 @@ void ArrayAccess::run() {
 
   for (auto func : funcs) {
     auto region = func->getRegion();
+
+    // Remove all existing subscripts first.
+    remove(region);
 
     for (auto bb : region->getBlocks()) {
       for (auto op : bb->getOps()) {
