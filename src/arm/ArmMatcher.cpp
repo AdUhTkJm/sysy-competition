@@ -445,6 +445,8 @@ Op *ArmRule::buildExpr(Expr *expr) {
   BUILD_BINARY_IMM("strw", StrWOp);
   BUILD_BINARY_IMM("strf", StrFOp);
   BUILD_BINARY_IMM("strx", StrXOp);
+  BUILD_BINARY_IMM("addwl", AddWLOp);
+  BUILD_BINARY_IMM("addwr", AddWROp);
 
   BUILD_UNARY_IMM("addwi", AddWIOp);
   BUILD_UNARY_IMM("addxi", AddXIOp);

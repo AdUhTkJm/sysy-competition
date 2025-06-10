@@ -42,7 +42,7 @@ using namespace sys::arm;
     
 #define JMP_BINARY(Ty, name) \
   case Ty::id: \
-    os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n"; \
+    os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n  "; \
     os << name << " bb" << bbcnt(TARGET(op)) << "\n"; \
     break
 
@@ -116,8 +116,13 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
 
   UNARY_I_W(AddWIOp, "add");
   UNARY_I_W(AsrWIOp, "asr");
+  UNARY_I_W(LslWIOp, "lsl");
+  UNARY_I_W(LsrWIOp, "lsr");
 
   UNARY_I_X(AddXIOp, "add");
+  UNARY_I_X(AsrXIOp, "asr");
+  UNARY_I_X(LslXIOp, "lsl");
+  UNARY_I_X(LsrXIOp, "lsr");
 
   UNARY_X(MovROp, "mov");
   UNARY_W(NegOp, "neg");
@@ -165,55 +170,59 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     break;
   case CsetLtOp::id:
     os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
-    os << "cset " << wreg(RD(op)) << ", lt\n";
+    os << "  cset " << wreg(RD(op)) << ", lt\n";
     break;
   case CsetLeOp::id:
     os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
-    os << "cset " << wreg(RD(op)) << ", le\n";
+    os << "  cset " << wreg(RD(op)) << ", le\n";
     break;
   case CsetNeOp::id:
     os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
-    os << "cset " << wreg(RD(op)) << ", ne\n";
+    os << "  cset " << wreg(RD(op)) << ", ne\n";
     break;
   case CsetEqOp::id:
     os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
-    os << "cset " << wreg(RD(op)) << ", eq\n";
+    os << "  cset " << wreg(RD(op)) << ", eq\n";
     break;
   case CsetLtFOp::id:
     os << "cmp " << freg(RS(op)) << ", " << freg(RS2(op)) << "\n";
-    os << "cset " << wreg(RD(op)) << ", lt\n";
+    os << "  cset " << wreg(RD(op)) << ", lt\n";
     break;
   case CsetLeFOp::id:
     os << "cmp " << freg(RS(op)) << ", " << freg(RS2(op)) << "\n";
-    os << "cset " << wreg(RD(op)) << ", le\n";
+    os << "  cset " << wreg(RD(op)) << ", le\n";
     break;
   case CsetNeFOp::id:
     os << "cmp " << freg(RS(op)) << ", " << freg(RS2(op)) << "\n";
-    os << "cset " << wreg(RD(op)) << ", ne\n";
+    os << "  cset " << wreg(RD(op)) << ", ne\n";
     break;
   case CsetEqFOp::id:
     os << "cmp " << freg(RS(op)) << ", " << freg(RS2(op)) << "\n";
-    os << "cset " << wreg(RD(op)) << ", eq\n";
+    os << "  cset " << wreg(RD(op)) << ", eq\n";
     break;
   case CsetEqFcmpZOp::id:
     os << "fcmpz " << freg(RS(op)) << "\n";
-    os << "cset " << wreg(RD(op)) << ", eq\n";
+    os << "  cset " << wreg(RD(op)) << ", eq\n";
     break;
   case CsetNeFcmpZOp::id:
     os << "fcmpz " << freg(RS(op)) << "\n";
-    os << "cset " << wreg(RD(op)) << ", ne\n";
+    os << "  cset " << wreg(RD(op)) << ", ne\n";
     break;
   case CsetNeTstOp::id:
     os << "tst " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
-    os << "cset " << wreg(RD(op)) << ", ne\n";
+    os << "  cset " << wreg(RD(op)) << ", ne\n";
     break;
   case CsetEqTstOp::id:
     os << "tst " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
-    os << "cset " << wreg(RD(op)) << ", eq\n";
+    os << "  cset " << wreg(RD(op)) << ", eq\n";
     break;
   case CselCmpZOp::id:
     os << "cmp " << wreg(RS(op)) << ", #0\n  ";
-    os << "csel " << wreg(RD(op)) << ", " << wreg(RS2(op)) << ", " << wreg(RS3(op)) << ", ne\n";
+    os << "  csel " << wreg(RD(op)) << ", " << wreg(RS2(op)) << ", " << wreg(RS3(op)) << ", ne\n";
+    break;
+  case CselLtZOp::id:
+    os << "cmp " << wreg(RS(op)) << ", #0\n  ";
+    os << "  csel " << wreg(RD(op)) << ", " << wreg(RS2(op)) << ", " << wreg(RS3(op)) << ", lt\n";
     break;
   case RetOp::id:
     os << "ret \n";
@@ -229,6 +238,12 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     break;
   case MovkOp::id:
     os << "movk " << wreg(RD(op)) << ", " << V(op) << ", lsl " << LSL(op) << "\n";
+    break;
+  case AddWLOp::id:
+    os << "add " << wreg(RD(op)) << ", " << wreg(RS(op)) << ", " << wreg(RS2(op)) << ", lsl #" << V(op) << "\n";
+    break;
+  case AddWROp::id:
+    os << "add " << wreg(RD(op)) << ", " << wreg(RS(op)) << ", " << wreg(RS2(op)) << ", lsr #" << V(op) << "\n";
     break;
   default:
     std::cerr << "unimplemented op: " << op;

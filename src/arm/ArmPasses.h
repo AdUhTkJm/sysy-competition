@@ -29,6 +29,18 @@ public:
   void run() override;
 };
 
+class StrengthReduct : public Pass {
+  int convertedTotal = 0;
+
+  int runImpl();
+public:
+  StrengthReduct(ModuleOp *module): Pass(module) {}
+    
+  std::string name() override { return "arm-strength-reduct"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
+};
+
 // The only difference with opt/DCE is that `isImpure` behaves differently.
 class ArmDCE : public Pass {
   std::vector<Op*> removeable;
