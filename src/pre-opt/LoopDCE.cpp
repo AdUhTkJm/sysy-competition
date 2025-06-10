@@ -32,7 +32,8 @@ void LoopDCE::run() {
     auto loops = module->findAll<ForOp>();
     changed = false;
     for (auto loop : loops) {
-      if (pure(loop->getRegion())) {
+      auto region = loop->getRegion();
+      if (pure(region)) {
         auto step = loop->DEF(2);
         if (!isa<IntOp>(step) || V(step) != 1)
           continue;
@@ -40,6 +41,14 @@ void LoopDCE::run() {
         // Replace with a store of `ivAddr`.
         builder.setAfterOp(loop);
         builder.create<StoreOp>({ loop->getOperand(1), loop->getOperand(3) }, { new SizeAttr(4) });
+        loop->erase(), changed = true, erased++;
+      }
+
+      // For a parallel loop (no loop-carried dependency) whose indvar is never used,
+      // It is simply doing repeated work.
+      if (loop->has<ParallelizableAttr>() && !loop->getUses().size()) {
+        auto entry = region->getFirstBlock();
+        entry->inlineBefore(loop);
         loop->erase(), changed = true, erased++;
       }
     }

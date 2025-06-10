@@ -14,6 +14,7 @@
 #include "../opt/Analysis.h"
 #include "../pre-opt/PrePasses.h"
 #include "../pre-opt/PreLoopPasses.h"
+#include "../pre-opt/PreAnalysis.h"
 #include "../arm/ArmPasses.h"
 #include "../rv/RvPasses.h"
 #include "../utils/smt/SMT.h"
@@ -63,6 +64,8 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::LoopDCE>();
   pm.addPass<sys::Fusion>();
   pm.addPass<sys::Unswitch>();
+  pm.addPass<sys::Parallelizable>();
+  pm.addPass<sys::LoopDCE>();
   pm.addPass<sys::Lower>();
 
   // ===== Flattened CFG =====

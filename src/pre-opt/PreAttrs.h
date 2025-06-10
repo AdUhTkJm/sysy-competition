@@ -38,6 +38,7 @@ public:
 class ParallelizableAttr : public AttrImpl<ParallelizableAttr, PREOPTLINE> {
 public:
   Op *accum;
+  ParallelizableAttr(): accum(nullptr) {}
   ParallelizableAttr(Op *accum): accum(accum) {}
 
   std::string toString() override;

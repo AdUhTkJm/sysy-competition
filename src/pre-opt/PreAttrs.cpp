@@ -25,6 +25,8 @@ std::string BaseAttr::toString() {
 
 std::string ParallelizableAttr::toString() {
   std::stringstream ss;
-  ss << "<base = " << getValueNumber(accum->getResult()) << ">";
+  if (!accum)
+    return "<parallelizable>";
+  ss << "<parallel accum = " << getValueNumber(accum->getResult()) << ">";
   return ss.str();
 }

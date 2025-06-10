@@ -70,8 +70,7 @@ void Fusion::runImpl(FuncOp *func) {
       for (auto load : loads) {
         auto addr = load->DEF();
         BAD(!addr->has<BaseAttr>());
-        auto base = BASE(addr);
-        reads.insert(base);
+        reads.insert(BASE(addr));
       }
       if (!good)
         continue;

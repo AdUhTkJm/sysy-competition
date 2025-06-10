@@ -35,7 +35,7 @@ public:
 
 // Checks whether a loop is parallelizable.
 class Parallelizable : public Pass {
-  void runImpl(Op *loop);
+  void runImpl(Op *loop, int depth);
 public:
   Parallelizable(ModuleOp *module): Pass(module) {}
     
