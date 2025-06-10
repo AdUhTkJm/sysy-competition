@@ -68,6 +68,7 @@ void Globalize::runImpl(Region *region) {
     auto global = builder.create<GlobalOp>({
       new NameAttr(gName),
       new SizeAttr(size),
+      new DimensionAttr(DIM(alloca)),
       // Note that this only refers to, rather than copies, `data`.
       isFP
         ? (Attr*) new FloatArrayAttr((float*) data, size / 4)

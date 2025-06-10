@@ -14,7 +14,6 @@
 #include "../opt/Analysis.h"
 #include "../pre-opt/PrePasses.h"
 #include "../pre-opt/PreLoopPasses.h"
-#include "../pre-opt/PreAnalysis.h"
 #include "../arm/ArmPasses.h"
 #include "../rv/RvPasses.h"
 #include "../utils/smt/SMT.h"
@@ -60,8 +59,6 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::RaiseToFor>();
   pm.addPass<sys::DCE>(/*elimBlocks=*/ false);
   pm.addPass<sys::EarlyInline>();
-  pm.addPass<sys::ArrayAccess>();
-  pm.addPass<sys::Base>();
   pm.addPass<sys::View>();
   pm.addPass<sys::LoopDCE>();
   pm.addPass<sys::Fusion>();

@@ -33,6 +33,17 @@ public:
   void run() override;
 };
 
+// Checks whether a loop is parallelizable.
+class Parallelizable : public Pass {
+  void runImpl(Op *loop);
+public:
+  Parallelizable(ModuleOp *module): Pass(module) {}
+    
+  std::string name() override { return "parallelizable"; };
+  std::map<std::string, int> stats() override { return {}; };
+  void run() override;
+};
+
 }
 
 #endif

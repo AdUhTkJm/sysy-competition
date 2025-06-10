@@ -22,3 +22,9 @@ std::string BaseAttr::toString() {
   ss << "<base = " << getValueNumber(base->getResult()) << ">";
   return ss.str();
 }
+
+std::string ParallelizableAttr::toString() {
+  std::stringstream ss;
+  ss << "<base = " << getValueNumber(accum->getResult()) << ">";
+  return ss.str();
+}

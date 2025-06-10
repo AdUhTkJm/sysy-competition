@@ -130,7 +130,6 @@ void Fusion::runImpl(FuncOp *func) {
 
       AffineExpr subscripts;
 
-      auto entry = loop->getRegion()->getFirstBlock();
       auto region = next->getRegion();
       auto bb = region->getFirstBlock();
 

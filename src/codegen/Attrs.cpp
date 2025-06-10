@@ -255,3 +255,14 @@ bool sys::neverAlias(Op *a, Op *b) {
 bool sys::mayAlias(Op *a, Op *b) {
   return !neverAlias(a, b);
 }
+
+std::string DimensionAttr::toString() {
+  std::stringstream ss;
+  ss << "<dims = ";
+  if (dims.size() > 0)
+    ss << dims[0];
+  for (int i = 1; i < dims.size(); i++)
+    ss << ", " << dims[i];
+  ss << ">";
+  return ss.str();
+}

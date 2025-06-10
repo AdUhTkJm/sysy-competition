@@ -374,6 +374,7 @@ void CodeGen::emit(ASTNode *node) {
           new SizeAttr(getSize(vardecl->type)),
           new IntArrayAttr(new int(value), 1),
           new NameAttr(vardecl->name),
+          new DimensionAttr({ 1 }),
         });
         globals[vardecl->name] = addr;
         return;
@@ -386,6 +387,7 @@ void CodeGen::emit(ASTNode *node) {
           new SizeAttr(getSize(vardecl->type)),
           new FloatArrayAttr(new float(value), 1),
           new NameAttr(vardecl->name),
+          new DimensionAttr({ 1 }),
         });
         globals[vardecl->name] = addr;
         return;
@@ -393,7 +395,8 @@ void CodeGen::emit(ASTNode *node) {
 
       auto size = 1;
       Type *base = vardecl->type;
-      if (auto arrTy = dyn_cast<ArrayType>(vardecl->type)) {
+      auto arrTy = dyn_cast<ArrayType>(vardecl->type);
+      if (arrTy) {
         size = arrTy->getSize();
         base = arrTy->base;
       }
@@ -417,6 +420,7 @@ void CodeGen::emit(ASTNode *node) {
           new SizeAttr(getSize(vardecl->type)),
           new FloatArrayAttr((float*) value, size),
           new NameAttr(vardecl->name),
+          new DimensionAttr(arrTy ? arrTy->dims : std::vector { 1 }),
         });
         addr.defining->add<FPAttr>();
       } else {
@@ -424,6 +428,7 @@ void CodeGen::emit(ASTNode *node) {
           new SizeAttr(getSize(vardecl->type)),
           new IntArrayAttr((int*) value, size),
           new NameAttr(vardecl->name),
+          new DimensionAttr(arrTy ? arrTy->dims : std::vector { 1 }),
         });
       }
       globals[vardecl->name] = addr;
@@ -448,6 +453,7 @@ void CodeGen::emit(ASTNode *node) {
       // Also check whether this is a floating point array.
       // If it is, give the original alloca a FPAttr.
       auto arrTy = cast<ArrayType>(vardecl->type);
+      addr->add<DimensionAttr>(arrTy->dims);
       if (isa<FloatType>(arrTy->base))
         addr->add<FPAttr>();
       return;
@@ -507,6 +513,7 @@ void CodeGen::emit(ASTNode *node) {
         });
         builder.create<StoreOp>({ addr, arrayPtr }, { new SizeAttr(8) });
         symbols[vardecl->name] = arrayPtr;
+        addr->add<DimensionAttr>(arrTy->dims);
         // Give a FPAttr if the array is float*.
         if (isa<FloatType>(arrTy->base))
           addr->add<FPAttr>();

@@ -248,7 +248,15 @@ public:
   IncreaseAttr *clone() override { return new IncreaseAttr(amt, mod); }
 };
 
+class DimensionAttr : public AttrImpl<DimensionAttr, __LINE__> {
+public:
+  std::vector<int> dims;
 
+  DimensionAttr(const std::vector<int> &dims): dims(dims) {}
+
+  std::string toString() override;
+  DimensionAttr *clone() override { return new DimensionAttr(dims); }
+};
 
 bool mustAlias(Op *a, Op *b);
 bool neverAlias(Op *a, Op *b);
@@ -267,5 +275,6 @@ bool mayAlias(Op *a, Op *b);
 #define RANGE(op) (op)->get<RangeAttr>()->range
 #define FROM(attr) cast<FromAttr>(attr)->bb
 #define INCR(op) (op)->get<IncreaseAttr>()
+#define DIM(op) (op)->get<DimensionAttr>()->dims
 
 #endif

@@ -32,9 +32,23 @@ public:
   BaseAttr *clone() override { return new BaseAttr(base); }
 };
 
+// Shows whether the loop is parallelizable;
+// For loops without loop-carried dependencies, it's trivial,
+// but if there is a single dependency of a scalar, then it's considered an accumulator.
+class ParallelizableAttr : public AttrImpl<ParallelizableAttr, PREOPTLINE> {
+public:
+  Op *accum;
+  ParallelizableAttr(Op *accum): accum(accum) {}
+
+  std::string toString() override;
+  ParallelizableAttr *clone() override { return new ParallelizableAttr(accum); }
+};
+
 }
 
 #define SUBSCRIPT(op) (op)->get<SubscriptAttr>()->subscript
 #define BASE(op) (op)->get<BaseAttr>()->base
+#define PARALLEL(op) (op)->has<ParallelizableAttr>()
+#define ACCUM(op) (op)->get<ParallelizableAttr>()->accum
 
 #endif

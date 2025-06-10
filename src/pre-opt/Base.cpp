@@ -3,6 +3,20 @@
 
 using namespace sys;
 
+namespace {
+
+void remove(Region *region) {
+  for (auto bb : region->getBlocks()) {
+    for (auto op : bb->getOps()) {
+      op->remove<BaseAttr>();
+      for (auto r : op->getRegions())
+        remove(r);
+    }
+  }
+}
+
+}
+
 void Base::runImpl(Region *region) {
   for (auto bb : region->getBlocks()) {
     for (auto op : bb->getOps()) {
@@ -37,8 +51,11 @@ void Base::run() {
   auto funcs = collectFuncs();
   
   for (auto func : funcs) {
-    // Find the place to insert in.
     Region *region = func->getRegion();
+    // First remove all existing BaseAttrs.
+    remove(region);
+
+    // Find the place to hoist get-globals.
     auto bb = region->getFirstBlock();
     if (bb->getOpCount() && isa<AllocaOp>(bb->getFirstOp()))
       bb = bb->nextBlock();

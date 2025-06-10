@@ -8,7 +8,8 @@ using namespace pres;
 // See this tutorial of dual simplex; I wrote it.
 // https://gbc.xq.gl/polyhedral/maths/dual-simplex/
 bool BasicSet::empty() {
-  denom = std::vector<int>(tableau.size(), 1);
+  if (!denom.size())
+    denom = std::vector<int>(tableau.size(), 1);
 
   for (;;) {
     // Choose a variable to evict from base.

@@ -1,4 +1,5 @@
 #include "PreLoopPasses.h"
+#include "PreAnalysis.h"
 
 using namespace sys;
 
@@ -253,6 +254,9 @@ void View::runImpl(Op *func) {
 }
 
 void View::run() {
+  ArrayAccess(module).run();
+  Base(module).run();
+
   auto funcs = collectFuncs();
 
   // Analyze global variable usage.
