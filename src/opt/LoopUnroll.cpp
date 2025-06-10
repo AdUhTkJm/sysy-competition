@@ -15,7 +15,7 @@ BasicBlock *ConstLoopUnroll::copyLoop(LoopInfo *loop, BasicBlock *bb, int unroll
   Builder builder;
   BasicBlock *latch = loop->getLatch();
   BasicBlock *lastLatch = loop->getLatch();
-  BasicBlock *header = loop->getHeader();
+  BasicBlock *header = loop->header;
   BasicBlock *exit = loop->getExit();
   BasicBlock *latchRewire = nullptr;
   auto region = lastLatch->getParent();
@@ -167,11 +167,11 @@ bool ConstLoopUnroll::runImpl(LoopInfo *loop) {
   if (!loop->getInduction())
     return false;
 
-  if (loop->getExits().size() != 1)
+  if (loop->exits.size() != 1)
     return false;
 
-  auto header = loop->getHeader();
-  auto preheader = loop->getPreheader();
+  auto header = loop->header;
+  auto preheader = loop->preheader;
   auto latch = loop->getLatch();
   // The loop is not rotated. Don't unroll it.
   if (!isa<BranchOp>(latch->getLastOp()))
@@ -262,7 +262,7 @@ bool ConstLoopUnroll::runImpl(LoopInfo *loop) {
 }
 
 static void postorder(LoopInfo *loop, std::vector<LoopInfo*> &order) {
-  for (auto subloop : loop->getSubloops())
+  for (auto subloop : loop->subloops)
     order.push_back(subloop);
   order.push_back(loop);
 }
@@ -292,7 +292,7 @@ void ConstLoopUnroll::run() {
       for (auto loop : order) {
         // We only want to unroll innermost loops.
         // Also, we can't unroll nested loops correctly.
-        if (loop->getSubloops().size() > 0)
+        if (loop->subloops.size() > 0)
           continue;
 
         if (runImpl(loop)) {

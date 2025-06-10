@@ -121,12 +121,12 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
   Rule br("(br (lt x y))");
   Rule brRotated("(br (lt (add x 'a) y))");
   for (auto loop : forest.getLoops()) {
-    auto header = loop->getHeader();
+    auto header = loop->header;
     auto phis = header->getPhis();
-    if (!phis.size() || loop->getLatches().size() != 1)
+    if (!phis.size() || loop->latches.size() != 1)
       continue;
 
-    auto preheader = loop->getPreheader();
+    auto preheader = loop->preheader;
     if (!preheader)
       continue;
 
@@ -154,10 +154,13 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
         if (addi.match(def2, { { "x", phi } })) {
           auto step = addi.extract("'a");
 
-          // OK, now this is definitely an induction variable.
+          // This is an induction variable if the step is an integer or it dominates preheader.
+          if (!(isa<IntOp>(step) && (!preheader || !step->getParent()->dominates(preheader))))
+            continue;
+          
           loop->induction = phi;
           loop->start = def1;
-          loop->step = V(step);
+          loop->step = step;
 
           // Try to identify the stop condition by looking at header.
           auto term = latch->getLastOp();

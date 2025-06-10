@@ -20,36 +20,30 @@ namespace sys {
 //
 // Note the difference of the last two terms.
 class LoopInfo {
+public:
   std::vector<LoopInfo*> subloops;
   std::set<BasicBlock*> exitings;
   std::set<BasicBlock*> exits;
   std::set<BasicBlock*> latches;
   std::set<BasicBlock*> bbs;
+
   BasicBlock *preheader = nullptr;
   BasicBlock *header;
   LoopInfo *parent = nullptr;
   // Induction variable. Though there might be multiple, we only preserve the first encountered.
   Op *induction = nullptr;
   Op *start = nullptr, *stop = nullptr;
-  int step;
+  Op *step = nullptr;
 
-  friend class LoopAnalysis;
-  friend class LoopForest;
-public:
-  const auto &getLatches() const { return latches; }
-  const auto &getExits() const { return exits; }
-  const auto &getExitingBlocks() const { return exitings; }
-  const auto &getSubloops() const { return subloops; }
   const auto &getBlocks() const { return bbs; }
-  auto getPreheader() const { return preheader; }
-  auto getHeader() const { return header; }
   auto getParent() const { return parent; }
   auto getLatch() const { assert(latches.size() == 1); return *latches.begin(); }
   auto getExit() const { assert(exits.size() == 1); return *exits.begin(); }
   auto getInduction() const { return induction; }
   auto getStart() const { return start; }
   auto getStop() const { return stop; }
-  int getStep() const { return step; }
+  auto getStepOp() const { return step; }
+  int getStep() const { return V(step); }
 
   bool contains(const BasicBlock *bb) const { return bbs.count(const_cast<BasicBlock*>(bb)); }
 

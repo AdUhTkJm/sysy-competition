@@ -28,7 +28,7 @@ Op *getValueFor(BasicBlock *bb, LoopInfo *info, std::map<BasicBlock*, Op*> &phiM
 }
 
 void CanonicalizeLoop::canonicalize(LoopInfo *loop) {
-  for (auto subloop : loop->getSubloops())
+  for (auto subloop : loop->subloops)
     canonicalize(subloop);
 
   Builder builder;
@@ -46,7 +46,7 @@ void CanonicalizeLoop::canonicalize(LoopInfo *loop) {
       if (!hasOutsideUses)
         continue;
 
-      const auto &exits = loop->getExits();
+      const auto &exits = loop->exits;
       if (!exits.size())
         continue;
 
@@ -130,7 +130,7 @@ void CanonicalizeLoop::run() {
     LoopForest forest = info[func];
 
     for (auto loop : forest.getLoops()) {
-      auto header = loop->getHeader();
+      auto header = loop->header;
       const auto &preds = header->preds;
       auto region = header->getParent();
       auto preheader = region->insert(header);
@@ -154,7 +154,7 @@ void CanonicalizeLoop::run() {
         std::vector<std::pair<Op*, BasicBlock*>> forwarded, preserved;
         for (size_t i = 0; i < phi->getOperands().size(); i++) {
           auto from = cast<FromAttr>(phi->getAttrs()[i])->bb;
-          if (!loop->getLatches().count(from))
+          if (!loop->latches.count(from))
             forwarded.push_back({ phi->getOperand(i).defining, from });
           else
             preserved.push_back({ phi->getOperand(i).defining, from });

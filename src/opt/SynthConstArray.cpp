@@ -306,7 +306,7 @@ void SynthConstArray::run() {
         // The only place it can come from is SCEV.
         LoopInfo *loop = nullptr;
         for (auto l : forest.getLoops()) {
-          if (l->getHeader() == parent)
+          if (l->header == parent)
             loop = l;
         }
         if (!loop)

@@ -4,7 +4,7 @@
 using namespace sys;
 
 static void postorder(LoopInfo *loop, std::vector<LoopInfo*> &loops) {
-  for (auto subloop : loop->getSubloops())
+  for (auto subloop : loop->subloops)
     loops.push_back(subloop);
   loops.push_back(loop);
 }
@@ -18,13 +18,13 @@ std::map<std::string, int> LoopRotate::stats() {
 void LoopRotate::runImpl(LoopInfo *info) {
   if (!info->getInduction())
     return;
-  if (info->getExits().size() != 1)
+  if (info->exits.size() != 1)
     return;
 
   auto exit = info->getExit();
 
   auto induction = info->getInduction();
-  auto header = info->getHeader();
+  auto header = info->header;
   // We only rotate canonicalized loop in form `for (int i = %0; i < x; i += 'b)`
   // Here `x` is an SSA value defined outside loop.
   // Check header condition for this.
@@ -47,7 +47,7 @@ void LoopRotate::runImpl(LoopInfo *info) {
   // Now replace the preheader's condition with (%0 < %1).
   Builder builder;
 
-  auto preheader = info->getPreheader();
+  auto preheader = info->preheader;
   auto preterm = preheader->getLastOp();
   if (!isa<GotoOp>(preterm))
     return;
@@ -146,11 +146,11 @@ void LoopRotate::run() {
     LoopForest forest = info[func];
 
     for (auto loop : forest.getLoops()) {
-      auto header = loop->getHeader();
-      if (loop->getLatches().size() == 1)
+      auto header = loop->header;
+      if (loop->latches.size() == 1)
         continue;
 
-      const auto &latches = loop->getLatches();
+      const auto &latches = loop->latches;
       auto region = header->getParent();
       auto latch = region->insert(*--latches.end());
 

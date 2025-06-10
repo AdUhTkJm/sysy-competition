@@ -67,7 +67,7 @@ void LICM::markVariant(LoopInfo *info, BasicBlock *bb, bool hoistable) {
 
   // Now hoist everything to preheader.
   hoisted += invariant.size();
-  auto term = info->getPreheader()->getLastOp();
+  auto term = info->preheader->getLastOp();
   for (auto op : invariant)
     op->moveBefore(term);
 
@@ -80,15 +80,15 @@ void LICM::markVariant(LoopInfo *info, BasicBlock *bb, bool hoistable) {
 void LICM::runImpl(LoopInfo *info) {
   // Hoist internal loops first;
   // otherwise we risk hoisting inner-loop's variants out.
-  for (auto subloop : info->getSubloops())
+  for (auto subloop : info->subloops)
     runImpl(subloop);
 
   // Check rotated loops.
-  auto preheader = info->getPreheader();
+  auto preheader = info->preheader;
   if (!preheader)
     return;
 
-  for (auto latch : info->getLatches()) {
+  for (auto latch : info->latches) {
     auto term = latch->getLastOp();
     if (!isa<BranchOp>(term))
       return;
@@ -108,7 +108,7 @@ void LICM::runImpl(LoopInfo *info) {
 
   // Mark invariants inside the loop, and try hoisting it out.
   // We must traverse through domtree to preserve def-use chain.
-  auto header = info->getHeader();
+  auto header = info->header;
   markVariant(info, header, true);
 }
 

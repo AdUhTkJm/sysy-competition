@@ -16,8 +16,8 @@ static Rule constIncrL("(addl x 'a)");
 static Rule modIncr("(mod (add x y) 'a)");
 
 void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
-  auto preheader = info->getPreheader();
-  auto header = info->getHeader();
+  auto preheader = info->preheader;
+  auto header = info->header;
   auto latch = info->getLatch();
 
   for (auto op : bb->getOps()) {
@@ -187,13 +187,13 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
 }
 
 void SCEV::runImpl(LoopInfo *info) {
-  for (auto loop : info->getSubloops())
+  for (auto loop : info->subloops)
     runImpl(loop);
 
-  if (info->getLatches().size() > 1)
+  if (info->latches.size() > 1)
     return;
 
-  auto header = info->getHeader();
+  auto header = info->header;
   auto latch = info->getLatch();
   // Check rotated loops.
   if (!isa<BranchOp>(latch->getLastOp()))
@@ -202,11 +202,11 @@ void SCEV::runImpl(LoopInfo *info) {
     return;
 
   auto phis = header->getPhis();
-  auto preheader = info->getPreheader();
+  auto preheader = info->preheader;
   if (!preheader)
     return;
 
-  if (info->getExits().size() != 1)
+  if (info->exits.size() != 1)
     return;
 
   // Inspect phis to find the amount by which something increases.
@@ -328,13 +328,13 @@ void SCEV::runImpl(LoopInfo *info) {
 }
 
 void SCEV::discardIv(LoopInfo *info) {
-  for (auto loop : info->getSubloops())
+  for (auto loop : info->subloops)
     discardIv(loop);
 
-  if (info->getLatches().size() > 1)
+  if (info->latches.size() > 1)
     return;
 
-  auto header = info->getHeader();
+  auto header = info->header;
   auto latch = info->getLatch();
   if (!isa<BranchOp>(latch->getLastOp()))
     return;
@@ -342,11 +342,11 @@ void SCEV::discardIv(LoopInfo *info) {
     return;
 
   auto phis = header->getPhis();
-  auto preheader = info->getPreheader();
+  auto preheader = info->preheader;
   if (!preheader)
     return;
 
-  if (info->getExits().size() != 1)
+  if (info->exits.size() != 1)
     return;
 
   if (!info->getInduction())
@@ -415,8 +415,8 @@ void SCEV::replaceAfter(LoopInfo *info) {
   if (!info->getInduction())
     return;
 
-  auto header = info->getHeader();
-  auto preheader = info->getPreheader();
+  auto header = info->header;
+  auto preheader = info->preheader;
   auto exit = info->getExit();
   auto latch = info->getLatch();
   auto phis = header->getPhis();
@@ -554,7 +554,7 @@ void SCEV::run() {
     const auto &forest = forests[func];
 
     for (auto loop : forest.getLoops()) {
-      if (!loop->getSubloops().size())
+      if (!loop->subloops.size())
         discardIv(loop);
     }
   }

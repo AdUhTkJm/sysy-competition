@@ -15,7 +15,7 @@ static bool pinned(Op *op) {
 }
 
 bool RemoveEmptyLoop::runImpl(LoopInfo *info) {
-  if (info->getExits().size() > 1)
+  if (info->exits.size() > 1)
     return false;
 
   for (auto bb : info->getBlocks()) {
@@ -34,7 +34,7 @@ bool RemoveEmptyLoop::runImpl(LoopInfo *info) {
 
   // Safe to remove.
   // All header's predecessors should now connect to the exit.
-  auto header = info->getHeader();
+  auto header = info->header;
   auto exit = info->getExit();
   for (auto pred : header->preds) {
     auto term = pred->getLastOp();

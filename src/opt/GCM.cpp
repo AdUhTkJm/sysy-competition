@@ -107,7 +107,7 @@ void GCM::updateLoopDepth(LoopInfo *info, int dep) {
   for (auto bb : info->getBlocks())
     loopDepth[bb] = dep;
 
-  for (auto subloop : info->getSubloops())
+  for (auto subloop : info->subloops)
     updateLoopDepth(subloop, dep + 1);
 }
 
