@@ -117,9 +117,9 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
   }
 
   // Try to find the induction variable.
-  Rule addi("(add x 'a)");
+  Rule addi("(add x y)");
   Rule br("(br (lt x y))");
-  Rule brRotated("(br (lt (add x 'a) y))");
+  Rule brRotated("(br (lt (add x z) y))");
   for (auto loop : forest.getLoops()) {
     auto header = loop->header;
     auto phis = header->getPhis();
@@ -150,12 +150,15 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
         // Now this is a candidate of induction variable.
         // See if `def2` is of form `%phi + 'a`.
 
-        // addi: (add x 'a)
+        // addi: (add x y)
         if (addi.match(def2, { { "x", phi } })) {
-          auto step = addi.extract("'a");
+          auto step = addi.extract("y");
 
           // This is an induction variable if the step is an integer or it dominates preheader.
-          if (!(isa<IntOp>(step) && (!preheader || !step->getParent()->dominates(preheader))))
+          if (!isa<IntOp>(step) && !step->getParent()->dominates(preheader))
+            continue;
+          // A load means it might change at any time. Don't do this.
+          if (isa<LoadOp>(step))
             continue;
           
           loop->induction = phi;
@@ -166,7 +169,7 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
           auto term = latch->getLastOp();
           if (isa<BranchOp>(term)) {
             // Already rotated. Check latch instead.
-            // brRotated: (br (lt (add x 'a) y))
+            // brRotated: (br (lt (add x z) y))
             term = latch->getLastOp();
             if (!brRotated.match(term,  { { "x", loop->induction } }))
               continue;
