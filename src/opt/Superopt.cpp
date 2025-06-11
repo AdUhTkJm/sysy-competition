@@ -287,16 +287,18 @@ void Superopt::run() {
         BvSolver solver;
         solver.opts.stats = true;
         // Use just some random bits to find a good `c`.
-        BvSolver::Model model = { { "x", -519782519 }, { "y", 1373081924 } };
+        BvSolver::Model model = { { "x", -2 }, { "y", 3 } };
         auto sfilled = solidify(filled, model, true);
         auto scand = solidify(candidate, model, true);
         auto eq = ctx.create(BvExpr::Eq, sfilled, scand);
-        std::cerr << eq << "\n";
-        eq = simplify(eq, ctx);
-        bool succ = solver.infer(eq);
+        auto _and = ctx.create(BvExpr::And, eq, ctx.create(BvExpr::Ne, ctx.create(BvExpr::Var, "c"), ctx.create(BvExpr::Const, 0)));
+        std::cerr << _and << "\n";
+        _and = simplify(_and, ctx);
+        bool succ = solver.infer(_and);
         if (!succ)
           continue;
         std::cerr << "sat\n";
+        std::cerr << "c = " << solver.extract("c") << "\n";
         model = solver.model();
       }
       // Extract a model and prove equality.

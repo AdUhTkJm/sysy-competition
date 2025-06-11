@@ -212,15 +212,24 @@ void SCEV::runImpl(LoopInfo *info) {
   // Inspect phis to find the amount by which something increases.
   start.clear();
   std::unordered_set<Op*> mods;
+  Builder builder;
   for (auto phi : phis) {
     auto latchval = Op::getPhiFrom(phi, latch);
-    // Try to match (add (x 'a)).
+    // Try to match (add x 'a).
     if (constIncr.match(latchval, { { "x", phi } })) {
       auto v = constIncr.extract("'a");
       phi->add<IncreaseAttr>(V(v));
 
       // Also find out the start value.
       start[phi] = Op::getPhiFrom(phi, preheader);
+      // If the latchval is used more than once (elsewhere than the phi),
+      // We also record it's startval: phi + 1.
+      if (latchval->getUses().size() > 1) {
+        builder.setAfterOp(start[phi]);
+        auto vi = builder.create<IntOp>({ new IntAttr(1) });
+        auto add = builder.create<AddIOp>({ start[phi], vi });
+        start[latchval] = add;
+      }
     }
 
     // Also try to match repeated modulus.
@@ -288,7 +297,6 @@ void SCEV::runImpl(LoopInfo *info) {
 
   // Transform `addi` to `addl` and factor out the modulus.
   // This won't overflow because i32*i32 <= i64.
-  Builder builder;
   auto exit = info->getExit();
   auto insert = nonphi(exit);
   

@@ -40,7 +40,7 @@ BvRule rules[] = {
   // Ite
   "(change (ite (not x) y z) (ite x z y))",
   "(change (ite 0 y z) z)",
-  "(change (ite 'a y z) (!if-only (!ne 'a 0) y))",
+  "(change (ite 'a y z) (!only-if (!ne 'a 0) y))",
 
   // Mulmod
   "(change (mulmod 'a 'b 'c) (!mulmod 'a 'b 'c))",
