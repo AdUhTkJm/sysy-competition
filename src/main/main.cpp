@@ -27,7 +27,6 @@ void initArmPipeline(sys::PassManager &pm) {
   using namespace sys::arm;
 
   pm.addPass<Lower>();
-  pm.addPass<StrengthReduct>();
   pm.addPass<InstCombine>();
   pm.addPass<ArmDCE>();
   pm.addPass<RegAlloc>();

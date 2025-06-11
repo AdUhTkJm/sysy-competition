@@ -64,8 +64,6 @@ ARMOP(AddWOp);
 ARMOP(AddWIOp); // Accept immediate
 ARMOPL(AddXOp);
 ARMOPL(AddXIOp); // Accept immediate
-ARMOP(AddWLOp);  // Add with left-shift
-ARMOP(AddWROp);  // Add with right-shift
 
 ARMOP(SubWOp);
 ARMOP(RsbWOp); // Reverse subtract
@@ -159,7 +157,12 @@ ARMOP(CsetEqFcmpZOp);
 // Similar to CSET, CSEL also have different versions.
 
 ARMOP(CselCmpZOp); // Test if the condition equals to zero, then uses an `ne`.
-ARMOP(CselLtZOp);
+ARMOP(CselEqOp);
+ARMOP(CselNeOp);
+ARMOP(CselLtOp);
+ARMOP(CselLeOp);
+ARMOP(CselGtOp);
+ARMOP(CselGeOp);
 
 // ====== Branch family ======
 ARMOP(BgtOp);
