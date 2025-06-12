@@ -120,9 +120,7 @@ void Lower::run() {
     parent->succs = { bb1, bb2 };
     return false;
   });
-
-  module->dump();
-
+  
   REPLACE(IntOp, LiOp);
   REPLACE(AddIOp, AddwOp);
   REPLACE(AddLOp, AddOp);

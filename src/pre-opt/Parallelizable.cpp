@@ -15,12 +15,13 @@ void Parallelizable::runImpl(Op *loop, int depth) {
     BAD(isa<CallOp>(op) && op->has<ImpureAttr>());
 
   // The subscript for this variable `loop` must be the same.
-  std::unordered_map<Op*, std::vector<std::pair<Op*, bool>>> access;
+  std::unordered_map<Op*, std::vector<std::pair<Op*, bool>>> access, ops;
   auto stores = loop->findAll<StoreOp>();
   for (auto store : stores) {
     auto addr = store->DEF(1);
     BAD(!addr->has<BaseAttr>());
     access[BASE(addr)].emplace_back(addr, true);
+    ops[BASE(addr)].emplace_back(store, true);
   }
 
   auto loads = loop->findAll<LoadOp>();
@@ -28,6 +29,7 @@ void Parallelizable::runImpl(Op *loop, int depth) {
     auto addr = load->DEF();
     BAD(!addr->has<BaseAttr>());
     access[BASE(addr)].emplace_back(addr, false);
+    ops[BASE(addr)].emplace_back(load, false);
   }
 
   for (const auto &[base, access] : access) {
@@ -52,6 +54,51 @@ void Parallelizable::runImpl(Op *loop, int depth) {
       auto n2 = subscript[depth];
       auto vi2 = n2 ? subscript.back() / (n2 / 4) : -1;
       BAD(n2 != n || vi2 != vi);
+    }
+  }
+
+  // The first load must have a preceding store, or no store at all.
+  for (const auto &[base, access] : ops) {
+    Op *load = nullptr;
+    for (auto [op, isStore] : access) {
+      if (!isStore) {
+        load = op;
+        break;
+      }
+    }
+    // Alright. No stores, or no loads.
+    if (!load || load == access[0].first)
+      continue;
+    
+    auto [store, _] = access[0];
+    std::vector<Op*> parents;
+    for (auto runner = store; runner != loop; runner = runner->getParentOp())
+      parents.push_back(runner);
+    std::cerr << store << load;
+    for (auto runner = load; runner != loop; runner = runner->getParentOp()) {
+      // check whether `runner` and anything in `parents` are on the same layer.
+      bool decided = false, good = false;
+      for (auto parent : parents) {
+        if (runner->getParent() != parent->getParent())
+          continue;
+
+        decided = true;
+        // We expect `parent` to be front of `runner`.
+        for (auto w = parent; !w->atBack(); w = w->nextOp()) {
+          if (w == runner) {
+            good = true;
+            break;
+          }
+        }
+        if (parent->getParent()->getLastOp() == runner) {
+          good = true;
+          break;
+        }
+      }
+      if (decided && !good)
+        return;
+      if (decided)
+        break;
     }
   }
 
