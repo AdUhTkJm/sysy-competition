@@ -73,19 +73,55 @@ void Lower::run() {
   // When `x` is 0 or 1, we have:
   //   x ? y : z = (-x & y) | ((x - 1) & z)
   //
-  // I strongly doubt if the competition has a good branch predictor.
+  // It's 7 ops though, so I strongly suspect branches will be better.
+  // Here I'll use branches.
   runRewriter([&](SelectOp *op) {
+    std::cerr << "found select\n";
     auto x = op->DEF(0), y = op->DEF(1), z = op->DEF(2);
-    builder.setBeforeOp(op);
-    auto snez = builder.create<SnezOp>({ x });
-    auto zero = builder.create<LiOp>({ new IntAttr(0) });
-    auto neg = builder.create<SubOp>({ zero, snez });
-    auto sub = builder.create<AddiOp>({ snez }, { new IntAttr(-1) });
-    Value andy = builder.create<AndOp>({ neg, y });
-    Value andz = builder.create<AndOp>({ sub, z });
-    builder.replace<OrOp>(op, { andy, andz });
+    auto parent = op->getParent();
+    auto region = parent->getParent();
+    auto tgt = region->appendBlock();
+    auto bb1 = region->appendBlock();
+    auto bb2 = region->appendBlock();
+
+    parent->splitOpsAfter(tgt, op);
+    tgt->moveAfter(parent);
+    bb1->moveBefore(tgt);
+    bb2->moveBefore(tgt);
+
+    // Create a branch at the end of `parent`.
+    builder.setToBlockEnd(parent);
+    builder.create<BranchOp>({ x }, { new TargetAttr(bb1), new ElseAttr(bb2) });
+
+    // Create goto's.
+    builder.setToBlockEnd(bb1);
+    builder.create<GotoOp>({ new TargetAttr(tgt) });
+
+    builder.setToBlockEnd(bb2);
+    builder.create<GotoOp>({ new TargetAttr(tgt) });
+
+    // Replace with a phi.
+    builder.replace<PhiOp>(op, { y, z }, { new FromAttr(bb1), new FromAttr(bb2) });
+
+    // For every successor after `parent`, their operand now come from `tgt`.
+    for (auto succ : parent->succs) {
+      auto phis = succ->getPhis();
+      for (auto phi : phis) {
+        for (auto attr : phi->getAttrs()) {
+          if (FROM(attr) == parent)
+            FROM(attr) = tgt;
+        }
+      }
+      succ->preds.erase(parent);
+      succ->preds.insert(tgt);
+    }
+    // Update successors/predecessors
+    tgt->succs = parent->succs;
+    parent->succs = { bb1, bb2 };
     return false;
   });
+
+  module->dump();
 
   REPLACE(IntOp, LiOp);
   REPLACE(AddIOp, AddwOp);
