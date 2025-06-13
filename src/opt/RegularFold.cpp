@@ -100,8 +100,8 @@ static Rule rules[] = {
   "(change (mod 'a 'b) (!mod 'a 'b))",
 
   // Shift
-  "(change (lshift 'a 'b) (!lshift 'a 'b))",
-  "(change (rshift 'a 'b) (!rshift 'a 'b))",
+  "(change (lshift 'a 'b) (!lsh 'a 'b))",
+  "(change (rshift 'a 'b) (!rsh 'a 'b))",
 
   // Minus
   "(change (minus 'a) (!sub 0 'a))",

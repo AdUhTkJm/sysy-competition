@@ -11,9 +11,14 @@ std::map<std::string, int> SCEV::stats() {
   };
 }
 
-static Rule constIncr("(add x 'a)");
-static Rule constIncrL("(addl x 'a)");
-static Rule modIncr("(mod (add x y) 'a)");
+namespace {
+
+Rule constIncr("(add x 'a)");
+Rule constIncrL("(addl x 'a)");
+Rule modIncr("(mod (add x y) 'a)");
+Rule constDiv("(div x 'a)");
+
+}
 
 void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
   auto preheader = info->preheader;
@@ -212,6 +217,7 @@ void SCEV::runImpl(LoopInfo *info) {
   // Inspect phis to find the amount by which something increases.
   start.clear();
   std::unordered_set<Op*> mods;
+  std::set<std::pair<Op*, int>> divs;
   Builder builder;
   for (auto phi : phis) {
     auto latchval = Op::getPhiFrom(phi, latch);
@@ -304,6 +310,7 @@ void SCEV::runImpl(LoopInfo *info) {
   for (auto phi : exit->getPhis()) 
     exitlatch[Op::getPhiFrom(phi, latch)] = phi;
 
+  // Factor out the modulus.
   for (auto phi : mods) {
     auto mod = Op::getPhiFrom(phi, latch);
     auto latchphi = exitlatch.count(mod) ? exitlatch[mod] : exitlatch[phi];
@@ -468,17 +475,53 @@ void SCEV::replaceAfter(LoopInfo *info) {
   builder.setToBlockStart(interm);
 
   for (auto phi : phis) {
-    if (!phi->has<IncreaseAttr>())
-      continue;
     auto latchval = Op::getPhiFrom(phi, latch);
     bool addl = isa<AddLOp>(latchval);
 
-    // Match sizes.
-    auto incr = phi->get<IncreaseAttr>();
     auto vstart = Op::getPhiFrom(phi, preheader);
     auto latchphi = exitlatch[latchval];
     if (!latchphi)
       continue;
+
+    if (!phi->has<IncreaseAttr>()) {
+      // Match repeated division as well.
+      if (constDiv.match(latchval, { { "x", phi } })) {
+        // To factor out the division, we need that the denominator is a power of 2.
+        auto vi = V(constDiv.extract("'a"));
+        if (__builtin_popcount(vi) != 1)
+          continue;
+
+        // Check the div is never used elsewhere in the loop.
+        int usecnt = 0;
+        for (auto use : phi->getUses()) {
+          if (info->contains(use->getParent()))
+            usecnt++;
+        }
+        if (usecnt != 1)
+          continue;
+
+        // Rewrite it as n / (1 << (ctz(vi) * ceil((stop - start) / step))).
+        Value diff = builder.create<SubIOp>({ stop->getResult(), start });
+        if (step != 1) {
+          auto vi = builder.create<IntOp>({ new IntAttr(step - 1) });
+          auto vj = builder.create<IntOp>({ new IntAttr(step) });
+          auto add = builder.create<AddIOp>({ diff, vi });
+          diff = builder.create<DivIOp>({ add, vj });
+        }
+        Value ctz = builder.create<IntOp>({ new IntAttr(__builtin_ctz(vi)) });
+        Value mul = builder.create<MulIOp>({ ctz, diff });
+        Value one = builder.create<IntOp>({ new IntAttr(1) });
+        Value lsh = builder.create<LShiftLOp>({ one, mul });
+        Value replace = builder.create<DivLOp>({ vstart, lsh });
+        latchphi->replaceOperand(latchval, replace);
+        continue;
+      }
+
+      continue;
+    }
+
+    // Match sizes.
+    auto incr = phi->get<IncreaseAttr>();
 
     if (incr->amt.size() == 1) {
       // Final value:

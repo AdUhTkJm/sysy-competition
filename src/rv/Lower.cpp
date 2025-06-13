@@ -131,6 +131,7 @@ void Lower::run() {
   REPLACE(MulshOp, MulhOp);
   REPLACE(MuluhOp, MulhuOp);
   REPLACE(DivIOp, DivwOp);
+  REPLACE(DivLOp, DivOp);
   REPLACE(ModIOp, RemwOp);
   REPLACE(ModLOp, RemOp);
   REPLACE(LShiftOp, SllwOp);
