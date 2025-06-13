@@ -50,18 +50,39 @@ BvExpr *Superopt::fillHole(BvExpr *expr, BvExpr *candidate) {
   static const auto &fill = [&](BvExpr *&p) {
     if (!p)
       return p;
-    return p->ty == BvExpr::Hole ? candidate : fillHole(p, candidate);
+    if (p->ty != BvExpr::Hole)
+      return fillHole(p, candidate);
+    
+    std::unordered_map<std::string, BvExpr*> model;
+    if (p->l)
+      model["x"] = p->l;
+    if (p->r)
+      model["y"] = p->r;
+    return solidify(candidate, model);
   };
   auto bvexpr = ctx.create(expr->ty, expr->vi, expr->name, fill(expr->cond), fill(expr->l), fill(expr->r));
   return bvexpr;
 }
 
 BvExpr *Superopt::solidify(BvExpr *expr, BvSolver::Model &model, bool allowX) {
-  static const auto &fill = [&](BvExpr *&p) {
+  static const auto &fill = [&](BvExpr *p) {
     if (!p)
       return p;
     return p->ty == BvExpr::Var && (allowX ^ (p->name[0] == 'c'))
       ? ctx.create(BvExpr::Const, model[p->name])
+      : solidify(p, model);
+  };
+  auto bvexpr = ctx.create(expr->ty, expr->vi, expr->name, fill(expr->cond), fill(expr->l), fill(expr->r));
+  return bvexpr;
+}
+
+BvExpr *Superopt::solidify(BvExpr *expr, const std::unordered_map<std::string, BvExpr*> &model) {
+  static const auto &fill = [&](BvExpr *p) {
+    if (!p)
+      return p;
+
+    return p->ty == BvExpr::Var && model.count(p->name)
+      ? model.at(p->name)
       : solidify(p, model);
   };
   auto bvexpr = ctx.create(expr->ty, expr->vi, expr->name, fill(expr->cond), fill(expr->l), fill(expr->r));
@@ -149,11 +170,9 @@ BvExpr *Superopt::trace(Op *op) {
       auto hole = ctx.create(BvExpr::Hole);
       int argcnt = op->getOperandCount();
       if (argcnt >= 1)
-        hole->cond = trace(op->DEF(0));
+        hole->l = trace(op->DEF(0));
       if (argcnt >= 2)
-        hole->l = trace(op->DEF(1));
-      if (argcnt >= 3)
-        hole->r = trace(op->DEF(2));
+        hole->r = trace(op->DEF(1));
 
       return cache[op] = hole;
     }
@@ -282,7 +301,7 @@ void Superopt::run() {
     const std::vector<BvExpr*> &candidates = argcnt == 1 ? candidates_1 : candidates_2;
     for (auto candidate : candidates) {
       BvSolver::Model model;
-        auto filled = fillHole(expr, candidate);
+      auto filled = fillHole(expr, candidate);
       {
         BvSolver solver;
         solver.opts.stats = true;

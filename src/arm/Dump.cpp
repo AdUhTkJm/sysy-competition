@@ -180,19 +180,19 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     os << "cset " << wreg(RD(op)) << ", eq\n";
     break;
   case CsetLtFOp::id:
-    os << "cmp " << freg(RS(op)) << ", " << freg(RS2(op)) << "\n";
+    os << "fcmp " << freg(RS(op)) << ", " << freg(RS2(op)) << "\n  ";
     os << "cset " << wreg(RD(op)) << ", lt\n";
     break;
   case CsetLeFOp::id:
-    os << "cmp " << freg(RS(op)) << ", " << freg(RS2(op)) << "\n";
+    os << "fcmp " << freg(RS(op)) << ", " << freg(RS2(op)) << "\n  ";
     os << "cset " << wreg(RD(op)) << ", le\n";
     break;
   case CsetNeFOp::id:
-    os << "cmp " << freg(RS(op)) << ", " << freg(RS2(op)) << "\n";
+    os << "fcmp " << freg(RS(op)) << ", " << freg(RS2(op)) << "\n  ";
     os << "cset " << wreg(RD(op)) << ", ne\n";
     break;
   case CsetEqFOp::id:
-    os << "cmp " << freg(RS(op)) << ", " << freg(RS2(op)) << "\n";
+    os << "fcmp " << freg(RS(op)) << ", " << freg(RS2(op)) << "\n  ";
     os << "cset " << wreg(RD(op)) << ", eq\n";
     break;
   case CsetEqFcmpZOp::id:

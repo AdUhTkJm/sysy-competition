@@ -26,6 +26,7 @@ class Superopt : public Pass {
   // Replaces all variables whose value have been worked out to concrete constants.
   // Configurable whether `x`, `y` etc. are allowed to be substituted.
   smt::BvExpr *solidify(smt::BvExpr *expr, smt::BvSolver::Model &model, bool allowX = false);
+  smt::BvExpr *solidify(smt::BvExpr *expr, const std::unordered_map<std::string, smt::BvExpr*> &model);
 
   smt::BvExpr *trace(Op *op);
   void rewireExit(Region *region);

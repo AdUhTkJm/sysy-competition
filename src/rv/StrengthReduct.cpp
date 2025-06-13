@@ -304,6 +304,41 @@ int StrengthReduct::runImpl() {
     return false;
   });
 
+  // ===================
+  // Rewrite DivOp.
+  // ===================
+
+  runRewriter([&](DivOp *op) {
+    auto x = op->DEF(0);
+    auto y = op->DEF(1);
+
+    // Currently, DivOp can only be emitted by SCEV.
+    // It will be of a pattern (x / (1 << n)),
+    // which can be fold according to `DivwOp` above.
+    // We check this pattern here.
+    if (isa<SllOp>(y) && isa<LiOp>(y->DEF(0)) && V(y->DEF(0)) == 1) {
+      converted++;
+      builder.setBeforeOp(op);
+
+      // According to clang (a0 = x):
+      //   srai    a1, a0, 63
+      //   srl     a1, a1, (64 - n)
+      //   add     a0, a0, a1
+      //   sra     a0, a0, n
+
+      auto n = y->DEF(1);
+      auto srai = builder.create<SraiOp>({ x }, { new IntAttr(63) });
+      auto vi = builder.create<LiOp>({ new IntAttr(64) });
+      auto sub = builder.create<SubOp>({ vi, n });
+      auto srl = builder.create<SrlOp>({ srai, sub });
+      auto add = builder.create<AddOp>({ x, srl });
+      builder.replace<SraOp>(op, { add, n });
+      return true;
+    }
+
+    return false;
+  });
+
   return converted;
 }
 
