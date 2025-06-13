@@ -64,12 +64,17 @@ void RemoveEmptyLoop::run() {
     auto region = func->getRegion();
     auto forest = analysis.runImpl(region);
 
-    for (auto loop : forest.getLoops()) {
-      if (!runImpl(loop))
-        continue;
+    bool changed;
+    do {
+      changed = false;
+      for (auto loop : forest.getLoops()) {
+        if (!runImpl(loop))
+          continue;
 
-      forest = analysis.runImpl(region);
-      break;
-    }
+        forest = analysis.runImpl(region);
+        changed = true;
+        break;
+      }
+    } while (changed);
   }
 }

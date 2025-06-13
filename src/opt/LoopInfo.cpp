@@ -21,3 +21,10 @@ void LoopInfo::dump(std::ostream &os) {
     os << bbmap[bb] << " ";
   os << "\n";
 }
+
+void LoopForest::dump(std::ostream &os) {
+  for (auto loop : loops) {
+    loop->dump(os);
+    os << "\n\n";
+  }
+}

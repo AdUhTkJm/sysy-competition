@@ -69,7 +69,7 @@ public:
 
   LoopInfo *getInfo(BasicBlock *header) { return loopMap[header]; }
 
-  void dump(std::ostream &os);
+  void dump(std::ostream &os = std::cerr);
 };
 
 class LoopAnalysis : public Pass {
