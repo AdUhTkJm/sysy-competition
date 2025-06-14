@@ -137,13 +137,14 @@ void initPipeline(sys::PassManager &pm) {
 
   // ===== Another round of loop optimization =====
 
-  for (int i = 0; i < 2; i++) {
+  //for (int i = 0; i < 2; i++) {
     pm.addPass<sys::CanonicalizeLoop>(/*lcssa=*/ true);
+    pm.addPass<sys::LICM>();
     pm.addPass<sys::SCEV>();
     pm.addPass<sys::RemoveEmptyLoop>();
     pm.addPass<sys::GVN>();
     pm.addPass<sys::RegularFold>();
-  }
+  //}
 
   // ===== Final Cleanup =====
 

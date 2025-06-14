@@ -180,8 +180,14 @@ class LICM : public Pass {
   bool impure;
 
   // A store is hoistable when no branch or load has been met.
+  void hoistVariant(LoopInfo *info, BasicBlock *bb, bool hoistable);
   void markVariant(LoopInfo *info, BasicBlock *bb, bool hoistable);
   void runImpl(LoopInfo *info);
+  bool hoistSubloop(LoopInfo *outer);
+
+  // Find out all stores in the loop and update `stores`.
+  // Returns false when finds out unsuitable to hoist.
+  bool updateStores(LoopInfo *info);
 public:
   LICM(ModuleOp *module): Pass(module) {}
 
