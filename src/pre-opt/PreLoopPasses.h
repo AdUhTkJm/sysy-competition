@@ -78,6 +78,16 @@ public:
   void run() override;
 };
 
+class Unroll : public Pass {
+  int unrolled = 0;
+public:
+  Unroll(ModuleOp *module): Pass(module) {}
+
+  std::string name() override { return "unroll"; }
+  std::map<std::string, int> stats() override;
+  void run() override;
+};
+
 // Lower operations back to its original form.
 class Lower : public Pass {
 public:

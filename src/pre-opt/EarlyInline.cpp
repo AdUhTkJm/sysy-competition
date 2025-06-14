@@ -4,6 +4,18 @@ using namespace sys;
 
 namespace {
 
+bool isRecursive(Op *func) {
+  auto calls = func->findAll<CallOp>();
+  const auto &name = NAME(func);
+  for (auto call : calls) {
+    if (NAME(call) == name)
+      return true;
+  }
+  return false;
+}
+
+}
+
 // Count all ops inside a region.
 int opcount(Region *region) {
   int total = 0;
@@ -15,18 +27,6 @@ int opcount(Region *region) {
     total += bb->getOpCount();
   }
   return total;
-}
-
-bool isRecursive(Op *func) {
-  auto calls = func->findAll<CallOp>();
-  const auto &name = NAME(func);
-  for (auto call : calls) {
-    if (NAME(call) == name)
-      return true;
-  }
-  return false;
-}
-
 }
 
 void EarlyInline::run() {

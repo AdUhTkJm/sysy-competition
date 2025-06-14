@@ -230,12 +230,17 @@ bool ConstLoopUnroll::runImpl(LoopInfo *loop) {
   while (isa<PhiOp>(upper) && upper->getOperandCount() == 1)
     upper = upper->DEF();
 
+  auto step = loop->getStepOp();
+  if (!isa<IntOp>(step))
+    return false;
+
   // Fully unroll constant-bounded loops if it's small enough.
   if (lower && upper && isa<IntOp>(lower) && isa<IntOp>(upper)) {
     int low = V(lower);
     int high = V(upper);
-    if (high - low <= 1000 / loopsize)
-      unroll = high - low;
+    int times = (high - low) / V(step);
+    if (times <= 1000 / loopsize)
+      unroll = times;
   }
   // Not a constant loop.
   if (unroll == -1)
