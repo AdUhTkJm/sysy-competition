@@ -111,18 +111,6 @@ public:
   void run() override;
 };
 
-class RedundancyElim : public Pass {
-  int elim = 0;
-
-  bool runImpl(Region *region);
-public:
-  RedundancyElim(ModuleOp *module): Pass(module) {}
-
-  std::string name() override { return "redundancy-elim"; };
-  std::map<std::string, int> stats() override;
-  void run() override;
-};
-
 }
 
 #endif
