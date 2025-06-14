@@ -47,7 +47,7 @@ Superopt::Superopt(ModuleOp *module): Pass(module) {
 }
 
 BvExpr *Superopt::fillHole(BvExpr *expr, BvExpr *candidate) {
-  static const auto &fill = [&](BvExpr *&p) {
+  const auto &fill = [&](BvExpr *p) {
     if (!p)
       return p;
     if (p->ty != BvExpr::Hole)
@@ -65,7 +65,7 @@ BvExpr *Superopt::fillHole(BvExpr *expr, BvExpr *candidate) {
 }
 
 BvExpr *Superopt::solidify(BvExpr *expr, BvSolver::Model &model, bool allowX) {
-  static const auto &fill = [&](BvExpr *p) {
+  const auto &fill = [&](BvExpr *p) {
     if (!p)
       return p;
     return p->ty == BvExpr::Var && (allowX ^ (p->name[0] == 'c'))
@@ -77,7 +77,7 @@ BvExpr *Superopt::solidify(BvExpr *expr, BvSolver::Model &model, bool allowX) {
 }
 
 BvExpr *Superopt::solidify(BvExpr *expr, const std::unordered_map<std::string, BvExpr*> &model) {
-  static const auto &fill = [&](BvExpr *p) {
+  const auto &fill = [&](BvExpr *p) {
     if (!p)
       return p;
 

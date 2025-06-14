@@ -66,7 +66,6 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::Unswitch>();
   pm.addPass<sys::Parallelizable>();
   pm.addPass<sys::LoopDCE>();
-  // pm.addPass<sys::Unroll>();
   pm.addPass<sys::Lower>();
 
   // ===== Flattened CFG =====
