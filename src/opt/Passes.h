@@ -194,6 +194,8 @@ public:
 // Recognize `if-else` patterns and raise to SelectOp.
 class Select : public Pass {
   int raised = 0;
+
+  void raiseEmpty(Op *phi, BasicBlock *pred, BasicBlock *bb1, BasicBlock *bb2);
 public:
   Select(ModuleOp *module): Pass(module) {}
 

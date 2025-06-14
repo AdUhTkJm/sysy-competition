@@ -110,6 +110,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DAE>();
   pm.addPass<sys::DSE>();
   pm.addPass<sys::DLE>();
+  pm.addPass<sys::RedundancyElim>();
   pm.addPass<sys::Select>();
   pm.addPass<sys::RegularFold>();
   pm.addPass<sys::DCE>();
