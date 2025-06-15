@@ -103,6 +103,8 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   BINARY_W(MulWOp, "mul");
   BINARY_W(SdivWOp, "sdiv");
   BINARY_W(AsrWOp, "asr");
+  BINARY_W(LslWOp, "lslv");
+  BINARY_W(LsrWOp, "lsr");
 
   BINARY_F(FaddOp, "fadd");
   BINARY_F(FsubOp, "fsub");
@@ -110,9 +112,12 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   BINARY_F(FdivOp, "fdiv");
 
   BINARY_X(AddXOp, "add");
+  BINARY_X(SubXOp, "sub");
   BINARY_X(MulXOp, "mul");
   BINARY_X(SdivXOp, "sdiv");
   BINARY_X(AsrXOp, "asr");
+  BINARY_X(LslXOp, "lslv");
+  BINARY_X(LsrXOp, "lsr");
 
   UNARY_I_W(AddWIOp, "add");
   UNARY_I_W(AsrWIOp, "asr");
@@ -164,19 +169,19 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     os << "ldr " << freg(RD(op)) << ", [" << xreg(RS(op)) << ", #" << V(op) << "]\n";
     break;
   case CsetLtOp::id:
-    os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
+    os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n  ";
     os << "cset " << wreg(RD(op)) << ", lt\n";
     break;
   case CsetLeOp::id:
-    os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
+    os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n  ";
     os << "cset " << wreg(RD(op)) << ", le\n";
     break;
   case CsetNeOp::id:
-    os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
+    os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n  ";
     os << "cset " << wreg(RD(op)) << ", ne\n";
     break;
   case CsetEqOp::id:
-    os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
+    os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n  ";
     os << "cset " << wreg(RD(op)) << ", eq\n";
     break;
   case CsetLtFOp::id:
@@ -196,19 +201,19 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     os << "cset " << wreg(RD(op)) << ", eq\n";
     break;
   case CsetEqFcmpZOp::id:
-    os << "fcmpz " << freg(RS(op)) << "\n";
+    os << "fcmpz " << freg(RS(op)) << "\n  ";
     os << "cset " << wreg(RD(op)) << ", eq\n";
     break;
   case CsetNeFcmpZOp::id:
-    os << "fcmpz " << freg(RS(op)) << "\n";
+    os << "fcmpz " << freg(RS(op)) << "\n  ";
     os << "cset " << wreg(RD(op)) << ", ne\n";
     break;
   case CsetNeTstOp::id:
-    os << "tst " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
+    os << "tst " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n  ";
     os << "cset " << wreg(RD(op)) << ", ne\n";
     break;
   case CsetEqTstOp::id:
-    os << "tst " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
+    os << "tst " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n  ";
     os << "cset " << wreg(RD(op)) << ", eq\n";
     break;
   case CselCmpZOp::id:
@@ -226,6 +231,9 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     break;
   case MovIOp::id:
     os << "mov " << wreg(RD(op)) << ", " << V(op) << "\n";
+    break;
+  case MovnOp::id:
+    os << "movn " << wreg(RD(op)) << ", " << V(op) << "\n";
     break;
   case MovkOp::id:
     os << "movk " << wreg(RD(op)) << ", " << V(op) << ", lsl " << LSL(op) << "\n";

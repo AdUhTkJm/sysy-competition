@@ -169,7 +169,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       op->moveToStart(entry);
       builder.setBeforeOp(op);
       builder.create<PlaceHolderOp>({ fargHolders[fcnt] });
-      builder.replace<ReadRegOp>(op, { new RegAttr(fargRegs[fcnt]) });
+      builder.replace<ReadRegOp>(op, Value::f32, { new RegAttr(fargRegs[fcnt]) });
       fcnt++;
       continue;
     }
@@ -177,7 +177,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       op->moveToStart(entry);
       builder.setBeforeOp(op);
       builder.create<PlaceHolderOp>({ argHolders[cnt] });
-      builder.replace<ReadRegOp>(op, { new RegAttr(argRegs[cnt]) });
+      builder.replace<ReadRegOp>(op, Value::i64, { new RegAttr(argRegs[cnt]) });
       cnt++;
       continue;
     }

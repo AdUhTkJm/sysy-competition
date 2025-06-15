@@ -33,7 +33,7 @@ static void rewriteAlloca(FuncOp *func) {
   for (auto op : allocas) {
     // Translate itself into `sp + offset`.
     builder.setBeforeOp(op);
-    auto spValue = builder.create<ReadRegOp>({ new RegAttr(Reg::sp) });
+    auto spValue = builder.create<ReadRegOp>(Value::i64, { new RegAttr(Reg::sp) });
     auto offsetValue = builder.create<MovIOp>({ new IntAttr(offset) });
     auto add = builder.create<AddXOp>({ spValue, offsetValue });
     op->replaceAllUsesWith(add);
@@ -55,9 +55,11 @@ void Lower::run() {
   REPLACE(AddIOp, AddWOp);
   REPLACE(AddLOp, AddXOp);
   REPLACE(SubIOp, SubWOp);
+  REPLACE(SubLOp, SubXOp);
   REPLACE(MulIOp, MulWOp);
   REPLACE(MulLOp, MulXOp);
   REPLACE(DivIOp, SdivWOp);
+  REPLACE(DivLOp, SdivXOp);
   REPLACE(LShiftLOp, LslXOp);
   REPLACE(LShiftOp, LslWOp);
   REPLACE(RShiftLOp, AsrXOp);
@@ -210,8 +212,11 @@ void Lower::run() {
       builder.create<SubSpOp>({ new IntAttr(stackOffset) });
     
     for (int i = 0; i < spilled.size(); i++) {
-      auto sp = builder.create<ReadRegOp>({ new RegAttr(Reg::sp) });
-      builder.create<StrXOp>({ spilled[i], sp }, { new SizeAttr(8), new IntAttr(i * 8) });
+      auto sp = builder.create<ReadRegOp>(Value::i64, { new RegAttr(Reg::sp) });
+      if (spilled[i].defining->getResultType() == Value::f32)
+        builder.create<StrFOp>({ spilled[i], sp }, { new SizeAttr(8), new IntAttr(i * 8) });
+      else
+        builder.create<StrXOp>({ spilled[i], sp }, { new SizeAttr(8), new IntAttr(i * 8) });
     }
 
     builder.create<BlOp>(argsNew, { 
@@ -225,9 +230,9 @@ void Lower::run() {
 
     // Read result from a0.
     if (op->getResultType() == Value::f32)
-      builder.replace<ReadRegOp>(op, { new RegAttr(Reg::v0) });
+      builder.replace<ReadRegOp>(op, Value::f32, { new RegAttr(Reg::v0) });
     else
-      builder.replace<ReadRegOp>(op, { new RegAttr(Reg::x0) });
+      builder.replace<ReadRegOp>(op, Value::i64, { new RegAttr(Reg::x0) });
     return true;
   });
 
@@ -250,7 +255,7 @@ void Lower::run() {
   // Finally, convert all `mov x, 0` to reading from xzr.
   runRewriter([&](MovIOp *op) {
     if (V(op) == 0)
-      builder.replace<ReadRegOp>(op, { new RegAttr(Reg::xzr) });
+      builder.replace<ReadRegOp>(op, Value::i64, { new RegAttr(Reg::xzr) });
     
     return false;
   });

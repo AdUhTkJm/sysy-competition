@@ -23,12 +23,18 @@ void LateLegalize::run() {
 
   // Use `mov` and `movk` for an out-of-range `mov`.
   runRewriter([&](MovIOp *op) {
-    if (V(op) >= 16384) {
-      int v = V(op);
-
+    int v = V(op);
+    if (v >= 65536) {
       builder.setBeforeOp(op);
       builder.create<MovIOp>({ RDC(RD(op)), new IntAttr(v & 0xffff) });
       builder.replace<MovkOp>(op, { RDC(RD(op)), new IntAttr(((unsigned) v) >> 16), new LslAttr(16) });
+    }
+    if (v < -65536) {
+      unsigned u = v;
+
+      builder.setBeforeOp(op);
+      builder.create<MovnOp>({ RDC(RD(op)), new IntAttr((uint16_t)(~(uint16_t)(u & 0xffff))) });
+      builder.replace<MovkOp>(op, { RDC(RD(op)), new IntAttr(u >> 16), new LslAttr(16) });
     }
     return false;
   });

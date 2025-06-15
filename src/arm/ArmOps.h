@@ -189,7 +189,7 @@ ARMOPF(FmulOp);
 ARMOPF(FdivOp);
 
 // ==== Pseudo Ops ====
-ARMOP(ReadRegOp);
+ARMOPE(ReadRegOp);
 ARMOP(WriteRegOp);
 ARMOP(PlaceHolderOp);
 ARMOP(SubSpOp);
