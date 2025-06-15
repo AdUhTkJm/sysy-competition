@@ -208,7 +208,6 @@ bool LICM::hoistSubloop(LoopInfo *outer) {
     phi->add<VariantAttr>();
 
   markVariant(outer, outer->header, /*hoistable=*/true);
-  module->dump();
 
   for (auto loop : outer->subloops) {
     if (loop->exits.size() > 1 || loop->latches.size() > 1)
@@ -329,18 +328,23 @@ void LICM::run() {
     domtree = getDomTree(region);
 
     auto forest = forests[func];
-    for (auto info : forest.getLoops()) {
-      // Only call for top-level loops.
-      if (!info->getParent() && hoistSubloop(info)) {
-        forest = loop.runImpl(region);
-        domtree = getDomTree(region);
-        break;
+    bool changed;
+    do {
+      changed = false;
+      for (auto info : forest.getLoops()) {
+        // Only call for top-level loops.
+        if (!info->getParent() && hoistSubloop(info)) {
+          forest = loop.runImpl(region);
+          domtree = getDomTree(region);
+          changed = true;
+          break;
+        }
       }
-    }
 
-    for (auto bb : region->getBlocks()) {
-      for (auto op : bb->getOps())
-        op->remove<VariantAttr>();
-    }
+      for (auto bb : region->getBlocks()) {
+        for (auto op : bb->getOps())
+          op->remove<VariantAttr>();
+      }
+    } while (changed);
   }
 }
