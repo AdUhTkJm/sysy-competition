@@ -78,9 +78,9 @@ Options sys::parseArgs(int argc, char **argv) {
     exit(1);
   }
 
-  // Default to RISC-V.
+  // Default to ARM.
   if (!opts.rv && !opts.arm)
-    opts.rv = true;
+    opts.arm = true;
 
   return opts;
 }
