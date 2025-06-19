@@ -62,8 +62,10 @@ ARMOPL(AdrOp); // The ADR instruction only allows 1 MB range. We use pseudo-inst
 
 ARMOP(AddWOp);
 ARMOP(AddWIOp); // Accept immediate
+ARMOP(AddWLOp); // LSL
 ARMOPL(AddXOp);
 ARMOPL(AddXIOp); // Accept immediate
+ARMOPL(AddXLOp); // LSL
 
 ARMOP(SubWOp);
 ARMOP(RsbWOp); // Reverse subtract

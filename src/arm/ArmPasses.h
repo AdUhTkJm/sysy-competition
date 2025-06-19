@@ -19,6 +19,18 @@ public:
   void run() override;
 };
 
+class StrengthReduct : public Pass {
+  int convertedTotal = 0;
+
+  int runImpl();
+public:
+  StrengthReduct(ModuleOp *module): Pass(module) {}
+    
+  std::string name() override { return "strength-reduction"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
+};
+
 class InstCombine : public Pass {
   int combined = 0;
 public:
