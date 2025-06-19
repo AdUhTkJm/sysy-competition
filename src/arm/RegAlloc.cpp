@@ -421,6 +421,15 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     spillOffset.clear();
   }
 
+  // Only 2 registers are spilled. Let's use x28 and x29.
+  if (highest == currentOffset + 8) {
+    for (auto [op, offset] : spillOffset) {
+      auto fp = op->getResultType() == Value::f32;
+      assignment[op] = offset ? (fp ? fspillReg3 : spillReg3) : (fp ? fspillReg : spillReg);
+    }
+    spillOffset.clear();
+  }
+
   // Allocate more stack space for it.
   if (spillOffset.size())
     STACKOFF(funcOp) = highest + 8;

@@ -18,7 +18,7 @@ static const Reg argRegs[] = {
 
 static const Reg spillReg = Reg::x28;
 static const Reg spillReg2 = Reg::x15;
-static const Reg spillReg3 = Reg::x14;
+static const Reg spillReg3 = Reg::x29;
 static const Reg fspillReg = Reg::v31;
 static const Reg fspillReg2 = Reg::v15;
 static const Reg fspillReg3 = Reg::v30;
@@ -29,7 +29,7 @@ static const Reg leafOrder[] = {
   Reg::x4, Reg::x5, Reg::x6, Reg::x7,
 
   Reg::x8, Reg::x9, Reg::x10, Reg::x11,
-  Reg::x12, Reg::x13,
+  Reg::x12, Reg::x13, Reg::x14,
 
   Reg::x19, Reg::x20, Reg::x21, Reg::x22,
   Reg::x23, Reg::x24, Reg::x25, Reg::x26,
@@ -45,7 +45,7 @@ static const Reg normalOrder[] = {
   Reg::x4, Reg::x5, Reg::x6, Reg::x7,
 
   Reg::x8, Reg::x9, Reg::x10, Reg::x11,
-  Reg::x12, Reg::x13,
+  Reg::x12, Reg::x13, Reg::x14,
 };
 
 // The same, but for floating point registers.
