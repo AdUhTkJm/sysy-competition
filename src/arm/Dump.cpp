@@ -225,6 +225,10 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     os << "cmp " << wreg(RS(op)) << ", #0\n  ";
     os << "csel " << wreg(RD(op)) << ", " << wreg(RS2(op)) << ", " << wreg(RS3(op)) << ", ne\n";
     break;
+  case CselLtZOp::id:
+    os << "cmp " << wreg(RS(op)) << ", #0\n  ";
+    os << "csel " << wreg(RD(op)) << ", " << wreg(RS2(op)) << ", " << wreg(RS3(op)) << ", lt\n";
+    break;
   case RetOp::id:
     os << "ret \n";
     break;
@@ -246,6 +250,9 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   case AddWLOp::id:
     os << "add " << wreg(RD(op))  << ", " << wreg(RS(op)) << ", " << wreg(RS2(op)) << ", lsl " << V(op) << "\n";
     break;
+  case AddWROp::id:
+    os << "add " << wreg(RD(op))  << ", " << wreg(RS(op)) << ", " << wreg(RS2(op)) << ", lsr " << V(op) << "\n";
+    break;
   case LdrWROp::id:
     os << "ldr " << wreg(RD(op)) << ", [" << xreg(RS(op)) << ", " << xreg(RS2(op));
     if (V(op))
@@ -254,6 +261,12 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     break;
   case LdrXROp::id:
     os << "ldr " << xreg(RD(op)) << ", [" << xreg(RS(op)) << ", " << xreg(RS2(op));
+    if (V(op))
+      os << ", lsl " << V(op);
+    os << "]\n";
+    break;
+  case LdrFROp::id:
+    os << "ldr " << freg(RD(op)) << ", [" << xreg(RS(op)) << ", " << xreg(RS2(op));
     if (V(op))
       os << ", lsl " << V(op);
     os << "]\n";
@@ -269,6 +282,15 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     if (V(op))
       os << ", lsl " << V(op);
     os << "]\n";
+    break;
+  case StrFROp::id:
+    os << "str " << freg(RS(op)) << ", [" << xreg(RS2(op)) << ", " << xreg(RS3(op));
+    if (V(op))
+      os << ", lsl " << V(op);
+    os << "]\n";
+    break;
+  case SmullOp::id:
+    os << "smull " << xreg(RD(op)) << ", " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
     break;
   default:
     std::cerr << "unimplemented op: " << op;

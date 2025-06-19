@@ -63,9 +63,11 @@ ARMOPL(AdrOp); // The ADR instruction only allows 1 MB range. We use pseudo-inst
 ARMOP(AddWOp);
 ARMOP(AddWIOp); // Accept immediate
 ARMOP(AddWLOp); // LSL
+ARMOP(AddWROp); // RSL
 ARMOPL(AddXOp);
 ARMOPL(AddXIOp); // Accept immediate
 ARMOPL(AddXLOp); // LSL
+ARMOPL(AddXROp); // LSL
 
 ARMOP(SubWOp);
 ARMOP(SubWIOp); // Accept immediate
@@ -85,8 +87,7 @@ ARMOPL(MsubXOp);
 ARMOP(NegOp);
 ARMOPF(FnegOp);
 
-ARMOPL(SmulhOp);
-ARMOPL(UmulhOp);
+ARMOPL(SmullOp); // Signed mul long
 
 ARMOP(AndOp);
 ARMOP(OrOp);

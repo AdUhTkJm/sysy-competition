@@ -4,7 +4,12 @@ using namespace sys::arm;
 using namespace sys;
 
 // See rv/StrengthReduct.cpp
-struct Multiplier;
+struct Multiplier {
+  int shPost;
+  uint64_t mHigh;
+  int l;
+};
+
 Multiplier chooseMultiplier(int d);
 
 std::map<std::string, int> StrengthReduct::stats() {
@@ -94,6 +99,79 @@ int StrengthReduct::runImpl() {
   });
 
   runRewriter([&](SdivWOp *op) {
+    auto x = op->DEF(0);
+    auto y = op->DEF(1);
+
+    if (isa<MovIOp>(x) && isa<MovIOp>(y)) {
+      converted++;
+      builder.replace<MovIOp>(op, { new IntAttr(V(x) / V(y)) });
+      return true;
+    }
+
+    if (!isa<MovIOp>(y))
+      return false;
+
+    auto i = V(y);
+    if (i < 0)
+      return false;
+
+    if (i == 1) {
+      converted++;
+      op->replaceAllUsesWith(x);
+      op->erase();
+      return true;
+    }
+
+    if (i == 2) {
+      converted++;
+      builder.setBeforeOp(op);
+
+      // add     w8, w0, w0, lsr #31
+      // asr     w0, w8, #1
+      Value add = builder.create<AddWROp>({ x, x }, { new IntAttr(31) });
+      builder.replace<AsrWIOp>(op, { add }, { new IntAttr(1) });
+      return true;
+    }
+
+    if (__builtin_popcount(i) == 1) {
+      converted++;
+      builder.setBeforeOp(op);
+
+      // add     w8, w0, #(2^n - 1)
+      // cmp     w0, #0
+      // csel    w8, w8, w0, lt
+      // asr     w0, w8, #n
+      Value vi = builder.create<MovIOp>({ new IntAttr(i - 1) });
+      Value add = builder.create<AddWOp>({ x, vi });
+      Value csel = builder.create<CselLtZOp>({ x, add, x });
+      builder.replace<AsrWIOp>(op, { csel }, { new IntAttr(__builtin_ctz(i)) });
+      return true;
+    }
+
+    // Similar to the thing at RISC-V.
+    converted++;
+    auto [shPost, m, l] = chooseMultiplier(i);
+    builder.setBeforeOp(op);
+    if (m < (1ull << 31)) {
+      Value mVal = builder.create<MovIOp>({ new IntAttr(m) });
+      Value mulsh = builder.create<SmullOp>({ x, mVal });
+      Value sra = builder.create<AsrXIOp>({ mulsh }, { new IntAttr(32 + shPost) });
+      builder.replace<AddWROp>(op, { sra, sra }, { new IntAttr(31) });
+      return true;
+    } else {
+      Value mVal = builder.create<MovIOp>({ new IntAttr(m - (1ull << 32)) });
+      Value mul = builder.create<SmullOp>({ mVal, x });
+      Value mulsh = builder.create<AsrXIOp>({ mul }, { new IntAttr(32) });
+      Value add = builder.create<AddWOp>({ mulsh, x });
+      Value sra = add;
+      if (shPost > 0)
+        sra = builder.create<AsrWIOp>({ add }, { new IntAttr(shPost) });
+      
+      Value xsign = builder.create<AsrWIOp>({ x }, { new IntAttr(31) });
+      builder.replace<SubWOp>(op, { sra, xsign });
+      return true;
+    }
+
     return false;
   });
 
