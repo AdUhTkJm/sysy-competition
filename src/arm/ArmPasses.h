@@ -26,7 +26,7 @@ class StrengthReduct : public Pass {
 public:
   StrengthReduct(ModuleOp *module): Pass(module) {}
     
-  std::string name() override { return "strength-reduction"; };
+  std::string name() override { return "arm-strength-reduct"; };
   std::map<std::string, int> stats() override;
   void run() override;
 };

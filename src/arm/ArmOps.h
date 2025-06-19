@@ -68,7 +68,6 @@ ARMOPL(AddXIOp); // Accept immediate
 ARMOPL(AddXLOp); // LSL
 
 ARMOP(SubWOp);
-ARMOP(RsbWOp); // Reverse subtract
 ARMOP(SubWIOp); // Accept immediate
 ARMOP(SubSWOp); // Sub and set flag; Note that only S-suffixed ops will set flag.
 ARMOP(SubXOp);
@@ -106,7 +105,6 @@ ARMOP(StrXOp); // Store i64
 ARMOP(StrFOp); // Store f32
 
 // ==== Take another register, L-shifted by amount (can be 0) ====
-// If the l-shift amount is negative, then it means to SUBTRACT THE REGISTER instead.
 ARMOP(LdrWROp); // Load i32
 ARMOPL(LdrXROp); // Load i64
 ARMOPF(LdrFROp); // Load f32
@@ -158,13 +156,12 @@ ARMOP(CsetEqFcmpZOp);
 // ====== CSEL family ======
 // Similar to CSET, CSEL also have different versions.
 
-ARMOP(CselCmpZOp); // Test if the condition equals to zero, then uses an `ne`.
-ARMOP(CselEqOp);
-ARMOP(CselNeOp);
-ARMOP(CselLtOp);
-ARMOP(CselLeOp);
-ARMOP(CselGtOp);
-ARMOP(CselGeOp);
+ARMOP(CselEqZOp);
+ARMOP(CselNeZOp);
+ARMOP(CselLtZOp);
+ARMOP(CselLeZOp);
+ARMOP(CselGtZOp);
+ARMOP(CselGeZOp);
 
 // ====== Branch family ======
 ARMOP(BgtOp);

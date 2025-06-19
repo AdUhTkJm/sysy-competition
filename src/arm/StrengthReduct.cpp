@@ -13,7 +13,7 @@ std::map<std::string, int> StrengthReduct::stats() {
   };
 }
 
-void StrengthReduct::run() {
+int StrengthReduct::runImpl() {
   int converted = 0;
   Builder builder;
 
@@ -93,5 +93,48 @@ void StrengthReduct::run() {
     return false;
   });
 
-  convertedTotal += converted;
+  runRewriter([&](SdivWOp *op) {
+    return false;
+  });
+
+  runRewriter([&](SdivXOp *op) {
+    auto x = op->DEF(0);
+    auto y = op->DEF(1);
+
+    // Currently, DivOp can only be emitted by SCEV.
+    // It will be of a pattern (x / (1 << n)),
+    // which can be fold according to `DivwOp` above.
+    // We check this pattern here.
+    if (isa<LslXOp>(y) && isa<MovIOp>(y->DEF(0)) && V(y->DEF(0)) == 1) {
+      converted++;
+      builder.setBeforeOp(op);
+
+      // I believe `cmp + csel` is not as good as asr + lsl.
+      //   srai    a1, a0, 63
+      //   srl     a1, a1, (64 - n)
+      //   add     a0, a0, a1
+      //   sra     a0, a0, n
+
+      auto n = y->DEF(1);
+      auto srai = builder.create<AsrXIOp>({ x }, { new IntAttr(63) });
+      auto vi = builder.create<MovIOp>({ new IntAttr(64) });
+      auto sub = builder.create<SubWOp>({ vi, n });
+      auto srl = builder.create<LslXOp>({ srai, sub });
+      auto add = builder.create<AddXOp>({ x, srl });
+      builder.replace<AsrXOp>(op, { add, n });
+      return true;
+    }
+
+    return false;
+  });
+
+  return converted;
+}
+
+void StrengthReduct::run() {
+  int converted;
+  do {
+    converted = runImpl();
+    convertedTotal += converted;
+  } while (converted);
 }

@@ -24,6 +24,21 @@ using namespace sys::arm;
     return matchExpr(list->elements[1], op->getOperand(0).defining); \
   }
 
+#define MATCH_TERNARY_IMM(opcode, Ty) \
+  if (opname == opcode && isa<Ty>(op)) { \
+    if (!matchExpr(list->elements[1], op->getOperand(0).defining) || \
+        !matchExpr(list->elements[2], op->getOperand(1).defining) || \
+        !matchExpr(list->elements[3], op->getOperand(2).defining)) \
+      return false;\
+    int imm = V(op); \
+    auto var = cast<Atom>(list->elements[4])->value; \
+    assert(var[0] == '#'); \
+    if (imms.count(var)) \
+      return imms[var] == imm; \
+    imms[var] = imm; \
+    return true; \
+  }
+
 #define MATCH_BINARY_IMM(opcode, Ty) \
   if (opname == opcode && isa<Ty>(op)) { \
     if (!matchExpr(list->elements[1], op->getOperand(0).defining) || \
@@ -121,6 +136,15 @@ using namespace sys::arm;
     Value b = buildExpr(list->elements[2]); \
     Value c = buildExpr(list->elements[3]); \
     return builder.create<Ty>({ a, b, c }); \
+  }
+
+#define BUILD_TERNARY_IMM(opcode, Ty) \
+  if (opname == opcode) { \
+    Value a = buildExpr(list->elements[1]); \
+    Value b = buildExpr(list->elements[2]); \
+    Value c = buildExpr(list->elements[3]); \
+    int d = evalExpr(list->elements[4]); \
+    return builder.create<Ty>({ a, b, c }, { new IntAttr(d) }); \
   }
 
 #define BUILD_BINARY(opcode, Ty) \
@@ -269,10 +293,13 @@ bool ArmRule::matchExpr(Expr *expr, Op* op) {
 
   MATCH_TERNARY("mla", MlaOp);
 
+  MATCH_TERNARY_IMM("strwr", StrWROp);
+  MATCH_TERNARY_IMM("strfr", StrFROp);
+  MATCH_TERNARY_IMM("strxr", StrXROp);
+
   MATCH_BINARY("addw", AddWOp);
   MATCH_BINARY("addx", AddXOp);
   MATCH_BINARY("subw", SubWOp);
-  MATCH_BINARY("rsbw", RsbWOp);
   MATCH_BINARY("mulw", MulWOp);
   MATCH_BINARY("mulx", MulXOp);
   MATCH_BINARY("sdivw", SdivWOp);
@@ -288,6 +315,9 @@ bool ArmRule::matchExpr(Expr *expr, Op* op) {
   MATCH_BINARY_IMM("strw", StrWOp);
   MATCH_BINARY_IMM("strf", StrFOp);
   MATCH_BINARY_IMM("strx", StrXOp);
+  MATCH_BINARY_IMM("ldrwr", LdrWROp);
+  MATCH_BINARY_IMM("ldrfr", LdrFROp);
+  MATCH_BINARY_IMM("ldrxr", LdrXROp);
 
   MATCH_UNARY_IMM("addwi", AddWIOp);
   MATCH_UNARY_IMM("addxi", AddXIOp);
@@ -297,7 +327,7 @@ bool ArmRule::matchExpr(Expr *expr, Op* op) {
   MATCH_UNARY_IMM("ldrx", LdrXOp);
   MATCH_UNARY_IMM("lslwi", LslWIOp);
   MATCH_UNARY_IMM("lslxi", LslXIOp);
-  MATCH_UNARY_IMM("rslwi", LsrWIOp);
+  MATCH_UNARY_IMM("lsrwi", LsrWIOp);
   MATCH_UNARY_IMM("lsrxi", LsrXIOp);
   MATCH_UNARY_IMM("asrwi", AsrWIOp);
   MATCH_UNARY_IMM("asrxi", AsrXIOp);
@@ -426,10 +456,12 @@ Op *ArmRule::buildExpr(Expr *expr) {
 
   BUILD_TERNARY("mla", MlaOp);
 
+  BUILD_TERNARY_IMM("strwr", StrWROp);
+  BUILD_TERNARY_IMM("strxr", StrXROp);
+
   BUILD_BINARY("addw", AddWOp);
   BUILD_BINARY("addx", AddXOp);
   BUILD_BINARY("subw", SubWOp);
-  BUILD_BINARY("rsbw", RsbWOp);
   BUILD_BINARY("mulw", MulWOp);
   BUILD_BINARY("mulx", MulXOp);
   BUILD_BINARY("sdivw", SdivWOp);
@@ -447,6 +479,8 @@ Op *ArmRule::buildExpr(Expr *expr) {
   BUILD_BINARY_IMM("strx", StrXOp);
   BUILD_BINARY_IMM("addwl", AddWLOp);
   BUILD_BINARY_IMM("addxl", AddXLOp);
+  BUILD_BINARY_IMM("ldrwr", LdrWROp);
+  BUILD_BINARY_IMM("ldrxr", LdrXROp);
 
   BUILD_UNARY_IMM("addwi", AddWIOp);
   BUILD_UNARY_IMM("addxi", AddXIOp);

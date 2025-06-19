@@ -42,7 +42,7 @@ using namespace sys::arm;
     
 #define JMP_BINARY(Ty, name) \
   case Ty::id: \
-    os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n"; \
+    os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n  "; \
     os << name << " bb" << bbcnt(TARGET(op)) << "\n"; \
     break
 
@@ -120,13 +120,14 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   BINARY_X(LsrXOp, "lsr");
 
   UNARY_I_W(AddWIOp, "add");
-  UNARY_I_W(AsrWIOp, "asr");
   UNARY_I_W(LslWIOp, "lsl");
   UNARY_I_W(LsrWIOp, "lsr");
+  UNARY_I_W(AsrWIOp, "asr");
 
   UNARY_I_X(AddXIOp, "add");
   UNARY_I_X(LslXIOp, "lsl");
   UNARY_I_X(LsrXIOp, "lsr");
+  UNARY_I_X(AsrXIOp, "asr");
 
   UNARY_X(MovROp, "mov");
   UNARY_W(NegOp, "neg");
@@ -220,7 +221,7 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     os << "tst " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n  ";
     os << "cset " << wreg(RD(op)) << ", eq\n";
     break;
-  case CselCmpZOp::id:
+  case CselNeZOp::id:
     os << "cmp " << wreg(RS(op)) << ", #0\n  ";
     os << "csel " << wreg(RD(op)) << ", " << wreg(RS2(op)) << ", " << wreg(RS3(op)) << ", ne\n";
     break;
@@ -244,6 +245,30 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     break;
   case AddWLOp::id:
     os << "add " << wreg(RD(op))  << ", " << wreg(RS(op)) << ", " << wreg(RS2(op)) << ", lsl " << V(op) << "\n";
+    break;
+  case LdrWROp::id:
+    os << "ldr " << wreg(RD(op)) << ", [" << xreg(RS(op)) << ", " << xreg(RS2(op));
+    if (V(op))
+      os << ", lsl " << V(op);
+    os << "]\n";
+    break;
+  case LdrXROp::id:
+    os << "ldr " << xreg(RD(op)) << ", [" << xreg(RS(op)) << ", " << xreg(RS2(op));
+    if (V(op))
+      os << ", lsl " << V(op);
+    os << "]\n";
+    break;
+  case StrWROp::id:
+    os << "str " << wreg(RS(op)) << ", [" << xreg(RS2(op)) << ", " << xreg(RS3(op));
+    if (V(op))
+      os << ", lsl " << V(op);
+    os << "]\n";
+    break;
+  case StrXROp::id:
+    os << "str " << xreg(RS(op)) << ", [" << xreg(RS2(op)) << ", " << xreg(RS3(op));
+    if (V(op))
+      os << ", lsl " << V(op);
+    os << "]\n";
     break;
   default:
     std::cerr << "unimplemented op: " << op;

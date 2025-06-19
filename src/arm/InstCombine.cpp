@@ -17,7 +17,6 @@ static ArmRule rules[] = {
   "(change (addw x (lslwi x #a)) (addwl x x #a))",
   "(change (addw (lslwi x #a) x) (addwl x x #a))",
 
-
   // SUB
   "(change (subw x (mov #a)) (!only-if (!inbit 12 (!minus #a)) (addwi x (!minus #a))))",
 
@@ -36,10 +35,18 @@ static ArmRule rules[] = {
   // LDR
   "(change (ldrw (addxi x #a) #b) (!only-if (!inbit 12 (!add #a #b)) (ldrw x (!add #a #b))))",
   "(change (ldrx (addxi x #a) #b) (!only-if (!inbit 12 (!add #a #b)) (ldrx x (!add #a #b))))",
+  "(change (ldrw (addx x y) #a) (!only-if (!eq #a 0) (ldrwr x y #a)))",
+  "(change (ldrx (addx x y) #a) (!only-if (!eq #a 0) (ldrxr x y #a)))",
+  "(change (ldrwr x (lslxi y #a) #b) (!only-if (!eq (!add #a #b) 2) (ldrwr x y 2)))",
+  "(change (ldrxr x (lslxi y #a) #b) (!only-if (!eq (!add #a #b) 3) (ldrxr x y 3)))",
 
   // STR
   "(change (strw y (addxi x #a) #b) (!only-if (!inbit 12 (!add #a #b)) (strw y x (!add #a #b))))",
   "(change (strx y (addxi x #a) #b) (!only-if (!inbit 12 (!add #a #b)) (strx y x (!add #a #b))))",
+  "(change (strw z (addx x y) #a) (!only-if (!eq #a 0) (strwr z x y #a)))",
+  "(change (strx z (addx x y) #a) (!only-if (!eq #a 0) (strxr z x y #a)))",
+  "(change (strwr z x (lslxi y #a) #b) (!only-if (!eq (!add #a #b) 2) (strwr z x y 2)))",
+  "(change (strxr z x (lslxi y #a) #b) (!only-if (!eq (!add #a #b) 3) (strxr z x y 3)))",
 };
 
 void InstCombine::run() {
