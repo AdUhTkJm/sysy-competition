@@ -180,11 +180,6 @@ bool Unswitch::cmpmod(Op *loop, Op *cond) {
 }
 
 bool Unswitch::ltconst(Op *loop, Op *cond) {
-  // Big strides might cause the second loop to not start at `limit`.
-  // To make thing simpler we just disable this.
-  if (V(loop->DEF(2)) != 1)
-    return false;
-
   if (!cmplt.match(cond, { { "x", loop } }))
     return false;
   
@@ -209,21 +204,45 @@ bool Unswitch::ltconst(Op *loop, Op *cond) {
     limit->moveBefore(loop);
 
   // Now it's safe. Split the loop into two.
-  Builder builder;
-  builder.setBeforeOp(loop);
 
   // Start from the original start to the new limit.
+  auto start = loop->getOperand(0);
   auto stop = loop->getOperand(1);
   auto step = loop->getOperand(2);
   auto ivAddr = loop->getOperand(3);
+  // It's always save to do so. We've verified that the step is loop-invariant.
+  if (step.defining->inside(loop))
+    step.defining->moveBefore(loop);
+  
+  Builder builder;
+  builder.setBeforeOp(loop);
 
   // Create a min of `limit` and `stop`.
   // min = (stop < limit) ? stop : limit
   auto lt = builder.create<LtOp>({ stop, limit });
   auto min = builder.create<SelectOp>({ lt, stop, limit });
 
-  auto floop = builder.create<ForOp>({ loop->getOperand(0), min, step, ivAddr });
-  loop->setOperand(0, limit);
+  auto floop = builder.create<ForOp>({ start, min, step, ivAddr });
+
+  // Calculate the starting point of the `i >= limit` branch.
+  // The value should be equal to:
+  //   start + (limit - start + step - 1) / step * step
+  builder.setBeforeOp(loop);
+  Value sub = builder.create<SubIOp>({ limit, start });
+  Value one = builder.create<IntOp>({ new IntAttr(1) });
+  Value sub2 = builder.create<SubIOp>({ step, one });
+  Value plus = builder.create<AddLOp>({ sub, sub2 });
+  Value div = builder.create<DivLOp>({ plus, step });
+  Value mul = builder.create<MulLOp>({ div, step });
+  // This might overflow. Saturation is needed.
+  Value lim = builder.create<AddLOp>({ start, mul });
+  Value imax = builder.create<IntOp>({ new IntAttr(2147483647) });
+  Value _lt = builder.create<LtOp>({ lim, imax });
+  Value x = builder.create<SelectOp>({ _lt, lim, imax });
+  // Take the maximum of `x` and the original `start`.
+  Value gt = builder.create<LtOp>({ start, x });
+  Value y = builder.create<SelectOp>({ gt, x, start });
+  loop->setOperand(0, y);
 
   // Copy the operations into that new loop.
   auto region = loop->getRegion();
@@ -315,8 +334,7 @@ bool Unswitch::runImpl(Op *loop) {
     return false;
 
   // The step must be a constant.
-  if (!isa<IntOp>(loop->DEF(2)))
-    return false;
+  auto step = loop->DEF(2);
 
   // Find an "if" that is related to the induction variable.
   Op *branch = nullptr;
@@ -334,7 +352,7 @@ bool Unswitch::runImpl(Op *loop) {
   auto cond = branch->DEF();
 
   return 
-    cmpmod(loop, cond) ||
+    (isa<IntOp>(step) && cmpmod(loop, cond)) ||
     ltconst(loop, cond);
 }
 

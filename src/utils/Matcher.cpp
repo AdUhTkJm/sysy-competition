@@ -239,6 +239,7 @@ bool Rule::matchExpr(Expr *expr, Op* op) {
   MATCH_BINARY("addl", AddLOp);
   MATCH_BINARY("subl", SubLOp);
   MATCH_BINARY("mull", MulLOp);
+  MATCH_BINARY("divl", DivLOp);
   MATCH_BINARY("fadd", AddFOp);
   MATCH_BINARY("fsub", SubFOp);
   MATCH_BINARY("fmul", MulFOp);

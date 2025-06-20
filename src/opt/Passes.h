@@ -146,7 +146,7 @@ public:
 class RegularFold : public Pass {
   int foldedTotal = 0;
 
-  int foldImpl();
+  int runImpl(Region *region);
 public:
   RegularFold(ModuleOp *module): Pass(module) {}
     

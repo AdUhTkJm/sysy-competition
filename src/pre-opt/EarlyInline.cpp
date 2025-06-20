@@ -34,14 +34,7 @@ void EarlyInline::run() {
   Builder builder;
 
   for (auto func : funcs) {
-    // We only have structured control flow.
-    // We can't support arbitrary returns in pre-passes.
-    auto rets = func->findAll<ReturnOp>();
     auto region = func->getRegion();
-    if (rets.size() > 1)
-      continue;
-    if (rets.size() && rets[0]->getParent() != region->getLastBlock())
-      continue;
 
     // Inline very small functions only.
     if (opcount(region) >= 200)
@@ -51,6 +44,37 @@ void EarlyInline::run() {
     if (isRecursive(func))
       continue;
 
+    // We only have structured control flow.
+    // We can't support arbitrary returns in pre-passes.
+    auto rets = func->findAll<ReturnOp>();
+    if (rets.size() > 1) {
+      // One more thing inlinable is when the 2 ops lie in the same parent op's
+      // different regions, and the parent is at back.
+      if (rets.size() == 2) {
+        auto p1 = rets[0]->getParentOp(), p2 = rets[1]->getParentOp();
+        if (rets[0]->atBack() && rets[1]->atBack() && p1 == p2 && p1->atBack() && p1->getParentOp() == func) {
+          // OK, inlinable. Sink the returns to the end and goto the main path.
+          Builder builder;
+          builder.setBeforeOp(p1);
+          auto alloca = builder.create<AllocaOp>({ new SizeAttr(4) });
+          auto retTy = rets[0]->getResultType();
+          if (retTy == Value::f32)
+            alloca->add<FPAttr>();
+          builder.replace<StoreOp>(rets[0], { rets[0]->getOperand(), alloca }, { new SizeAttr(4) });
+          builder.replace<StoreOp>(rets[1], { rets[1]->getOperand(), alloca }, { new SizeAttr(4) });
+
+          builder.setAfterOp(p1);
+          auto load = builder.create<LoadOp>(retTy, { alloca });
+          builder.create<ReturnOp>({ load });
+          goto mainpath;
+        }
+      }
+      continue;
+    }
+    if (rets.size() && rets[0]->getParent() != region->getLastBlock())
+      continue;
+
+    mainpath:
     // Start rewriting.
     auto calls = module->findAll<CallOp>();
     std::unordered_map<Op*, Op*> cloneMap;

@@ -25,6 +25,7 @@ static Rule rules[] = {
 
   // Addition (64-bit)
   "(change (addl x 0) x)",
+  "(change (addl 'a 'b) (!add 'a 'b))",
   "(change (addl 'a x) (addl x 'a))",
   "(change (addl (addl x 'a) 'b) (addl x (!add 'a 'b)))",
 
@@ -70,6 +71,9 @@ static Rule rules[] = {
   "(change (mul 'a x) (mul x 'a))",
   "(change (mul (mul x 'a) 'b) (mul x (!mul 'a 'b)))",
 
+  // Long multiplication
+  "(change (mull x 1) x)",
+
   // FP multiplication
   "(change (fmul *a *b) (?mul *a *b))",
   "(change (fmul x *0) *0)",
@@ -86,6 +90,9 @@ static Rule rules[] = {
   "(change (div 'a 'b) (!div 'a 'b))",
   "(change (div (mul x 'a) 'b) (!only-if (!eq (!mod 'a 'b) 0) (mul x (!div 'a 'b))))",
   "(change (div (div x 'a) 'b) (!only-if (!ne (!mul 'a 'b) -1) (div x (!mul 'a 'b))))",
+
+  // Long division
+  "(change (divl x 1) x)",
 
   // FP Division
   "(change (fdiv *a *b) (?div *a *b))",
@@ -148,14 +155,14 @@ static Rule rules[] = {
   // Less than
   "(change (lt x x) 0)",
   "(change (lt 'a 'b) (!lt 'a 'b))",
-  // "(change (lt (add x 'a) 'b) (lt x (!sub 'b 'a)))",
-  // "(change (lt (sub x 'a) 'b) (lt x (!add 'b 'a)))",
   "(change (lt (mul x 'a) 'b) (!only-if (!and (!gt 'a 0) (!gt 'b 0)) (lt x (!div 'b 'a))))",
   "(change (lt (div x 'a) 'b) (!only-if (!and (!gt 'a 0) (!gt 'b 0)) (lt x (!mul 'b 'a))))",
   "(change (lt 'b (add x 'a)) (lt (!sub 'b 'a) x))",
   "(change (lt 'b (sub x 'a)) (lt (!add 'b 'a) x))",
   "(change (lt 'b (mul x 'a)) (!only-if (!and (!gt 'a 0) (!gt 'b 0)) (lt (!div 'b 'a) x)))",
   "(change (lt 'b (div x 'a)) (!only-if (!and (!gt 'a 0) (!gt 'b 0)) (le (!mul 'a (!add 'b 1)) x)))",
+  "(change (lt x (add x 'a)) (!lt 0 'a))",
+  "(change (lt x (sub 'a x)) (!only-if (!gt 'a 0) (lt x (!div 'a 2))))",
   
   // FP Less than
   "(change (flt x x) 0)",
@@ -252,6 +259,32 @@ void tidyPhi(BasicBlock *bb, BasicBlock *from) {
     removePhiOperand(phi, from);
 }
 
+// This pass works on both structured control flow and flattened cfg.
+int RegularFold::runImpl(Region *region) {
+  int folded = 0;
+  for (auto bb : region->getBlocks()) {
+    auto ops = bb->getOps();
+    for (auto op : ops) {
+      // Match each rule.
+      bool success = false;
+      for (auto &rule : rules) {
+        success = rule.rewrite(op);
+        if (success) {
+          folded++;
+          break;
+        }
+      }
+
+      // Recursively fold regions.
+      if (!success) {
+        for (auto r : op->getRegions())
+          folded += runImpl(r);
+      }
+    }
+  }
+  return folded;
+}
+
 void RegularFold::run() {
   auto funcs = collectFuncs();
   int folded;
@@ -259,19 +292,7 @@ void RegularFold::run() {
     folded = 0;
     for (auto func : funcs) {
       auto region = func->getRegion();
-
-      for (auto bb : region->getBlocks()) {
-        auto ops = bb->getOps();
-        for (auto op : ops) {
-          for (auto &rule : rules) {
-            bool success = rule.rewrite(op);
-            if (success) {
-              folded++;
-              break;
-            }
-          }
-        }
-      }
+      folded += runImpl(region);
     }
 
     // Also, run some extra folds.

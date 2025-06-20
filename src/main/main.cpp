@@ -61,13 +61,14 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::RaiseToFor>();
   pm.addPass<sys::DCE>(/*elimBlocks=*/ false);
   pm.addPass<sys::EarlyInline>();
+  pm.addPass<sys::RegularFold>();
   pm.addPass<sys::View>();
   pm.addPass<sys::LoopDCE>();
   pm.addPass<sys::Fusion>();
   pm.addPass<sys::Unswitch>();
   pm.addPass<sys::Parallelizable>();
   pm.addPass<sys::LoopDCE>();
-  pm.addPass<sys::Unroll>();
+  // pm.addPass<sys::Unroll>(); // Unrolling doesn't help.
   pm.addPass<sys::Lower>();
 
   // ===== Flattened CFG =====

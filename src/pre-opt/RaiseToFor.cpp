@@ -1,4 +1,5 @@
 #include "PreLoopPasses.h"
+#include "PreAnalysis.h"
 #include "../utils/Matcher.h"
 
 using namespace sys;
@@ -13,6 +14,8 @@ std::map<std::string, int> RaiseToFor::stats() {
 }
 
 void RaiseToFor::run() {
+  Base(module).run();
+
   Builder builder;
   auto loops = module->findAll<WhileOp>();
 
@@ -84,9 +87,33 @@ void RaiseToFor::run() {
       break;
     }
 
-    // The increment doesn't need to be a constant, but it must be loop-invariant.
-    if (!good || !foundIncr || (!isa<IntOp>(incr) && incr->inside(loop)))
+    if (!good || !foundIncr)
       continue;
+    
+    // The increment doesn't need to be a constant, but it must be loop-invariant.
+    if (!isa<IntOp>(incr) && incr->inside(loop)) {
+      // If this is a load, we check there's no write to the same place,
+      // and it's not an array.
+      if (isa<LoadOp>(incr)) {
+        auto addr = incr->DEF();
+        if (!addr->has<BaseAttr>() || SIZE(BASE(addr)) != 4)
+          continue;
+
+        auto base = BASE(addr);
+        auto stores = loop->findAll<StoreOp>();
+        good = true;
+        for (auto store : stores) {
+          auto saddr = store->DEF(1);
+          if (!saddr->has<BaseAttr>() || BASE(saddr) == base) {
+            good = false;
+            break;
+          }
+        }
+
+        if (!good)
+          continue;
+      } else continue;
+    }
 
     // We also need to check that there's a store to `ivAddr`
     // before all break/continue and the end of the after region.

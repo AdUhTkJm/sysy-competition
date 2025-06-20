@@ -76,7 +76,6 @@ void Lower::run() {
   // It's 7 ops though, so I strongly suspect branches will be better.
   // Here I'll use branches.
   runRewriter([&](SelectOp *op) {
-    std::cerr << "found select\n";
     auto x = op->DEF(0), y = op->DEF(1), z = op->DEF(2);
     auto parent = op->getParent();
     auto region = parent->getParent();
