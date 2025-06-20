@@ -103,21 +103,33 @@ void unroll(Op *loop, int vi) {
   // Now the step is `vi` times larger.
   auto stop = loop->DEF(1);
   auto step = loop->DEF(2);
+  auto start = loop->DEF(0);
 
   builder.setBeforeOp(loop);
   auto xstep = builder.create<IntOp>({ new IntAttr(V(step) * vi)});
   loop->setOperand(2, xstep);
 
   // Loop end should be truncated.
-  auto li = builder.create<IntOp>({ new IntAttr(vi) });
-  auto div = builder.create<DivIOp>({ stop, li });
-  auto mul = builder.create<MulIOp>({ div, li });
-  loop->setOperand(1, mul);
+  // The way to do this is to first calculate `cnt = (stop - start + step - 1) / step`:
+  Value sub = builder.create<SubIOp>({ stop, start->getResult() });
+  Value v = builder.create<IntOp>({ new IntAttr(V(step) - 1) });
+  Value plus = builder.create<AddIOp>({ sub, v });
+  Value cnt = builder.create<DivIOp>({ plus, step });
 
-  // Create a side-loop from `mul` to `stop`.
+  // The number of unrolled iterations is `cnt / n`:
+  Value n = builder.create<IntOp>({ new IntAttr(vi) });
+  Value unrolled = builder.create<DivIOp>({ plus, n });
+
+  // Then the ending point is exactly `end = start + unrolled * n * step`.
+  Value mul2 = builder.create<MulIOp>({ unrolled, n });
+  Value mul = builder.create<MulIOp>({ mul2, step });
+  Value end = builder.create<AddIOp>({ start, mul });
+  loop->setOperand(1, end);
+
+  // Create a side-loop from `end` to `stop`.
   builder.setAfterOp(loop);
   auto ivAddr = loop->DEF(3);
-  auto sideloop = builder.create<ForOp>({ mul, stop, step, ivAddr });
+  auto sideloop = builder.create<ForOp>({ end, stop, step, ivAddr });
   auto sregion = sideloop->appendRegion();
   auto sEntry = sregion->appendBlock();
 

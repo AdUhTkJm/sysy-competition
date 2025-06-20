@@ -40,6 +40,10 @@ void Unroll::run() {
     if (opcount(region) >= 50)
       continue;
 
+    // Don't unroll loops with calls in it.
+    if (loop->findAll<CallOp>().size() > 0)
+      continue;
+
     // unroll() requires that step is 1.
     auto step = loop->DEF(2);
     if (!isa<IntOp>(step) || V(step) != 1)

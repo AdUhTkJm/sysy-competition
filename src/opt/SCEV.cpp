@@ -229,10 +229,10 @@ void SCEV::runImpl(LoopInfo *info) {
       // Also find out the start value.
       start[phi] = Op::getPhiFrom(phi, preheader);
       // If the latchval is used more than once (elsewhere than the phi),
-      // We also record it's startval: phi + 1.
+      // We also record it's startval: phi + step.
       if (latchval->getUses().size() > 1) {
         builder.setAfterOp(start[phi]);
-        auto vi = builder.create<IntOp>({ new IntAttr(1) });
+        auto vi = builder.create<IntOp>({ new IntAttr(V(v)) });
         auto add = builder.create<AddIOp>({ start[phi], vi });
         start[latchval] = add;
       }
