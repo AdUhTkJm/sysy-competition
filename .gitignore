@@ -5,6 +5,7 @@ test/temp
 test/fuzz
 test/cnf
 test/cnf_performance
+test/client-linux
 temp
 final_performance
 functional

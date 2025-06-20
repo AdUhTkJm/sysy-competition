@@ -98,6 +98,46 @@ int StrengthReduct::runImpl() {
     return false;
   });
 
+  // Modulus. It's lowered to sdiv + msub, so do it before sdiv is lowered.
+  runRewriter([&](MsubWOp *op) {
+    // x % y is lowered as (msubw (sdivw x y) y x). Match this pattern.
+    auto z = op->DEF(0);
+    auto y = op->DEF(1);
+    auto x = op->DEF(2);
+    
+    if (!isa<SdivWOp>(z) || z->DEF(0) != x || z->DEF(1) != y) {
+      return false;
+    }
+
+    // A mod is detected. Now time to make it work.
+    if (isa<MovIOp>(x) && isa<MovIOp>(y)) {
+      converted++;
+      builder.replace<MovIOp>(op, { new IntAttr(V(x) % V(y)) });
+      return true;
+    }
+
+    if (!isa<MovIOp>(y))
+      return false;
+
+    auto i = V(y);
+    if (i < 0)
+      return false;
+
+    if (i == 2) {
+      converted++;
+      builder.setBeforeOp(op);
+
+      // and     w8, w0, #1
+      // cmp     w0, #0
+      // cneg    w0, w8, lt
+      Value _and = builder.create<AndIOp>({ x }, { new IntAttr(1) });
+      builder.replace<CnegLtZOp>(op, { x, _and });
+      return true;
+    }
+
+    return false;
+  });
+
   runRewriter([&](SdivWOp *op) {
     auto x = op->DEF(0);
     auto y = op->DEF(1);

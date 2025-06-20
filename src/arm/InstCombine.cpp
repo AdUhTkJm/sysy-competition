@@ -16,6 +16,8 @@ static ArmRule rules[] = {
   "(change (addx x (mov #a)) (!only-if (!inbit 12 #a) (addxi x #a)))",
   "(change (addw x (lslwi x #a)) (addwl x x #a))",
   "(change (addw (lslwi x #a) x) (addwl x x #a))",
+  "(change (addx x (lslwi x #a)) (addxl x x #a))",
+  "(change (addx (lslwi x #a) x) (addxl x x #a))",
 
   // SUB
   "(change (subw x (mov #a)) (!only-if (!inbit 12 (!minus #a)) (addwi x (!minus #a))))",

@@ -499,6 +499,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(CsetEqFOp, BINARY);
   LOWER(CsetEqTstOp, BINARY);
   LOWER(CsetNeTstOp, BINARY);
+  LOWER(CnegLtZOp, BINARY);
   
   LOWER(LdrWOp, UNARY);
   LOWER(LdrXOp, UNARY);

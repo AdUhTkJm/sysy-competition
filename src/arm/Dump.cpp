@@ -128,6 +128,7 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   UNARY_I_X(LslXIOp, "lsl");
   UNARY_I_X(LsrXIOp, "lsr");
   UNARY_I_X(AsrXIOp, "asr");
+  UNARY_I_X(AndIOp, "and");
 
   UNARY_X(MovROp, "mov");
   UNARY_W(NegOp, "neg");
@@ -291,6 +292,10 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     break;
   case SmullOp::id:
     os << "smull " << xreg(RD(op)) << ", " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n";
+    break;
+  case CnegLtZOp::id:
+    os << "cmp " << wreg(RS(op)) << ", #0\n  ";
+    os << "cneg " << wreg(RD(op)) << ", " << wreg(RS2(op)) << ", lt\n";
     break;
   default:
     std::cerr << "unimplemented op: " << op;

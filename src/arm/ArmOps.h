@@ -154,6 +154,8 @@ ARMOP(CsetEqTstOp);
 ARMOP(CsetNeFcmpZOp);
 ARMOP(CsetEqFcmpZOp);
 
+ARMOP(CnegLtZOp);
+
 // ====== CSEL family ======
 // Similar to CSET, CSEL also have different versions.
 
