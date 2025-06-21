@@ -82,6 +82,8 @@ ARMOP(SdivWOp);
 ARMOPL(SdivXOp);
 ARMOP(UdivWOp);
 
+ARMOP(MaddWOp); // Multiply-add: rs3 + rs2 * rs
+ARMOPL(MaddXOp);
 ARMOP(MsubWOp); // Multiply-sub: rs3 - rs2 * rs
 ARMOPL(MsubXOp);
 ARMOP(NegOp);

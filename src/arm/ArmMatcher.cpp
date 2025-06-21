@@ -453,6 +453,9 @@ Op *ArmRule::buildExpr(Expr *expr) {
     return builder.create<IntOp>({ new IntAttr(result) });
   }
 
+  BUILD_TERNARY("maddw", MaddWOp);
+  BUILD_TERNARY("maddx", MaddXOp);
+
   BUILD_TERNARY_IMM("strwr", StrWROp);
   BUILD_TERNARY_IMM("strxr", StrXROp);
   BUILD_TERNARY_IMM("strfr", StrFROp);

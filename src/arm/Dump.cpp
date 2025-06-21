@@ -107,7 +107,10 @@ std::string vreg(Reg reg) {
 void Dump::dumpOp(Op *op, std::ostream &os) {
   switch (op->opid) {
   TERNARY_W(MsubWOp, "msub");
+  TERNARY_W(MaddWOp, "madd");
+  
   TERNARY_X(MsubXOp, "msub");
+  TERNARY_X(MaddXOp, "madd");
 
   BINARY_W(AddWOp, "add");
   BINARY_W(SubWOp, "sub");
