@@ -327,9 +327,15 @@ void SCEV::runImpl(LoopInfo *info) {
     builder.setBeforeOp(insert);
     auto modl = builder.create<ModLOp>(mod->getAttrs());
     latchphi->replaceAllUsesWith(modl);
+
     // We must push operands later, otherwise the operand itself will also be replaced.
     modl->pushOperand(latchphi);
-    modl->pushOperand(v);
+
+    // Create a new IntOp to avoid dominance issues.
+    builder.setBeforeOp(modl);
+    auto vi = builder.create<IntOp>({ new IntAttr(V(v)) });
+    modl->pushOperand(vi);
+    
     mod->erase();
   }
 

@@ -39,6 +39,12 @@ Options sys::parseArgs(int argc, char **argv) {
       i++;
       continue;
     }
+
+    if (strcmp(argv[i], "--print-before") == 0) {
+      opts.printBefore = argv[i + 1];
+      i++;
+      continue;
+    }
     
     if (strcmp(argv[i], "--compare") == 0) {
       opts.compareWith = argv[i + 1];
@@ -78,9 +84,9 @@ Options sys::parseArgs(int argc, char **argv) {
     exit(1);
   }
 
-  // Default to RV.
+  // Default to ARM.
   if (!opts.rv && !opts.arm)
-    opts.rv = true;
+    opts.arm = true;
 
   return opts;
 }

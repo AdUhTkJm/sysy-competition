@@ -19,6 +19,7 @@ bool ArmDCE::isImpure(Op *op) {
     IMPURE(StrFROp)
     IMPURE(StrWROp)
     IMPURE(StrXROp)
+    IMPURE(St1Op)
     IMPURE(BlOp)
     IMPURE(BgtOp)
     IMPURE(BltOp)

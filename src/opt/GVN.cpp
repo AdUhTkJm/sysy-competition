@@ -42,7 +42,10 @@ bool allowed(Op *op) {
     ALLOW(SubLOp)
     ALLOW(MulLOp)
     ALLOW(DivLOp)
-    ALLOW(MulLOp)
+    ALLOW(ModLOp)
+    ALLOW(AddVOp)
+    ALLOW(SubVOp)
+    ALLOW(MulVOp)
     ALLOW(EqOp)
     ALLOW(NeOp)
     ALLOW(LtOp)
@@ -66,6 +69,7 @@ bool allowed(Op *op) {
     ALLOW(MuluhOp)
     ALLOW(SetNotZeroOp)
     ALLOW(GetGlobalOp)
+    ALLOW(BroadcastOp)
   ;
 }
 

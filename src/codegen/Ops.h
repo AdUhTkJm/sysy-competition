@@ -41,6 +41,7 @@
 #define OP(Ty) OPBASE(Value::i32, Ty)
 #define OPF(Ty) OPBASE(Value::f32, Ty)
 #define OPL(Ty) OPBASE(Value::i64, Ty)
+#define OPV(Ty) OPBASE(Value::i128, Ty)
 
 namespace sys {
 
@@ -104,6 +105,16 @@ OP(SetNotZeroOp);
 OP(BreakOp);
 OP(ContinueOp);
 OP(SelectOp);
+
+// ====== Vectorized ======
+
+OPV(AddVOp);
+OPV(SubVOp);
+OPV(MulVOp);
+
+OPV(BroadcastOp);
+
+// vectorized load/store is detected by size.
 
 }
 

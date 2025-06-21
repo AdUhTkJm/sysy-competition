@@ -51,6 +51,10 @@ public:
   SpilledRs3Attr *clone() override { return new SpilledRs3Attr(fp, offset); }
 };
 
+bool fpreg(Value::Type ty) {
+  return ty == Value::f32 || ty == Value::f128 || ty == Value::i128;
+}
+
 }
 
 std::map<std::string, int> RegAlloc::stats() {
@@ -77,10 +81,10 @@ std::map<std::string, int> RegAlloc::stats() {
   if (!spillOffset.count(v##Index)) \
     op->add<AttrTy>(getReg(v##Index)); \
   else \
-    op->add<Spilled##AttrTy>(v##Index->getResultType() == Value::f32, spillOffset[v##Index]);
+    op->add<Spilled##AttrTy>(fpreg(v##Index->getResultType()), spillOffset[v##Index]);
 
 #define GET_SPILLED_ARGS(op) \
-  (op->getResultType() == Value::f32, spillOffset[op])
+  (fpreg(op->getResultType()), spillOffset[op])
 
 #define NULLARY
 #define UNARY ADD_ATTR(0, RsAttr)
@@ -165,7 +169,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     Op *op = getArgs[i];
     auto ty = op->getResultType();
 
-    if (ty == Value::f32 && fcnt < 8) {
+    if (fpreg(ty) && fcnt < 8) {
       op->moveToStart(entry);
       builder.setBeforeOp(op);
       builder.create<PlaceHolderOp>({ fargHolders[fcnt] });
@@ -173,7 +177,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       fcnt++;
       continue;
     }
-    if (ty != Value::f32 && cnt < 8) {
+    if (!fpreg(ty) && cnt < 8) {
       op->moveToStart(entry);
       builder.setBeforeOp(op);
       builder.create<PlaceHolderOp>({ argHolders[cnt] });
@@ -274,7 +278,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         for (Op* activeOp : active) {
           // FP and int are using different registers.
           // However, they use the same stack frame.
-          if (activeOp->getResultType() == Value::f32 ^ op->getResultType() == Value::f32) {
+          if (fpreg(activeOp->getResultType()) ^ fpreg(op->getResultType())) {
             spillInterf[op].insert(activeOp);
             spillInterf[activeOp].insert(op);
             continue;
@@ -363,8 +367,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       continue;
     }
 
-    auto rcnt = op->getResultType() != Value::f32 ? regcount : regcountf;
-    auto rorder = op->getResultType() != Value::f32 ? order : orderf;
+    auto rcnt = !fpreg(op->getResultType()) ? regcount : regcountf;
+    auto rorder = !fpreg(op->getResultType()) ? order : orderf;
 
     for (int i = 0; i < rcnt; i++) {
       if (!bad.count(rorder[i]) && !unpreferred.count(rorder[i])) {
@@ -417,14 +421,14 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   // Only a single register is spilled. Let's use x28.
   if (highest == currentOffset) {
     for (auto [op, _] : spillOffset)
-      assignment[op] = op->getResultType() == Value::f32 ? fspillReg : spillReg;
+      assignment[op] = fpreg(op->getResultType()) ? fspillReg : spillReg;
     spillOffset.clear();
   }
 
   // Only 2 registers are spilled. Let's use x28 and x29.
   if (highest == currentOffset + 8) {
     for (auto [op, offset] : spillOffset) {
-      auto fp = op->getResultType() == Value::f32;
+      auto fp = fpreg(op->getResultType());
       assignment[op] = offset ? (fp ? fspillReg3 : spillReg3) : (fp ? fspillReg : spillReg);
     }
     spillOffset.clear();
@@ -436,7 +440,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
   const auto getReg = [&](Op *op) {
     return assignment.count(op) ? assignment[op] :
-      op->getResultType() == Value::f32 ? orderf[0] : order[0];
+      fpreg(op->getResultType()) ? orderf[0] : order[0];
   };
 
   // Convert all operands to registers.
@@ -451,10 +455,12 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
   LOWER(AddXOp, BINARY);
   LOWER(AddWOp, BINARY);
+  LOWER(AddVOp, BINARY);
   LOWER(SubWOp, BINARY);
   LOWER(SubXOp, BINARY);
   LOWER(MulWOp, BINARY);
   LOWER(MulXOp, BINARY);
+  LOWER(MulVOp, BINARY);
   LOWER(SdivWOp, BINARY);
   LOWER(SdivXOp, BINARY);
   LOWER(MlaOp, BINARY);
@@ -464,6 +470,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(StrWOp, BINARY);
   LOWER(StrXOp, BINARY);
   LOWER(StrFOp, BINARY);
+  LOWER(St1Op, BINARY);
   LOWER(LslWOp, BINARY);
   LOWER(LsrWOp, BINARY);
   LOWER(LslXOp, BINARY);
@@ -504,6 +511,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(LdrWOp, UNARY);
   LOWER(LdrXOp, UNARY);
   LOWER(LdrFOp, UNARY);
+  LOWER(Ld1Op, UNARY);
   LOWER(AddXIOp, UNARY);
   LOWER(AddWIOp, UNARY);
   LOWER(NegOp, UNARY);
@@ -525,6 +533,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(FnegOp, UNARY);
   LOWER(CsetEqFcmpZOp, UNARY);
   LOWER(CsetNeFcmpZOp, UNARY);
+  LOWER(DupOp, UNARY);
 
   // Note that some ops are dealt with later.
   // We can't remove all operands here.
@@ -654,7 +663,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         builder.setBeforeOp(term);
         auto def = ops[i].defining;
         Op *mv;
-        if (phi->getResultType() == Value::f32) {
+        if (fpreg(phi->getResultType())) {
           mv = builder.create<FmovOp>({
             new ImpureAttr,
             spillOffset.count(phi) ? (Attr*) new SpilledRdAttr GET_SPILLED_ARGS(phi) : RDC(getReg(phi)),

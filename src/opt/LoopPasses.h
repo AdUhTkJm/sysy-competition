@@ -208,6 +208,19 @@ public:
   void run() override;
 };
 
+class Vectorize : public Pass {
+  std::unordered_map<Op*, Op*> base;
+  
+  Op *findBase(Op *op);
+  void runImpl(LoopInfo *info);
+public:
+  Vectorize(ModuleOp *module): Pass(module) {}
+
+  std::string name() override { return "vectorize"; }
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
+};
+
 }
 
 #endif

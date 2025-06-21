@@ -41,6 +41,7 @@
 #define ARMOP(Ty) ARMOPBASE(Value::i32, Ty)
 #define ARMOPL(Ty) ARMOPBASE(Value::i64, Ty)
 #define ARMOPF(Ty) ARMOPBASE(Value::f32, Ty)
+#define ARMOPV(Ty) ARMOPBASE(Value::i128, Ty)
 
 namespace sys::arm {
 
@@ -190,7 +191,14 @@ ARMOPF(FsubOp);
 ARMOPF(FmulOp);
 ARMOPF(FdivOp);
 
-// ==== Pseudo Ops ====
+// ====== Vector Ops ======
+ARMOP(St1Op);
+ARMOPV(Ld1Op);
+ARMOPV(AddVOp);
+ARMOPV(MulVOp);
+ARMOPV(DupOp);
+
+// ====== Pseudo Ops ======
 ARMOPE(ReadRegOp);
 ARMOP(WriteRegOp);
 ARMOP(PlaceHolderOp);

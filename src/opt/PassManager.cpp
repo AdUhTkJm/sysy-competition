@@ -62,6 +62,12 @@ void PassManager::run() {
     if (pass->name() == "rv-lower" || pass->name() == "arm-lower")
       inBackend = true;
 
+    if (pass->name() == opts.printBefore) {
+      std::cerr << "===== Before " << pass->name() << " =====\n\n";
+      module->dump(std::cerr);
+      std::cerr << "\n\n";
+    }
+
     pass->run();
     pass->cleanup();
 

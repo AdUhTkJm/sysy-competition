@@ -33,6 +33,7 @@ parser.add_argument("--asm", type=str)
 parser.add_argument("-t", "--test", type=str)
 parser.add_argument("-i", "--input", type=str) # Input to the executable
 parser.add_argument("-p", "--print-after", type=str)
+parser.add_argument("-q", "--print-before", type=str)
 
 args = parser.parse_args()
 
@@ -254,6 +255,9 @@ def run(full_file: str, no_exec: bool):
 
   if args.print_after:
     command.extend(["--print-after", args.print_after])
+
+  if args.print_before:
+    command.extend(["--print-before", args.print_before])
 
   if args.no_link:
     command.append("-S")

@@ -89,6 +89,11 @@ std::string freg(Reg reg) {
   return name;
 }
 
+std::string vreg(Reg reg) {
+  auto name = showReg(reg);
+  return name + ".4s"; // 4 signed integers
+}
+
 }
 
 void Dump::dumpOp(Op *op, std::ostream &os) {
@@ -296,6 +301,15 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   case CnegLtZOp::id:
     os << "cmp " << wreg(RS(op)) << ", #0\n  ";
     os << "cneg " << wreg(RD(op)) << ", " << wreg(RS2(op)) << ", lt\n";
+    break;
+  case DupOp::id:
+    os << "dup " << vreg(RD(op)) << ", " << wreg(RS(op)) << "\n";
+    break;
+  case St1Op::id:
+    os << "st1 {" << vreg(RS(op)) << "}, [" << xreg(RS2(op)) << "]\n";
+    break;
+  case Ld1Op::id:
+    os << "ld1 {" << vreg(RD(op)) << "}, [" << xreg(RS(op)) << "]\n";
     break;
   default:
     std::cerr << "unimplemented op: " << op;

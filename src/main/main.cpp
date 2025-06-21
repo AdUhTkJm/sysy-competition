@@ -101,6 +101,8 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::LICM>();
   pm.addPass<sys::ConstLoopUnroll>();
   pm.addPass<sys::SCEV>();
+  // if (opts.arm) // RV doesn't support SIMD.
+  //   pm.addPass<sys::Vectorize>();
   pm.addPass<sys::GVN>();
   
   // ===== Misc =====

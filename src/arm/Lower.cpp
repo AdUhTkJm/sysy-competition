@@ -11,26 +11,35 @@ using namespace sys::arm;
 
 // Collect allocas, and take them as an offset from base pointer (though we don't really use base pointer).
 // Also mark the function with an offset attribute.
-static void rewriteAlloca(FuncOp *func) {
+namespace {
+
+int round16(int x) {
+  if (x % 16 == 0)
+    return x;
+  return x / 16 * 16 + 16;
+}
+
+void rewriteAlloca(FuncOp *func) {
   Builder builder;
 
   auto region = func->getRegion();
   auto block = region->getFirstBlock();
 
   // All alloca's are in the first block.
-  size_t offset = 0; // Offset from sp.
   size_t total = 0; // Total stack frame size
-  std::vector<AllocaOp*> allocas;
+  std::vector<std::pair<Op*, int>> allocas;
   for (auto op : block->getOps()) {
     if (!isa<AllocaOp>(op))
       continue;
 
     size_t size = SIZE(op);
+    // Round up to 16 for alignment.
+    total = round16(total);
+    allocas.emplace_back(op, total);
     total += size;
-    allocas.push_back(cast<AllocaOp>(op));
   }
 
-  for (auto op : allocas) {
+  for (auto [op, offset] : allocas) {
     // Translate itself into `sp + offset`.
     builder.setBeforeOp(op);
     auto spValue = builder.create<ReadRegOp>(Value::i64, { new RegAttr(Reg::sp) });
@@ -39,11 +48,12 @@ static void rewriteAlloca(FuncOp *func) {
     op->replaceAllUsesWith(add);
 
     size_t size = SIZE(op);
-    offset += size;
     op->erase();
   }
 
   func->add<StackOffsetAttr>(total);
+}
+
 }
 
 
@@ -87,6 +97,9 @@ void Lower::run() {
   REPLACE(LtFOp, CsetLtFOp);
   REPLACE(LeFOp, CsetLeFOp);
   REPLACE(SelectOp, CselNeZOp);
+  REPLACE(BroadcastOp, DupOp);
+  REPLACE(AddVOp, AddVOp);
+  REPLACE(MulVOp, MulVOp);
 
   runRewriter([&](FloatOp *op) {
     float value = F(op);
@@ -141,7 +154,9 @@ void Lower::run() {
   });
 
   runRewriter([&](StoreOp *op) {
-    if (op->DEF(0)->getResultType() == Value::f32) {
+    auto ty = op->DEF(0)->getResultType();
+
+    if (ty == Value::f32) {
       builder.replace<StrFOp>(op, op->getOperands(), { new IntAttr(0) });
       return false;
     }
@@ -151,12 +166,19 @@ void Lower::run() {
       return false;
     }
 
+    if (ty == Value::i128 && SIZE(op) == 16) {
+      builder.replace<St1Op>(op, op->getOperands());
+      return false;
+    }
+
     builder.replace<StrWOp>(op, op->getOperands(), { new IntAttr(0) });
     return false;
   });
 
   runRewriter([&](LoadOp *op) {
-    if (op->getResultType() == Value::f32) {
+    auto ty = op->getResultType();
+    
+    if (ty == Value::f32) {
       builder.replace<LdrFOp>(op, op->getOperands(), { new IntAttr(0) });
       return false;
     }
@@ -165,6 +187,12 @@ void Lower::run() {
       builder.replace<LdrXOp>(op, op->getOperands(), { new IntAttr(0) });
       return false;
     }
+
+    if (ty == Value::i128 && SIZE(op) == 16) {
+      builder.replace<Ld1Op>(op, op->getOperands());
+      return false;
+    }
+
 
     builder.replace<LdrWOp>(op, op->getOperands(), { new IntAttr(0) });
     return false;
