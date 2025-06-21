@@ -1,4 +1,5 @@
 #include "LoopPasses.h"
+#include <deque>
 
 using namespace sys;
 
@@ -38,11 +39,19 @@ Op *Vectorize::findBase(Op *op) {
 }
 
 void Vectorize::runImpl(LoopInfo *info) {
-  if (info->latches.size() > 1)
+  if (info->latches.size() > 1 || !info->preheader)
     return;
 
   auto header = info->header;
   auto latch = info->getLatch();
+
+  // The loop must be rotated.
+  if (!isa<BranchOp>(latch->getLastOp()) || !info->getInduction())
+    return;
+
+  // The loop must have a stop (in order to unroll below).
+  if (!info->stop)
+    return;
 
   // Ensure no branching except for the latch.
   for (auto bb : info->getBlocks()) {
@@ -68,9 +77,6 @@ void Vectorize::runImpl(LoopInfo *info) {
   for (auto phi : phis) {
     auto latchval = Op::getPhiFrom(phi, latch);
     if (!isa<AddLOp>(latchval)) {
-      if (isa<AddIOp>(latchval) && isa<IntOp>(latchval->DEF(1)))
-        continue;
-
       // Other phi nodes cannot easily get mutated.
       return;
     }
@@ -116,7 +122,7 @@ void Vectorize::runImpl(LoopInfo *info) {
   std::vector<Op*> erased, created;
   bool success = true;
 
-  std::vector<Op*> queue(stores.begin(), stores.end());
+  std::deque<Op*> queue(stores.begin(), stores.end());
   
 #define BAD(x) if (x) { std::cerr << "bad on " #x "\n"; success = false; break; }
 
@@ -153,12 +159,38 @@ void Vectorize::runImpl(LoopInfo *info) {
     auto x = queue.back();
     queue.pop_back();
 
+    // If some of its operands inside the loop have not been visited, visit them first.
+    bool ready = true;
+    if (info->contains(x->getParent())) {
+      const std::vector<Value> &waitlist = isa<StoreOp>(x)
+        ? std::vector { x->getOperand(0) }
+        : x->getOperands();
+      
+      for (auto operand : waitlist) {
+        auto def = operand.defining;
+        if (!visited.count(def) && info->contains(def->getParent()) && !isa<PhiOp>(def)) {
+          queue.push_back(def);
+          ready = false;
+          continue;
+        }
+      }
+      if (!ready) {
+        queue.push_front(x);
+        continue;
+      }
+    }
+
     if (visited.count(x))
       continue;
     visited.insert(x);
 
     builder.setBeforeOp(x);
     switch (x->opid) {
+    case IntOp::id: {
+      auto b = builder.create<BroadcastOp>({ x });
+      created.push_back(b);
+      break;
+    }
     case LoadOp::id: {
       // These loads are definitely outside the loop.
       // All loads inside this loop have been processed above.
@@ -188,8 +220,8 @@ void Vectorize::runImpl(LoopInfo *info) {
     case AddIOp::id: {
       auto a = x->DEF(0), b = x->DEF(1);
       if (opmap.count(a) && opmap.count(b)) {
-        auto aty = a->getResultType();
-        auto bty = b->getResultType();
+        auto aty = opmap[a]->getResultType();
+        auto bty = opmap[b]->getResultType();
         if (aty == bty && aty == Value::i128) {
           auto vop = builder.create<AddVOp>({ opmap[a]->getResult(), opmap[b] });
           replace(x, vop);
@@ -199,7 +231,7 @@ void Vectorize::runImpl(LoopInfo *info) {
       if (opmap.count(b) && !opmap.count(a))
         std::swap(a, b);
       if (opmap.count(a) && !opmap.count(b)) {
-        auto aty = a->getResultType();
+        auto aty = opmap[a]->getResultType();
         auto bty = b->getResultType();
         
         // `b` has to be loop invariant.
@@ -222,14 +254,49 @@ void Vectorize::runImpl(LoopInfo *info) {
       success = false;
       break;
     }
+    case MulIOp::id: {
+      auto a = x->DEF(0), b = x->DEF(1);
+      if (opmap.count(a) && opmap.count(b)) {
+        auto aty = opmap[a]->getResultType();
+        auto bty = opmap[b]->getResultType();
+        if (aty == bty && aty == Value::i128) {
+          auto vop = builder.create<MulVOp>({ opmap[a]->getResult(), opmap[b] });
+          replace(x, vop);
+          break;
+        }
+      }
+      if (opmap.count(b) && !opmap.count(a))
+        std::swap(a, b);
+      if (opmap.count(a) && !opmap.count(b)) {
+        auto aty = opmap[a]->getResultType();
+        auto bty = b->getResultType();
+        
+        // `b` has to be loop invariant.
+        // TODO: when `b` itself is loop counter, perhaps optimizable?
+        BAD(info->contains(b->getParent()));
+
+        if (aty == Value::i128 && bty == Value::i32) {
+          auto broadcast = builder.create<BroadcastOp>({ b });
+          created.push_back(broadcast);
+          auto viop = builder.create<MulVOp>({ opmap[a]->getResult(), broadcast });
+          replace(x, viop);
+          break;
+        }
+        if (aty == Value::i32 && bty == Value::i32) {
+          auto add = builder.create<MulIOp>({ opmap[a]->getResult(), b });
+          replace(x, add);
+          break;
+        }
+      }
+      success = false;
+      break;
+    }
     // TODO: check PhiOp and deal with accumulator?
     default:
       std::cerr << "met unhandlable " << x;
       success = false;
       break;
     }
-    for (auto x : x->getUses())
-      queue.push_back(x);
   }
 
   if (!success) {
@@ -242,8 +309,118 @@ void Vectorize::runImpl(LoopInfo *info) {
     return;
   }
 
-  // Success; commit operations and erase the original ones.
+  // Success.
   std::cerr << "success, vectorized loop " << bbmap[info->header] << "\n";
+
+  // Create a side loop.
+  std::unordered_set<Op*> unwanted(created.begin(), created.end());
+  auto exit = info->getExit();
+  auto region = header->getParent();
+
+  std::vector<BasicBlock*> blocks;
+  std::unordered_map<Op*, Op*> cloneMap;
+  std::unordered_map<BasicBlock*, BasicBlock*> rewireMap;
+  blocks.reserve(info->getBlocks().size());
+
+  auto guard = region->insert(exit);
+  auto newpreheader = region->insert(exit);
+
+  for (auto x : info->getBlocks())
+    rewireMap[x] = region->insert(exit);
+
+  // The new preheader should be connected to the new header.
+  builder.setToBlockEnd(newpreheader);
+  builder.create<GotoOp>({ new TargetAttr(rewireMap[header]) });
+
+  // The guard should check whether it's needed to execute the side loop.
+  builder.setToBlockEnd(guard);
+  auto guardlatch = Op::getPhiFrom(info->induction, latch);
+  auto cond = builder.create<LtOp>({ guardlatch->getResult(), info->stop });
+  builder.create<BranchOp>({ cond }, { new TargetAttr(newpreheader), new ElseAttr(exit) });
+
+  // Shallow copy ops.
+  for (auto [k, v] : rewireMap) {
+    builder.setToBlockEnd(v);
+    for (auto op : k->getOps()) {
+      if (!unwanted.count(op)) {
+        Op *cloned = builder.copy(op);
+        cloneMap[op] = cloned;
+      }
+    }
+  }
+
+  // Rewire operands.
+  for (auto &[old, cloned] : cloneMap) {
+    for (int i = 0; i < old->getOperandCount(); i++) {
+      if (cloneMap.count(old->DEF(i)))
+        cloned->setOperand(i, cloneMap[old->DEF(i)]);
+    }
+  }
+
+  // Rewire blocks.
+  for (auto [_, v] : rewireMap) {
+    auto term = v->getLastOp();
+    if (auto attr = term->find<TargetAttr>(); attr && rewireMap.count(attr->bb))
+      attr->bb = rewireMap[attr->bb];
+    if (auto attr = term->find<ElseAttr>(); attr && rewireMap.count(attr->bb))
+      attr->bb = rewireMap[attr->bb];
+  }
+
+  // The latch's exit branch should get to the guard block instead.
+  auto term = latch->getLastOp();
+  if (TARGET(term) == exit)
+    TARGET(term) = guard;
+  if (ELSE(term) == exit)
+    ELSE(term) = guard;
+
+  auto tail = rewireMap[latch];
+
+  // For the new header, everything comes from the new latch (`tail`).
+  auto headerPhis = rewireMap[header]->getPhis();
+  for (auto phi : headerPhis) {
+    for (int i = 0; i < phi->getOperandCount(); i++) {
+      auto attr = phi->getAttrs()[i];
+      if (FROM(attr) == latch) {
+        FROM(attr) = tail;
+        break;
+      }
+    }
+  }
+
+  // For the exit, things might come either from the guard block or the tail.
+  auto exitphis = exit->getPhis();
+  for (auto phi : exitphis) {
+    Op *latchval = nullptr;
+    for (int i = 0; i < phi->getOperandCount(); i++) {
+      auto attr = phi->getAttrs()[i];
+      if (FROM(attr) == latch) {
+        FROM(attr) = guard;
+        latchval = phi->DEF(i);
+        break;
+      }
+    }
+    phi->add<FromAttr>(tail);
+    phi->pushOperand(cloneMap.count(latchval) ? cloneMap[latchval] : latchval);
+  }
+
+  // For the side loop, all values from preheader should come from the phis in the main loop.
+  std::unordered_map<Op*, Op*> phiMap;
+  for (auto phi : phis)
+    phiMap[Op::getPhiFrom(phi, info->preheader)] = Op::getPhiFrom(phi, latch);
+  
+  for (auto phi : headerPhis) {
+    for (int i = 0; i < phi->getOperandCount(); i++) {
+      auto attr = phi->getAttrs()[i];
+      if (FROM(attr) == info->preheader) {
+        FROM(attr) = newpreheader;
+        // Reset the operand to the value from the previous loop's latch.
+        phi->setOperand(i, phiMap[phi->DEF(i)]);
+        break;
+      }
+    }
+  }
+
+  // Commit operations and erase the original ones.
   for (auto op : erased) {
     op->replaceAllUsesWith(opmap[op]);
     op->erase();
@@ -277,7 +454,6 @@ void Vectorize::run() {
   
   for (auto func : funcs) {
     const auto &forest = forests[func];
-    auto region = func->getRegion();
 
     // Only vectorize innermost loops.
     for (auto loop : forest.getLoops()) {

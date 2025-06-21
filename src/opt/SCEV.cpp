@@ -452,6 +452,8 @@ void SCEV::replaceAfter(LoopInfo *info) {
   auto start = info->getStart();
   auto stop = info->getStop();
   int step = info->getStep();
+  if (!stop)
+    return;
 
   Builder builder;
 

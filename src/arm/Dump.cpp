@@ -51,6 +51,7 @@ using namespace sys::arm;
 #define BINARY_W(Ty, name) BINARY(Ty, name, wreg)
 #define BINARY_X(Ty, name) BINARY(Ty, name, xreg)
 #define BINARY_F(Ty, name) BINARY(Ty, name, freg)
+#define BINARY_V(Ty, name) BINARY(Ty, name, vreg)
 #define BINARY_NO_RD_W(Ty, name) BINARY_BASE(Ty, name, wreg,)
 #define BINARY_NO_RD_X(Ty, name) BINARY_BASE(Ty, name, xreg,)
 #define BINARY_NO_RD_F(Ty, name) BINARY_BASE(Ty, name, freg,)
@@ -123,6 +124,9 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   BINARY_X(AsrXOp, "asr");
   BINARY_X(LslXOp, "lslv");
   BINARY_X(LsrXOp, "lsr");
+
+  BINARY_V(AddVOp, "add");
+  BINARY_V(MulVOp, "mul");
 
   UNARY_I_W(AddWIOp, "add");
   UNARY_I_W(LslWIOp, "lsl");

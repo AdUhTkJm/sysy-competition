@@ -15,7 +15,7 @@ static bool pinned(Op *op) {
 }
 
 bool RemoveEmptyLoop::runImpl(LoopInfo *info) {
-  if (info->exits.size() > 1)
+  if (info->exits.size() != 1)
     return false;
 
   for (auto bb : info->getBlocks()) {
