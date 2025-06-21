@@ -82,7 +82,6 @@ ARMOP(SdivWOp);
 ARMOPL(SdivXOp);
 ARMOP(UdivWOp);
 
-ARMOP(MlaOp);
 ARMOP(MsubWOp); // Multiply-sub: rs3 - rs2 * rs
 ARMOPL(MsubXOp);
 ARMOP(NegOp);
@@ -102,9 +101,11 @@ ARMOP(EorIOp); // Accept immediate
 ARMOP(LdrWOp); // Load i32
 ARMOPL(LdrXOp); // Load i64
 ARMOPF(LdrFOp); // Load f32
+ARMOPF(LdrDOp); // Load f64
 ARMOP(StrWOp); // Store i32
 ARMOP(StrXOp); // Store i64
 ARMOP(StrFOp); // Store f32
+ARMOP(StrDOp); // Store f64
 
 // ==== Take another register, L-shifted by amount (can be 0) ====
 ARMOP(LdrWROp); // Load i32
@@ -196,6 +197,7 @@ ARMOP(St1Op);
 ARMOPV(Ld1Op);
 ARMOPV(AddVOp);
 ARMOPV(MulVOp);
+ARMOPV(MlaVOp);
 ARMOPV(DupOp);
 
 // ====== Pseudo Ops ======

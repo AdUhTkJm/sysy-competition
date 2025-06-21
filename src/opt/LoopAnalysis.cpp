@@ -118,10 +118,8 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
 
   // Try to find the induction variable.
   Rule addi("(add x y)");
-  Rule addli("(addl x y)");
   Rule br("(br (lt x y))");
   Rule brRotated("(br (lt (add x z) y))");
-  Rule brRotatedL("(br (lt (addl x z) y))");
   for (auto loop : forest.getLoops()) {
     auto header = loop->header;
     auto phis = header->getPhis();
@@ -181,36 +179,6 @@ LoopForest LoopAnalysis::runImpl(Region *region) {
           }
 
           // br: (br (lt x y))
-          if (!br.match(term, { { "x", loop->induction } }))
-            continue;
-
-          loop->stop = br.extract("y");
-          break;
-        }
-
-        // Do exactly the same for `addl`.
-        if (addli.match(def2, { { "x", phi } })) {
-          auto step = addli.extract("y");
-
-          if (!isa<IntOp>(step) && !step->getParent()->dominates(preheader))
-            continue;
-          if (isa<LoadOp>(step))
-            continue;
-          
-          loop->induction = phi;
-          loop->start = def1;
-          loop->step = step;
-
-          auto term = latch->getLastOp();
-          if (isa<BranchOp>(term)) {
-            term = latch->getLastOp();
-            if (!brRotatedL.match(term,  { { "x", loop->induction } }))
-              continue;
-
-            loop->stop = brRotatedL.extract("y");
-            break;
-          }
-
           if (!br.match(term, { { "x", loop->induction } }))
             continue;
 

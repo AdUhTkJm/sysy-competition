@@ -48,6 +48,7 @@ using namespace sys::arm;
 
 #define TERNARY_W(Ty, name) TERNARY(Ty, name, wreg)
 #define TERNARY_X(Ty, name) TERNARY(Ty, name, xreg)
+#define TERNARY_V(Ty, name) TERNARY(Ty, name, vreg)
 #define BINARY_W(Ty, name) BINARY(Ty, name, wreg)
 #define BINARY_X(Ty, name) BINARY(Ty, name, xreg)
 #define BINARY_F(Ty, name) BINARY(Ty, name, freg)
@@ -90,6 +91,12 @@ std::string freg(Reg reg) {
   return name;
 }
 
+std::string dreg(Reg reg) {
+  auto name = showReg(reg);
+  name[0] = 'd';
+  return name;
+}
+
 std::string vreg(Reg reg) {
   auto name = showReg(reg);
   return name + ".4s"; // 4 signed integers
@@ -99,9 +106,7 @@ std::string vreg(Reg reg) {
 
 void Dump::dumpOp(Op *op, std::ostream &os) {
   switch (op->opid) {
-  TERNARY_W(MlaOp, "mla");
   TERNARY_W(MsubWOp, "msub");
-
   TERNARY_X(MsubXOp, "msub");
 
   BINARY_W(AddWOp, "add");
@@ -127,6 +132,7 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
 
   BINARY_V(AddVOp, "add");
   BINARY_V(MulVOp, "mul");
+  BINARY_V(MlaVOp, "mla");
 
   UNARY_I_W(AddWIOp, "add");
   UNARY_I_W(LslWIOp, "lsl");
@@ -174,6 +180,9 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   case StrFOp::id:
     os << "str " << freg(RS(op)) << ", [" << xreg(RS2(op)) << ", #" << V(op) << "]\n";
     break;
+  case StrDOp::id:
+    os << "str " << dreg(RS(op)) << ", [" << xreg(RS2(op)) << ", #" << V(op) << "]\n";
+    break;
   case LdrXOp::id:
     os << "ldr " << xreg(RD(op)) << ", [" << xreg(RS(op)) << ", #" << V(op) << "]\n";
     break;
@@ -182,6 +191,9 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     break;
   case LdrFOp::id:
     os << "ldr " << freg(RD(op)) << ", [" << xreg(RS(op)) << ", #" << V(op) << "]\n";
+    break;
+  case LdrDOp::id:
+    os << "ldr " << dreg(RD(op)) << ", [" << xreg(RS(op)) << ", #" << V(op) << "]\n";
     break;
   case CsetLtOp::id:
     os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n  ";

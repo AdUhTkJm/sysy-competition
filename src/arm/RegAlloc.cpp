@@ -444,7 +444,6 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   };
 
   // Convert all operands to registers.
-  LOWER(MlaOp, TERNARY);
   LOWER(MsubWOp, TERNARY);
   LOWER(MsubXOp, TERNARY);
   LOWER(CselNeZOp, TERNARY);
@@ -463,7 +462,6 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(MulVOp, BINARY);
   LOWER(SdivWOp, BINARY);
   LOWER(SdivXOp, BINARY);
-  LOWER(MlaOp, BINARY);
   LOWER(AndOp, BINARY);
   LOWER(OrOp, BINARY);
   LOWER(EorOp, BINARY);

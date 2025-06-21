@@ -1,4 +1,5 @@
 #include "LoopPasses.h"
+#include "../utils/Matcher.h"
 #include <deque>
 
 using namespace sys;
@@ -46,8 +47,43 @@ void Vectorize::runImpl(LoopInfo *info) {
   auto latch = info->getLatch();
 
   // The loop must be rotated.
-  if (!isa<BranchOp>(latch->getLastOp()) || !info->getInduction())
+  if (!isa<BranchOp>(latch->getLastOp()))
     return;
+
+  auto latchterm = latch->getLastOp();
+  auto phis = header->getPhis();
+
+  // Find an induction variable (even if it's addl).
+  // The `LoopAnalysis` pass will only identify `addi`-formed induction variables.
+  if (!info->getInduction()) {
+    Rule brRotatedL("(br (lt (addl x z) y))");
+    Rule addli("(addl x y)");
+
+    for (auto phi : phis) {
+      auto def1 = Op::getPhiFrom(phi, info->preheader);
+      auto def2 = Op::getPhiFrom(phi, latch);
+
+      if (addli.match(def2, { { "x", phi } })) {
+        auto step = addli.extract("y");
+
+        if (!isa<IntOp>(step) && !step->getParent()->dominates(info->preheader))
+          continue;
+        if (isa<LoadOp>(step))
+          continue;
+        
+        info->induction = phi;
+        info->start = def1;
+        info->step = step;
+
+        auto term = latch->getLastOp();
+        if (!brRotatedL.match(term,  { { "x", info->induction } }))
+          continue;
+
+        info->stop = brRotatedL.extract("y");
+        break;
+      }
+    }
+  }
 
   // The loop must have a stop (in order to unroll below).
   if (!info->stop)
@@ -69,7 +105,6 @@ void Vectorize::runImpl(LoopInfo *info) {
     }
   }
 
-  auto phis = header->getPhis();
   std::unordered_set<Op*> bases;
   
   // Ensure all phis have stride 4 and different bases.
@@ -322,7 +357,6 @@ void Vectorize::runImpl(LoopInfo *info) {
   std::unordered_map<BasicBlock*, BasicBlock*> rewireMap;
   blocks.reserve(info->getBlocks().size());
 
-  auto guard = region->insert(exit);
   auto newpreheader = region->insert(exit);
 
   for (auto x : info->getBlocks())
@@ -331,12 +365,6 @@ void Vectorize::runImpl(LoopInfo *info) {
   // The new preheader should be connected to the new header.
   builder.setToBlockEnd(newpreheader);
   builder.create<GotoOp>({ new TargetAttr(rewireMap[header]) });
-
-  // The guard should check whether it's needed to execute the side loop.
-  builder.setToBlockEnd(guard);
-  auto guardlatch = Op::getPhiFrom(info->induction, latch);
-  auto cond = builder.create<LtOp>({ guardlatch->getResult(), info->stop });
-  builder.create<BranchOp>({ cond }, { new TargetAttr(newpreheader), new ElseAttr(exit) });
 
   // Shallow copy ops.
   for (auto [k, v] : rewireMap) {
@@ -366,14 +394,34 @@ void Vectorize::runImpl(LoopInfo *info) {
       attr->bb = rewireMap[attr->bb];
   }
 
-  // The latch's exit branch should get to the guard block instead.
+  // The latch's exit branch should get to the new preheader instead.
   auto term = latch->getLastOp();
   if (TARGET(term) == exit)
-    TARGET(term) = guard;
+    TARGET(term) = newpreheader;
   if (ELSE(term) == exit)
-    ELSE(term) = guard;
+    ELSE(term) = newpreheader;
 
   auto tail = rewireMap[latch];
+
+  // For the original loop, the stop should be decreased by 4 * step.
+  // This is to guard against non-4-multiple things.
+  auto cond = latchterm->DEF(0);
+  auto preterm = info->preheader->getLastOp();
+  builder.setBeforeOp(preterm);
+  
+  // Hoist the constants out of loop to fix dominance.
+  auto stop = info->stop;
+  if (isa<IntOp>(stop) && info->contains(stop->getParent()))
+    stop = builder.create<IntOp>({ new IntAttr(V(stop)) });
+
+  auto step = info->step;
+  if (isa<IntOp>(step) && info->contains(step->getParent()))
+    step = builder.create<IntOp>({ new IntAttr(V(step)) });
+  
+  Value four = builder.create<IntOp>({ new IntAttr(4) });
+  Value mul = builder.create<MulIOp>({ four, step });
+  Value lim = builder.create<SubLOp>({ stop, mul });
+  builder.replace<LtOp>(cond, { Op::getPhiFrom(info->induction, latch), lim });
 
   // For the new header, everything comes from the new latch (`tail`).
   auto headerPhis = rewireMap[header]->getPhis();
@@ -387,20 +435,17 @@ void Vectorize::runImpl(LoopInfo *info) {
     }
   }
 
-  // For the exit, things might come either from the guard block or the tail.
+  // For the exit, things can only come from the tail, and the values are also different.
   auto exitphis = exit->getPhis();
   for (auto phi : exitphis) {
-    Op *latchval = nullptr;
     for (int i = 0; i < phi->getOperandCount(); i++) {
       auto attr = phi->getAttrs()[i];
       if (FROM(attr) == latch) {
-        FROM(attr) = guard;
-        latchval = phi->DEF(i);
+        FROM(attr) = tail;
+        phi->setOperand(i, cloneMap[phi->DEF(i)]);
         break;
       }
     }
-    phi->add<FromAttr>(tail);
-    phi->pushOperand(cloneMap.count(latchval) ? cloneMap[latchval] : latchval);
   }
 
   // For the side loop, all values from preheader should come from the phis in the main loop.

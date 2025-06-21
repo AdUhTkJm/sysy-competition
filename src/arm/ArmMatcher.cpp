@@ -291,8 +291,6 @@ bool ArmRule::matchExpr(Expr *expr, Op* op) {
 
   std::string_view opname = head->value;
 
-  MATCH_TERNARY("mla", MlaOp);
-
   MATCH_TERNARY_IMM("strwr", StrWROp);
   MATCH_TERNARY_IMM("strfr", StrFROp);
   MATCH_TERNARY_IMM("strxr", StrXROp);
@@ -300,6 +298,7 @@ bool ArmRule::matchExpr(Expr *expr, Op* op) {
   MATCH_BINARY("addw", AddWOp);
   MATCH_BINARY("addx", AddXOp);
   MATCH_BINARY("subw", SubWOp);
+  MATCH_BINARY("subx", SubXOp);
   MATCH_BINARY("mulw", MulWOp);
   MATCH_BINARY("mulx", MulXOp);
   MATCH_BINARY("sdivw", SdivWOp);
@@ -453,8 +452,6 @@ Op *ArmRule::buildExpr(Expr *expr) {
 
     return builder.create<IntOp>({ new IntAttr(result) });
   }
-
-  BUILD_TERNARY("mla", MlaOp);
 
   BUILD_TERNARY_IMM("strwr", StrWROp);
   BUILD_TERNARY_IMM("strxr", StrXROp);

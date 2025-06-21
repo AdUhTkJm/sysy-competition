@@ -88,6 +88,28 @@ int RegAlloc::latePeephole(Op *funcOp) {
     return false;
   });
 
+  runRewriter(funcOp, [&](MulVOp *op) {
+    if (op == op->getParent()->getLastOp())
+      return false;
+
+    //   mul v0, v1, v2
+    //   add v3, v3, v0 (or in the opposite order)
+    // becomes 
+    //   mla v3, v1, v2
+    // This isn't doable in inst-select because it modifies v3 inplace.
+    auto next = op->nextOp();
+    if (isa<AddVOp>(next) &&
+       (RS(next) == RD(next) && RS2(next) == RD(op)
+     || RS2(next) == RD(next) && RS(next) == RD(op))) {
+      converted++;
+      builder.setBeforeOp(next);
+      builder.replace<MlaVOp>(next, { RDC(RD(next)), RSC(RS(op)), RS2C(RS2(op)) });
+      op->erase();
+    }
+
+    return false;
+  });
+
   // Eliminate useless MovROp.
   runRewriter(funcOp, [&](MovROp *op) {
     if (RD(op) == RS(op)) {
@@ -187,7 +209,7 @@ void save(Builder builder, const std::vector<Reg> &regs, int offset) {
     offset -= 8;
     bool fp = isFP(reg);
     if (fp)
-      builder.create<StrFOp>({ RSC(reg), RS2C(Reg::sp), new IntAttr(offset) });
+      builder.create<StrDOp>({ RSC(reg), RS2C(Reg::sp), new IntAttr(offset) });
     else
       builder.create<StrXOp>({ RSC(reg), RS2C(Reg::sp), new IntAttr(offset) });
   }
@@ -198,7 +220,7 @@ void load(Builder builder, const std::vector<Reg> &regs, int offset) {
     offset -= 8;
     bool fp = isFP(reg);
     if (fp)
-      builder.create<LdrFOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
+      builder.create<LdrDOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
     else
       builder.create<LdrXOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
   }
