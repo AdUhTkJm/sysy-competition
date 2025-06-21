@@ -15,6 +15,7 @@ Rule cmpmod("(eq (mod x 'a) 'b)");
 Rule cmpmod0("(mod x 'a)");
 Rule addmod("(mod (add x 'a) 'b)");
 Rule cmplt("(lt x y)");
+Rule cmpgt("(lt y x)");
 
 // It's guaranteed that the induction variable will be a multiple of `vi`
 // at the beginning of the loop.
@@ -328,6 +329,160 @@ bool Unswitch::ltconst(Op *loop, Op *cond) {
   return true;
 }
 
+// Basically a duplicate of the previous one.
+bool Unswitch::gtconst(Op *loop, Op *cond) {
+  if (!cmpgt.match(cond, { { "x", loop } }))
+    return false;
+  
+  auto limit = cmpgt.extract("y");
+  // Check whether it's a constant.
+  if (limit->inside(loop) && !isa<IntOp>(limit))
+    return false;
+
+  if (isa<LoadOp>(limit)) {
+    if (!limit->has<BaseAttr>())
+      return false;
+
+    // Check if there's any store to this limit.
+    auto stores = loop->findAll<StoreOp>();
+    for (auto store : stores) {
+      if (!store->has<BaseAttr>() || BASE(store) == limit)
+        return false;
+    }
+  }
+
+  if (isa<IntOp>(limit) && limit->inside(loop))
+    limit->moveBefore(loop);
+
+  // Now it's safe. Split the loop into two.
+
+  // Start from the original start to the new limit.
+  auto start = loop->getOperand(0);
+  auto stop = loop->getOperand(1);
+  auto step = loop->getOperand(2);
+  auto ivAddr = loop->getOperand(3);
+  // It's always save to do so. We've verified that the step is loop-invariant.
+  if (step.defining->inside(loop))
+    step.defining->moveBefore(loop);
+  
+  Builder builder;
+  builder.setBeforeOp(loop);
+
+  // Create a min of `limit` and `stop`.
+  // One difference from the previous one is that we're off by one.
+  // Or rather, we'd use `limit := limit + 1` since we want `i >= limit`.
+  Value one = builder.create<IntOp>({ new IntAttr(1) });
+  limit = builder.create<AddIOp>({ limit, one });
+
+  // min = (stop < limit) ? stop : limit
+  auto lt = builder.create<LtOp>({ stop, limit });
+  auto min = builder.create<SelectOp>({ lt, stop, limit });
+
+  auto floop = builder.create<ForOp>({ start, min, step, ivAddr });
+
+  // Calculate the starting point of the `i >= limit` branch.
+  // The value should be equal to:
+  //   start + (limit - start + step - 1) / step * step
+  builder.setBeforeOp(loop);
+  Value sub = builder.create<SubIOp>({ limit, start });
+  Value sub2 = builder.create<SubIOp>({ step, one });
+  Value plus = builder.create<AddLOp>({ sub, sub2 });
+  Value div = builder.create<DivLOp>({ plus, step });
+  Value mul = builder.create<MulLOp>({ div, step });
+  // This might overflow. Saturation is needed.
+  Value lim = builder.create<AddLOp>({ start, mul });
+  Value imax = builder.create<IntOp>({ new IntAttr(2147483647) });
+  Value _lt = builder.create<LtOp>({ lim, imax });
+  Value x = builder.create<SelectOp>({ _lt, lim, imax });
+  // Take the maximum of `x` and the original `start`.
+  Value gt = builder.create<LtOp>({ start, x });
+  Value y = builder.create<SelectOp>({ gt, x, start });
+  loop->setOperand(0, y);
+
+  // Copy the operations into that new loop.
+  auto region = loop->getRegion();
+  auto entry = region->getFirstBlock();
+
+  std::list<Op*> body = entry->getOps();
+  std::unordered_map<Op*, Op*> opmap;
+
+  const std::function<void (Op*)> copy = [&](Op *x) {
+    auto copied = builder.copy(x);
+    opmap[x] = copied;
+
+    for (auto r : x->getRegions()) {
+      Builder::Guard guard(builder);
+      
+      auto cr = copied->appendRegion();
+
+      auto entry = r->getFirstBlock();
+      auto cEntry = cr->appendBlock();
+      builder.setToBlockStart(cEntry);
+      for (auto op : entry->getOps())
+        copy(op);
+    }
+  };
+
+  auto fregion = floop->appendRegion();
+  auto fentry = fregion->appendBlock();
+  builder.setToBlockEnd(fentry);
+  opmap[loop] = floop;
+
+  for (auto x : body)
+    copy(x);
+
+  // Rewire operands.
+  for (auto [_, v] : opmap) {
+    for (int i = 0; i < v->getOperandCount(); i++) {
+      auto def = v->DEF(i);
+      v->setOperand(i, opmap.count(def) ? opmap[def] : def);
+    }
+  }
+
+  // Look for the if for the newly created loop.
+  auto fcond = opmap[cond];
+  const auto &fuses = fcond->getUses();
+  for (auto use : fuses) {
+    if (!isa<IfOp>(use))
+      continue;
+
+    // Move all ops in the "false" region outside the if,
+    // only if that region is present.
+    if (use->getRegionCount() > 1) {
+      auto ifnot = use->getRegion(1);
+      ifnot->getFirstBlock()->inlineBefore(use);
+    }
+  }
+  // Remove all if's.
+  for (auto it = fuses.begin(); it != fuses.end();) {
+    auto next = it; next++;
+    if (isa<IfOp>(*it))
+      (*it)->erase();
+    it = next;
+  }
+
+  // Similarly do it for the other side.
+  const auto &uses = cond->getUses();
+  for (auto use : uses) {
+    if (!isa<IfOp>(use))
+      continue;
+
+    // Move all ops in the "true" region outside the if.
+    auto ifnot = use->getRegion(0);
+    ifnot->getFirstBlock()->inlineBefore(use);
+  }
+  // Remove all if's.
+  for (auto it = uses.begin(); it != uses.end();) {
+    auto next = it; next++;
+    if (isa<IfOp>(*it))
+      (*it)->erase();
+    it = next;
+  }
+
+  unswitched++;
+  return true;
+}
+
 bool Unswitch::runImpl(Op *loop) {
   // Erased loop, but yet to be deleted.
   if (!loop->getOperandCount())
@@ -353,7 +508,8 @@ bool Unswitch::runImpl(Op *loop) {
 
   return 
     (isa<IntOp>(step) && cmpmod(loop, cond)) ||
-    ltconst(loop, cond);
+    ltconst(loop, cond) ||
+    gtconst(loop, cond);
 }
 
 void Unswitch::run() {

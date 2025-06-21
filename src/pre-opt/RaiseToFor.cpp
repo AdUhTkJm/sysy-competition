@@ -71,7 +71,7 @@ void RaiseToFor::run() {
       Op *vi = constIncr.extract("y");
       if (!foundIncr)
         incr = vi, foundIncr = true;
-      else if (incr != vi) {
+      else if (incr != vi && !(isa<IntOp>(incr) && isa<IntOp>(vi) && V(incr) == V(vi))) {
         good = false;
         break;
       }

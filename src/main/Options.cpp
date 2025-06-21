@@ -84,9 +84,8 @@ Options sys::parseArgs(int argc, char **argv) {
     exit(1);
   }
 
-  // Default to ARM.
   if (!opts.rv && !opts.arm)
-    opts.arm = true;
+    opts.rv = true;
 
   return opts;
 }
