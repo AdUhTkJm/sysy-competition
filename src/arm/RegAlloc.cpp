@@ -470,6 +470,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(StrWOp, BINARY);
   LOWER(StrXOp, BINARY);
   LOWER(StrFOp, BINARY);
+  LOWER(StrWPOp, BINARY);
+  LOWER(StrXPOp, BINARY);
+  LOWER(StrFPOp, BINARY);
   LOWER(St1Op, BINARY);
   LOWER(LslWOp, BINARY);
   LOWER(LsrWOp, BINARY);
@@ -511,6 +514,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   LOWER(LdrWOp, UNARY);
   LOWER(LdrXOp, UNARY);
   LOWER(LdrFOp, UNARY);
+  LOWER(LdrWPOp, UNARY);
+  LOWER(LdrXPOp, UNARY);
+  LOWER(LdrFPOp, UNARY);
   LOWER(Ld1Op, UNARY);
   LOWER(AddXIOp, UNARY);
   LOWER(AddWIOp, UNARY);
@@ -539,8 +545,23 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   // We can't remove all operands here.
   for (auto bb : region->getBlocks()) {
     for (auto op : bb->getOps()) {
-      if (isa<PlaceHolderOp>(op) || isa<BlOp>(op) || isa<RetOp>(op))
+      if (isa<BlOp>(op) || isa<RetOp>(op))
         op->removeAllOperands();
+
+      if (isa<PlaceHolderOp>(op)) {
+        // All users of it are phis.
+        for (auto use : op->getUses()) {
+          assert(isa<PhiOp>(use));
+          for (int i = 0; i < use->getOperandCount(); i++) {
+            if (use->DEF(i) == op) {
+              use->removeOperand(i);
+              use->removeAttribute(i);
+              break;
+            }
+          }
+        }
+        op->removeAllOperands();
+      }
     }
   }
 

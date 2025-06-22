@@ -46,8 +46,6 @@ void rewriteAlloca(FuncOp *func) {
     auto offsetValue = builder.create<MovIOp>({ new IntAttr(offset) });
     auto add = builder.create<AddXOp>({ spValue, offsetValue });
     op->replaceAllUsesWith(add);
-
-    size_t size = SIZE(op);
     op->erase();
   }
 
@@ -74,9 +72,9 @@ void Lower::run() {
   REPLACE(LShiftOp, LslWOp);
   REPLACE(RShiftLOp, AsrXOp);
   REPLACE(RShiftOp, AsrWOp);
-  REPLACE(AndIOp, AndOp);
-  REPLACE(OrIOp, OrOp);
-  REPLACE(XorIOp, EorOp);
+  REPLACE(sys::AndIOp, AndOp);
+  REPLACE(sys::OrIOp, OrOp);
+  REPLACE(sys::XorIOp, EorOp);
   REPLACE(GotoOp, BOp);
   REPLACE(BranchOp, CbnzOp);
   REPLACE(IntOp, MovIOp);

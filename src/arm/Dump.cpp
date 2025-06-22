@@ -132,6 +132,9 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   BINARY_X(AsrXOp, "asr");
   BINARY_X(LslXOp, "lslv");
   BINARY_X(LsrXOp, "lsr");
+  BINARY_X(AndOp, "and");
+  BINARY_X(OrOp, "or");
+  BINARY_X(EorOp, "eor");
 
   BINARY_V(AddVOp, "add");
   BINARY_V(MulVOp, "mul");
@@ -197,6 +200,24 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     break;
   case LdrDOp::id:
     os << "ldr " << dreg(RD(op)) << ", [" << xreg(RS(op)) << ", #" << V(op) << "]\n";
+    break;
+  case LdrXPOp::id:
+    os << "ldr " << xreg(RD(op)) << ", [" << xreg(RS(op)) << "], #" << V(op) << "]\n";
+    break;
+  case LdrWPOp::id:
+    os << "ldr " << wreg(RD(op)) << ", [" << xreg(RS(op)) << "], #" << V(op) << "\n";
+    break;
+  case LdrFPOp::id:
+    os << "ldr " << freg(RD(op)) << ", [" << xreg(RS(op)) << "], #" << V(op) << "\n";
+    break;
+  case StrXPOp::id:
+    os << "str " << xreg(RS(op)) << ", [" << xreg(RS2(op)) << "], #" << V(op) << "\n";
+    break;
+  case StrWPOp::id:
+    os << "str " << wreg(RS(op)) << ", [" << xreg(RS2(op)) << "], #" << V(op) << "\n";
+    break;
+  case StrFPOp::id:
+    os << "str " << freg(RS(op)) << ", [" << xreg(RS2(op)) << "], #" << V(op) << "\n";
     break;
   case CsetLtOp::id:
     os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n  ";

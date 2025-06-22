@@ -116,7 +116,7 @@ public:
 class Offset : public Pass {
   int folded = 0;
 
-  bool runImpl(Region *region);
+  void runImpl(Region *region);
 public:
   Offset(ModuleOp *module): Pass(module) {}
 

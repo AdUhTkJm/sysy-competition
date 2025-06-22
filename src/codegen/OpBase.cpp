@@ -188,6 +188,17 @@ void Op::removeOperand(int i) {
   removeOperandUse(def);
 }
 
+void Op::removeOperand(Op *v) {
+  for (int i = 0; i < operands.size(); i++) {
+    auto def = operands[i].defining;
+    if (def == v) {
+      removeOperand(i);
+      return;
+    }
+  }
+  assert(false);
+}
+
 int Op::replaceOperand(Op *before, Value v) {
   for (int i = 0; i < operands.size(); i++) {
     auto def = operands[i].defining;

@@ -139,7 +139,7 @@ static Rule rules[] = {
   "(change (eq (mul x 'a) 'b) (!only-if (!ne 0 (!mod 'b 'a)) 0))",
   "(change (eq (div x 'a) 'b) (!only-if (!gt 'a 0) (and (lt x (!mul (!add 'b 1) 'a)) (ge x (!mul 'b 'a)))))",
   "(change (eq (mod x 'a) 'b) (!only-if (!le 'a 'b) 0))",
-  "(change (eq (mod x 2) 1) (mod x 2))",
+  "(change (eq (mod x 2) 1) (and (ge x 0) (mod x 2)))",
   "(change (eq x 0) (not x))",
   "(change (eq (not x) 0) (snz x))",
 
@@ -197,7 +197,7 @@ static Rule rules[] = {
   "(change (ne 'a x) (ne x 'a))",
   "(change (ne (add x 'a) 'b) (ne x (!sub 'b 'a)))",
   "(change (ne (sub x 'a) 'b) (ne x (!add 'b 'a)))",
-  "(change (ne (mod x 2) 1) (not (mod x 2)))",
+  "(change (ne (mod x 2) 1) (or (lt x 0) (not (mod x 2))))",
   "(change (ne x 0) (snz x))",
   "(change (ne (not x) 0) (not x))",
 

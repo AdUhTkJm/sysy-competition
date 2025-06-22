@@ -227,6 +227,7 @@ public:
   void removeAllOperands();
   void setOperand(int i, Value v);
   void removeOperand(int i);
+  void removeOperand(Op *v);
   int replaceOperand(Op *before, Value v);
 
   void removeAllAttributes();

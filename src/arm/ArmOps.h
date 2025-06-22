@@ -64,11 +64,11 @@ ARMOPL(AdrOp); // The ADR instruction only allows 1 MB range. We use pseudo-inst
 ARMOP(AddWOp);
 ARMOP(AddWIOp); // Accept immediate
 ARMOP(AddWLOp); // LSL
-ARMOP(AddWROp); // RSL
+ARMOP(AddWROp); // ASR
 ARMOPL(AddXOp);
 ARMOPL(AddXIOp); // Accept immediate
 ARMOPL(AddXLOp); // LSL
-ARMOPL(AddXROp); // LSL
+ARMOPL(AddXROp); // ASR
 
 ARMOP(SubWOp);
 ARMOP(SubWIOp); // Accept immediate
@@ -116,6 +116,14 @@ ARMOPF(LdrFROp); // Load f32
 ARMOP(StrWROp); // Store i32
 ARMOP(StrXROp); // Store i64
 ARMOP(StrFROp); // Store f32
+
+// ==== Postfix increment ====
+ARMOP(LdrWPOp); // Load i32
+ARMOPL(LdrXPOp); // Load i64
+ARMOPF(LdrFPOp); // Load f32
+ARMOP(StrWPOp); // Store i32
+ARMOP(StrXPOp); // Store i64
+ARMOP(StrFPOp); // Store f32
 
 ARMOP(LslWOp); // // L-shift
 ARMOPL(LslXOp); // L-shift
@@ -213,6 +221,13 @@ inline bool hasRd(Op *op) {
     isa<StrWOp>(op) ||
     isa<StrXOp>(op) ||
     isa<StrFOp>(op) ||
+    isa<StrWPOp>(op) ||
+    isa<StrXPOp>(op) ||
+    isa<StrFPOp>(op) ||
+    isa<StrWROp>(op) ||
+    isa<StrXROp>(op) ||
+    isa<StrFROp>(op) ||
+    isa<St1Op>(op) ||
     isa<BOp>(op) ||
     isa<BlOp>(op) ||
     isa<BeqOp>(op) ||

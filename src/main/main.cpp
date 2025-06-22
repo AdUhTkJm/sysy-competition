@@ -16,6 +16,7 @@
 #include "../pre-opt/PreLoopPasses.h"
 #include "../pre-opt/PreAnalysis.h"
 #include "../arm/ArmPasses.h"
+#include "../arm/ArmLoopPasses.h"
 #include "../rv/RvPasses.h"
 #include "../rv/RvDupPasses.h"
 #include "../utils/smt/SMT.h"
@@ -30,6 +31,8 @@ void initArmPipeline(sys::PassManager &pm) {
   pm.addPass<Lower>();
   pm.addPass<StrengthReduct>();
   pm.addPass<InstCombine>();
+  pm.addPass<ArmDCE>();
+  pm.addPass<PostIncr>();
   pm.addPass<ArmDCE>();
   pm.addPass<RegAlloc>();
   pm.addPass<LateLegalize>();
@@ -111,8 +114,7 @@ void initPipeline(sys::PassManager &pm) {
   // ===== Misc =====
 
   pm.addPass<sys::RegularFold>();
-  if (!opts.arm) // Don't know why, perhaps ARM backend is buggy? Disable for now
-    pm.addPass<sys::Offset>();
+  // pm.addPass<sys::Offset>(); // Buggy?
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::SimplifyCFG>();

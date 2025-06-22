@@ -74,7 +74,6 @@ void Parallelizable::runImpl(Op *loop, int depth) {
     std::vector<Op*> parents;
     for (auto runner = store; runner != loop; runner = runner->getParentOp())
       parents.push_back(runner);
-    std::cerr << store << load;
     for (auto runner = load; runner != loop; runner = runner->getParentOp()) {
       // check whether `runner` and anything in `parents` are on the same layer.
       bool decided = false, good = false;
