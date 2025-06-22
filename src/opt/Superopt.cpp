@@ -70,7 +70,7 @@ BvExpr *Superopt::solidify(BvExpr *expr, BvSolver::Model &model, bool allowX) {
       return p;
     return p->ty == BvExpr::Var && (allowX ^ (p->name[0] == 'c'))
       ? ctx.create(BvExpr::Const, model[p->name])
-      : solidify(p, model);
+      : solidify(p, model, allowX);
   };
   auto bvexpr = ctx.create(expr->ty, expr->vi, expr->name, fill(expr->cond), fill(expr->l), fill(expr->r));
   return bvexpr;
@@ -306,9 +306,9 @@ void Superopt::run() {
         BvSolver solver;
         solver.opts.stats = true;
         // Use just some random bits to find a good `c`.
-        BvSolver::Model model = { { "x", -2 }, { "y", 3 } };
-        auto sfilled = solidify(filled, model, true);
-        auto scand = solidify(candidate, model, true);
+        BvSolver::Model inmodel = { { "x", -2 }, { "y", 3 } };
+        auto sfilled = solidify(filled, inmodel, true);
+        auto scand = solidify(candidate, inmodel, true);
         auto eq = ctx.create(BvExpr::Eq, sfilled, scand);
         auto _and = ctx.create(BvExpr::And, eq, ctx.create(BvExpr::Ne, ctx.create(BvExpr::Var, "c"), ctx.create(BvExpr::Const, 0)));
         std::cerr << _and << "\n";
@@ -320,6 +320,8 @@ void Superopt::run() {
         std::cerr << "c = " << solver.extract("c") << "\n";
         model = solver.model();
       }
+      if (!model.size())
+        continue;
       // Extract a model and prove equality.
       // Change variables to constants.
       {
@@ -332,8 +334,13 @@ void Superopt::run() {
         ne = simplify(ne, ctx);
         // Sadly, we can't reuse a solver.
         bool unsat = !solver.infer(ne);
-        if (!unsat)
+        if (!unsat) {
+          auto model = solver.model();
+          for (auto [k, v] : model)
+            std::cerr << k << ": " << v << "\n";
+          std::cerr << "result: " << solver.eval(sfilled, model) << "\n";
           continue;
+        }
         std::cerr << "unsat\n";
       }
     }

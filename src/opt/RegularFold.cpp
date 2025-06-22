@@ -48,6 +48,7 @@ static Rule rules[] = {
   "(change (sub y (add x y)) (minus x))",
   "(change (sub x (sub x y)) y)",
   "(change (sub (add x y) (sub x z)) (add y z))",
+  "(change (sub (add x y) (add x z)) (sub y z))",
   "(change (sub (add x 'a) 'b) (add x (!sub 'a 'b)))",
   "(change (sub (sub x 'a) 'b) (sub x (!add 'a 'b)))",
   "(change (sub x (minus y)) (add x y))",

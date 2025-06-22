@@ -709,12 +709,34 @@ int BvSolver::eval(BvExpr *expr) {
     return eval(expr->l) + eval(expr->r);
   case BvExpr::Sub:
     return eval(expr->l) - eval(expr->r);
+  case BvExpr::Mul:
+    return eval(expr->l) * eval(expr->r);
+  case BvExpr::Div:
+    return eval(expr->l) / eval(expr->r);
+  case BvExpr::Mod:
+    return eval(expr->l) % eval(expr->r);
+  case BvExpr::Lsh:
+    return eval(expr->l) << eval(expr->r);
+  case BvExpr::Rsh:
+    return eval(expr->l) >> eval(expr->r);
+  case BvExpr::MulMod:
+    return (((int64_t) eval(expr->cond)) * eval(expr->l)) % eval(expr->r);
+  case BvExpr::Ite:
+    if (eval(expr->cond))
+      return eval(expr->l);
+    return eval(expr->r);
   case BvExpr::And:
     return eval(expr->l) & eval(expr->r);
   case BvExpr::Or:
     return eval(expr->l) | eval(expr->r);
   case BvExpr::Xor:
     return eval(expr->l) ^ eval(expr->r);
+  case BvExpr::Not:
+    return !eval(expr->l);
+  case BvExpr::Eq:
+    return eval(expr->l) == eval(expr->r);
+  case BvExpr::Ne:
+    return eval(expr->l) != eval(expr->r);
   default:
     std::cerr << "unsupported type " << expr->ty << "\n";
     assert(false);

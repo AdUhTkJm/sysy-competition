@@ -31,7 +31,6 @@ void initArmPipeline(sys::PassManager &pm) {
   pm.addPass<StrengthReduct>();
   pm.addPass<InstCombine>();
   pm.addPass<ArmDCE>();
-  pm.addPass<sys::GVN>();
   pm.addPass<RegAlloc>();
   pm.addPass<LateLegalize>();
   pm.addPass<Dump>(opts.outputFile);
@@ -112,7 +111,8 @@ void initPipeline(sys::PassManager &pm) {
   // ===== Misc =====
 
   pm.addPass<sys::RegularFold>();
-  pm.addPass<sys::Offset>();
+  if (!opts.arm) // Don't know why, perhaps ARM backend is buggy? Disable for now
+    pm.addPass<sys::Offset>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::SimplifyCFG>();

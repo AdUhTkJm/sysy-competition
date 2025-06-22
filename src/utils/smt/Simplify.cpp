@@ -19,8 +19,6 @@ BvRule rules[] = {
 
   // And
   "(change (and 'a 'b) (!and 'a 'b))",
-  "(change (and 1 x) x)",
-  "(change (and x 1) x)",
   "(change (and x (eq x 'a)) (!only-if (!ne 'a 0) (eq x 'a)))",
 
   // Mod
