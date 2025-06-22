@@ -34,7 +34,7 @@ class Superopt : public Pass {
 public:
   Superopt(ModuleOp *module);
     
-  std::string name() override { return "verify"; };
+  std::string name() override { return "superopt"; };
   std::map<std::string, int> stats() override;
   void run() override;
 };

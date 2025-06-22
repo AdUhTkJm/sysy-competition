@@ -37,13 +37,20 @@ const char *argname[] = {
 
 }
 
+// Looks like the SMT solver fails to work out the constants even when the expression frame is known.
+// It's simply too many clauses.
+// So we'd have to disable this.
 Superopt::Superopt(ModuleOp *module): Pass(module) {
   // tsgen_push_1(ctx, candidates_1);
   // tsgen_push_2(ctx, candidates_2);
   auto _x = ctx.create(BvExpr::Var, "x");
   auto _y = ctx.create(BvExpr::Var, "y");
   auto _c = ctx.create(BvExpr::Var, "c");
-  candidates_2.push_back(ctx.create(BvExpr::MulMod, _x, _y, _c));
+  auto mulmod = ctx.create(BvExpr::MulMod, _x, _y, _c);
+  auto zero = ctx.create(BvExpr::Const, 0);
+  auto lt0 = ctx.create(BvExpr::Lt, _y, zero);
+  auto ite = ctx.create(BvExpr::Ite, lt0, zero, mulmod);
+  candidates_2.push_back(ite);
 }
 
 BvExpr *Superopt::fillHole(BvExpr *expr, BvExpr *candidate) {
@@ -126,7 +133,7 @@ bool Superopt::fillPredicate(Region *region) {
     if (isa<BranchOp>(term)) {
       BvExpr *cond = trace(term->DEF());
       if (!cond)
-        return false;
+        return std::cerr << term, false;
 
       propagate(TARGET(term), ctx.create(BvExpr::And, pred, cond));
       propagate(ELSE(term), ctx.create(BvExpr::And, pred, ctx.create(BvExpr::Not, cond)));
@@ -146,6 +153,8 @@ BvExpr *Superopt::trace(Op *op) {
     { MulIOp::id, BvExpr::Mul },
     { DivIOp::id, BvExpr::Div },
     { ModIOp::id, BvExpr::Mod },
+    { AndIOp::id, BvExpr::And },
+    { OrIOp::id, BvExpr::Or },
     { EqOp::id, BvExpr::Eq },
     { NeOp::id, BvExpr::Ne },
     { LeOp::id, BvExpr::Le },
@@ -296,7 +305,7 @@ void Superopt::run() {
     if (!expr)
       continue;
 
-    std::cerr << expr << "\n";
+    std::cerr << expr << "\n\n";
 
     const std::vector<BvExpr*> &candidates = argcnt == 1 ? candidates_1 : candidates_2;
     for (auto candidate : candidates) {
@@ -311,7 +320,7 @@ void Superopt::run() {
         auto scand = solidify(candidate, inmodel, true);
         auto eq = ctx.create(BvExpr::Eq, sfilled, scand);
         auto _and = ctx.create(BvExpr::And, eq, ctx.create(BvExpr::Ne, ctx.create(BvExpr::Var, "c"), ctx.create(BvExpr::Const, 0)));
-        std::cerr << _and << "\n";
+        std::cerr << _and << "\n\n";
         _and = simplify(_and, ctx);
         bool succ = solver.infer(_and);
         if (!succ)

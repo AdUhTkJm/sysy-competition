@@ -419,6 +419,19 @@ Variable BvSolver::blastCond(BvExpr *expr) {
     addAnd(_and, l, r);
     return _and;
   }
+  case BvExpr::Or: {
+    auto l = blastCond(expr->l);
+    auto r = blastCond(expr->r);
+    // Const fold.
+    if (l == _false)
+      return r;
+    if (l == _true)
+      return _true;
+    
+    auto _or = ctx.create();
+    addOr(_or, l, r);
+    return _or;
+  }
   case BvExpr::Not: {
     auto l = blastCond(expr->l);
     // Const fold.
@@ -464,6 +477,20 @@ Variable BvSolver::blastCond(BvExpr *expr) {
     }
 
     return c;
+  }
+  case BvExpr::Lt: {
+    auto l = blastOp(expr->l);
+    auto r = blastOp(expr->r);
+    auto diff = blastAdd(l, blastNot(r), true);
+    // l - r < 0
+    return diff[31];
+  }
+  case BvExpr::Le: {
+    auto l = blastOp(expr->l);
+    auto r = blastOp(expr->r);
+    auto diff = blastAdd(l, blastNot(r), false);
+    // l + ~r < 0 (i.e. l + (-1 - r) < 0)
+    return diff[31];
   }
   default: {
     // OR everything together.
@@ -719,6 +746,10 @@ int BvSolver::eval(BvExpr *expr) {
     return eval(expr->l) << eval(expr->r);
   case BvExpr::Rsh:
     return eval(expr->l) >> eval(expr->r);
+  case BvExpr::Lt:
+    return eval(expr->l) < eval(expr->r);
+  case BvExpr::Le:
+    return eval(expr->l) <= eval(expr->r);
   case BvExpr::MulMod:
     return (((int64_t) eval(expr->cond)) * eval(expr->l)) % eval(expr->r);
   case BvExpr::Ite:
@@ -737,8 +768,10 @@ int BvSolver::eval(BvExpr *expr) {
     return eval(expr->l) == eval(expr->r);
   case BvExpr::Ne:
     return eval(expr->l) != eval(expr->r);
+  case BvExpr::Extr:
+    return (unsigned) eval(expr->l) & (1u << expr->vi);
   default:
-    std::cerr << "unsupported type " << expr->ty << "\n";
+    std::cerr << "unsupported type " << BvExpr::names[expr->ty] << "\n";
     assert(false);
   }
 }

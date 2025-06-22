@@ -17,6 +17,12 @@ BvRule rules[] = {
   "(change (sub x 0) x)",
   "(change (sub x (minus y)) (add x y))",
 
+  // Mul
+  "(change (mul 'a 'b) (!mul 'a 'b))",
+
+  // Div
+  "(change (div 'a 'b) (!div 'a 'b))",
+
   // And
   "(change (and 'a 'b) (!and 'a 'b))",
   "(change (and x (eq x 'a)) (!only-if (!ne 'a 0) (eq x 'a)))",
@@ -34,6 +40,9 @@ BvRule rules[] = {
   // Not
   "(change (not 'a) (!not 'a))",
   "(change (not (eq x y)) (ne x y))",
+
+  // Lt
+  "(change (lt 'a 'b) (!lt 'a 'b))",
 
   // Ite
   "(change (ite (not x) y z) (ite x z y))",
