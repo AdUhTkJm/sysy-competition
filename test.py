@@ -28,7 +28,7 @@ parser.add_argument("-r", "--run", action="store_true")
 parser.add_argument("--sat", action="store_true")
 parser.add_argument("--bv", action="store_true")
 parser.add_argument("-d", "--directory", type=str)
-parser.add_argument("--timeout", type=float, default=2)
+parser.add_argument("--timeout", type=float, default=4)
 parser.add_argument("--asm", type=str)
 parser.add_argument("-t", "--test", type=str)
 parser.add_argument("-i", "--input", type=str) # Input to the executable

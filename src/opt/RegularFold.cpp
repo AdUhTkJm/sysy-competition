@@ -14,6 +14,7 @@ static Rule rules[] = {
   "(change (add (minus x) y) (sub y x))",
   "(change (add x (sub y x)) y)",
   "(change (add (add x 'a) 'b) (add x (!add 'a 'b)))",
+  "(change (add (sub x 'a) 'b) (add x (!sub 'b 'a)))",
   "(change (add (mul x 'a) (mul x 'b)) (mul x (!add 'a 'b)))",
   "(change (add (mul x 'a) x) (mul (!add 'a 1) x))",
   "(change (add x (mul x 'a)) (mul (!add 'a 1) x))",
@@ -45,6 +46,8 @@ static Rule rules[] = {
   "(change (sub (add x y) y) x)",
   "(change (sub x (add x y)) (minus y))",
   "(change (sub y (add x y)) (minus x))",
+  "(change (sub x (sub x y)) y)",
+  "(change (sub (add x y) (sub x z)) (add y z))",
   "(change (sub (add x 'a) 'b) (add x (!sub 'a 'b)))",
   "(change (sub (sub x 'a) 'b) (sub x (!add 'a 'b)))",
   "(change (sub x (minus y)) (add x y))",
@@ -70,6 +73,8 @@ static Rule rules[] = {
   "(change (mul 'a 'b) (!mul 'a 'b))",
   "(change (mul 'a x) (mul x 'a))",
   "(change (mul (mul x 'a) 'b) (mul x (!mul 'a 'b)))",
+  "(change (mul (add x 'a) 'b) (add (mul x 'b) (!mul 'a 'b)))",
+  "(change (mul (sub x 'a) 'b) (sub (mul x 'b) (!mul 'a 'b)))",
 
   // Long multiplication
   "(change (mull x 1) x)",

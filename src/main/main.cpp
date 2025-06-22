@@ -109,6 +109,7 @@ void initPipeline(sys::PassManager &pm) {
   // ===== Misc =====
 
   pm.addPass<sys::RegularFold>();
+  pm.addPass<sys::Offset>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::SimplifyCFG>();
