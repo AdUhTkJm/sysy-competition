@@ -1,4 +1,5 @@
 #include "RvPasses.h"
+#include "RvDupPasses.h"
 
 using namespace sys::rv;
 using namespace sys;
@@ -210,11 +211,41 @@ void InstCombine::run() {
     return false;
   });
 
+  RvDCE(module).run();
+
   runRewriter([&](AddiwOp *op) {
     if (V(op) == 0) {
       op->replaceAllUsesWith(op->getOperand().defining);
       op->erase();
       return true;
+    }
+    //   %op   = addiw %1 <V>
+    //   %addr = add %2 %op
+    //   %x    = load %def <V2>
+    // becomes
+    //   %addr = add %1 %2
+    //   %x    = load %def <V2 + V>
+    auto uses = op->getUses();
+    for (auto add : uses) {
+      if (!isa<AddOp>(add))
+        continue;
+
+      // Make sure all consumers of this `add` is load or store,
+      // and they're changeable.
+      auto vi = V(op);
+      bool good = true;
+      for (auto x : add->getUses()) {
+        if (!isa<StoreOp>(x) && !isa<LoadOp>(x) || !inRange(V(x) + vi)) {
+          good = false;
+          break;
+        }
+      }
+      if (!good)
+        continue;
+
+      add->replaceOperand(op, op->DEF());
+      for (auto x : add->getUses())
+        V(x) += vi;
     }
     return false;
   });
@@ -224,6 +255,34 @@ void InstCombine::run() {
       op->replaceAllUsesWith(op->getOperand().defining);
       op->erase();
       return true;
+    }
+    //   %op   = addi %1 <V>
+    //   %addr = add %op %2
+    //   %x    = load %def <V2>
+    // becomes
+    //   %addr = add %1 %2
+    //   %x    = load %def <V2 + V>
+    auto uses = op->getUses();
+    for (auto add : uses) {
+      if (!isa<AddOp>(add))
+        continue;
+
+      // Make sure all consumers of this `add` is load or store,
+      // and they're changeable.
+      auto vi = V(op);
+      bool good = true;
+      for (auto x : add->getUses()) {
+        if (!isa<StoreOp>(x) && !isa<LoadOp>(x) || !inRange(V(x) + vi)) {
+          good = false;
+          break;
+        }
+      }
+      if (!good)
+        continue;
+
+      add->replaceOperand(op, op->DEF());
+      for (auto x : add->getUses())
+        V(x) += vi;
     }
     return false;
   });

@@ -17,6 +17,7 @@
 #include "../pre-opt/PreAnalysis.h"
 #include "../arm/ArmPasses.h"
 #include "../rv/RvPasses.h"
+#include "../rv/RvDupPasses.h"
 #include "../utils/smt/SMT.h"
 
 using namespace smt;
@@ -30,6 +31,7 @@ void initArmPipeline(sys::PassManager &pm) {
   pm.addPass<StrengthReduct>();
   pm.addPass<InstCombine>();
   pm.addPass<ArmDCE>();
+  pm.addPass<sys::GVN>();
   pm.addPass<RegAlloc>();
   pm.addPass<LateLegalize>();
   pm.addPass<Dump>(opts.outputFile);
@@ -42,6 +44,7 @@ void initRvPipeline(sys::PassManager &pm) {
   pm.addPass<StrengthReduct>();
   pm.addPass<InstCombine>();
   pm.addPass<RvDCE>();
+  pm.addPass<sys::GVN>();
   pm.addPass<RegAlloc>();
   pm.addPass<Dump>(opts.outputFile);
 }

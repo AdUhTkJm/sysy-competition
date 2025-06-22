@@ -43,22 +43,6 @@ public:
   void run() override;
 };
 
-// The only difference with opt/DCE is that `isImpure` behaves differently.
-class RvDCE : public Pass {
-  std::vector<Op*> removeable;
-  int elim = 0;
-
-  bool isImpure(Op *op);
-  void markImpure(Region *region);
-  void runOnRegion(Region *region);
-public:
-  RvDCE(ModuleOp *module): Pass(module) {}
-    
-  std::string name() override { return "rv-dce"; };
-  std::map<std::string, int> stats() override;
-  void run() override;
-};
-
 class RegAlloc : public Pass {
   int spilled = 0;
   int convertedTotal = 0;

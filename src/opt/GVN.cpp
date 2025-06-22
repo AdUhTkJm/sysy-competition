@@ -1,4 +1,5 @@
 #include "Passes.h"
+#include "../rv/RvOps.h"
 
 using namespace sys;
 
@@ -70,6 +71,9 @@ bool allowed(Op *op) {
     ALLOW(SetNotZeroOp)
     ALLOW(GetGlobalOp)
     ALLOW(BroadcastOp)
+
+  // RISC-V GVN
+    ALLOW(rv::AddOp)
   ;
 }
 
