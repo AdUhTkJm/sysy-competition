@@ -113,6 +113,8 @@ void initPipeline(sys::PassManager &pm) {
   
   // ===== Misc =====
 
+  pm.addPass<sys::Range>();
+  pm.addPass<sys::RangeAwareFold>();
   pm.addPass<sys::RegularFold>();
   // pm.addPass<sys::Offset>(); // Buggy?
   pm.addPass<sys::DCE>();

@@ -8,6 +8,17 @@ std::map<std::string, int> RangeAwareFold::stats() {
   };
 }
 
+void RangeAwareFold::removeRange(Region *region) {
+  for (auto bb : region->getBlocks()) {
+    for (auto op : bb->getOps()) {
+      if (!isa<PhiOp>(op))
+        break;
+
+      op->remove<RangeAttr>();
+    }
+  }
+}
+
 void RangeAwareFold::run() {
   Builder builder;
 
@@ -56,4 +67,12 @@ void RangeAwareFold::run() {
     builder.replace<AndIOp>(op, { x, vi });
     return false;
   });
+
+  // Remove all positive attributes for phi.
+  auto funcs = collectFuncs();
+
+  for (auto func : funcs) {
+    auto region = func->getRegion();
+    removeRange(region);
+  }
 }

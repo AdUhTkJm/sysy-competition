@@ -94,6 +94,17 @@ int maxmod(int a1, int b1, int a2, int b2) {
   return std::max(std::abs(a2), std::abs(b2)) - 1;
 }
 
+#define NORANGE(Ty) || isa<Ty>(op)
+bool norange(Op *op) {
+  return isa<AllocaOp>(op)
+    NORANGE(GotoOp)
+    NORANGE(BranchOp)
+    NORANGE(ReturnOp)
+  ;
+}
+
+int nowiden;
+
 // Seems still have some problems.
 // Sometimes operations aren't properly updated.
 bool calculateRange(Op *op) {
@@ -128,7 +139,7 @@ bool calculateRange(Op *op) {
   }
 
   UPDATE_RANGE(AddIOp, ((int64_t) a1) + a2, ((int64_t) b1) + b2);
-  UPDATE_RANGE(SubIOp, ((int64_t) a1) - b2, ((int64_t) a2) - b1);
+  UPDATE_RANGE(SubIOp, ((int64_t) a1) - b2, ((int64_t) b1) - a2);
   UPDATE_RANGE(MulIOp, minmul(a1, b1, a2, b2), maxmul(a1, b1, a2, b2));
   UPDATE_RANGE(DivIOp, mindiv(a1, b1, a2, b2), maxdiv(a1, b1, a2, b2));
   UPDATE_RANGE(ModIOp, minmod(a1, b1, a2, b2), maxmod(a1, b1, a2, b2));
@@ -155,16 +166,18 @@ bool calculateRange(Op *op) {
       if (a1 == min && b1 == max)
         return false;
       auto last = range->range;
-      range->range = join(range->range, { min, max }, /*widen=*/true);
+      range->range = join(range->range, { min, max }, /*widen=*/!nowiden);
       return range->range != last;
     }
     // Unknown.
     if (min == INT_MAX && max == INT_MIN)
       return false;
-    else
-      op->add<RangeAttr>(min, max);
+    op->add<RangeAttr>(min, max);
+    return true;
   }
 
+  if (!op->has<RangeAttr>() && !norange(op))
+    op->add<RangeAttr>(/*unknown*/);
   return false;
 }
 
@@ -207,8 +220,10 @@ void Range::postdom(Region *region) {
 
 void Range::runImpl(Region *region, const LoopForest &forest) {
   bool changed;
+  nowiden = 4;
   do {
     changed = false;
+    nowiden--;
     for (auto bb : region->getBlocks()) {
       for (auto op : bb->getOps())
         changed |= calculateRange(op);
