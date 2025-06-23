@@ -161,14 +161,15 @@ static Rule rules[] = {
   // Less than
   "(change (lt x x) 0)",
   "(change (lt 'a 'b) (!lt 'a 'b))",
-  "(change (lt (mul x 'a) 'b) (!only-if (!and (!gt 'a 0) (!gt 'b 0)) (lt x (!div 'b 'a))))",
+  "(change (lt (mul x 'a) 'b) (!only-if (!and (!and (!gt 'a 0) (!gt 'b 0)) (!eq (!mod 'b 'a) 0)) (lt x (!div 'b 'a))))",
+  "(change (lt (mul x 'a) 'b) (!only-if (!and (!and (!gt 'a 0) (!gt 'b 0)) (!ne (!mod 'b 'a) 0)) (lt x (!add (!div 'b 'a) 1))))",
   "(change (lt (div x 'a) 'b) (!only-if (!and (!gt 'a 0) (!gt 'b 0)) (lt x (!mul 'b 'a))))",
   "(change (lt 'b (add x 'a)) (lt (!sub 'b 'a) x))",
   "(change (lt 'b (sub x 'a)) (lt (!add 'b 'a) x))",
   "(change (lt 'b (mul x 'a)) (!only-if (!and (!gt 'a 0) (!gt 'b 0)) (lt (!div 'b 'a) x)))",
   "(change (lt 'b (div x 'a)) (!only-if (!and (!gt 'a 0) (!gt 'b 0)) (le (!mul 'a (!add 'b 1)) x)))",
   "(change (lt x (add x 'a)) (!lt 0 'a))",
-  "(change (lt x (sub 'a x)) (!only-if (!gt 'a 0) (lt x (!div 'a 2))))",
+  "(change (lt x (sub 'a x)) (lt (mul x 2) 'a))",
   
   // FP Less than
   "(change (flt x x) 0)",
