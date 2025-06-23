@@ -21,8 +21,7 @@ static Rule rules[] = {
   "(change (add (mul x 'a) (mul y 'a)) (mul (add x y) 'a))",
   "(change (add (div 'a x) (div 'b x)) (div (!add 'a 'b) x))",
   "(change (add (div x 'a) (div y 'a)) (div (add x y) 'a))",
-  "(change (add (add x x) x) (mul x 3))",
-  "(change (add x (add x x)) (mul x 3))",
+  "(change (add x x) (mul x 2))",
 
   // Addition (64-bit)
   "(change (addl x 0) x)",
@@ -112,6 +111,9 @@ static Rule rules[] = {
   "(change (mod x x) 0)",
   "(change (mod 0 x) 0)",
   "(change (mod 'a 'b) (!mod 'a 'b))",
+  // Verified: https://alive2.llvm.org/ce/z/2Ebzml
+  // But why won't this work?
+  // "(change (mod (add (mod x 'a) y) 'a) (select (gt (add x y) 0) (mod (add x y) 'a) (add (mod (add x y) 'a) 'a)))",
 
   // Shift
   "(change (lshift 'a 'b) (!lsh 'a 'b))",
@@ -217,6 +219,10 @@ static Rule rules[] = {
 
   // FP Set not zero
   "(change (snz *a) (!fne *a *0))",
+
+  // And
+  "(change (and x 0) 0)",
+  "(change (and 'a 'b) (!and 'a 'b))",
 
   // Select
   "(change (select 1 x y) x)",

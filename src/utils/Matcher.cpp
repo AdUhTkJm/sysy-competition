@@ -67,6 +67,14 @@ using namespace sys;
     return op a; \
   }
 
+#define BUILD_TERNARY(opcode, Ty) \
+  if (opname == opcode) { \
+    Value a = buildExpr(list->elements[1]); \
+    Value b = buildExpr(list->elements[2]); \
+    Value c = buildExpr(list->elements[3]); \
+    return builder.create<Ty>({ a, b, c }); \
+  }
+
 #define BUILD_BINARY(opcode, Ty) \
   if (opname == opcode) { \
     Value a = buildExpr(list->elements[1]); \
@@ -384,6 +392,8 @@ Op *Rule::buildExpr(Expr *expr) {
 
     return builder.create<FloatOp>({ new FloatAttr(result) });
   }
+
+  BUILD_TERNARY("select", SelectOp);
 
   BUILD_BINARY("add", AddIOp);
   BUILD_BINARY("sub", SubIOp);
