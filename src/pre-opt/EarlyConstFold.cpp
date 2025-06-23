@@ -132,9 +132,9 @@ void EarlyConstFold::run() {
       // Now this is a constant value.
       Op *def = store->DEF(0);
   
-      // We only propagate compiler-time constants.
-      // Other things are better done in Mem2Reg.
-      if (!isa<IntOp>(def) && !isa<AllocaOp>(def))
+      // Don't propagate non-constants.
+      // GetArgs are special because they're checked against in many pre-passes.
+      if (isa<LoadOp>(def) || isa<CallOp>(def) || isa<GetArgOp>(def))
         continue;
       
       for (auto use : uses) {

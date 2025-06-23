@@ -111,9 +111,6 @@ static Rule rules[] = {
   "(change (mod x x) 0)",
   "(change (mod 0 x) 0)",
   "(change (mod 'a 'b) (!mod 'a 'b))",
-  // Verified: https://alive2.llvm.org/ce/z/2Ebzml
-  // But why won't this work?
-  // "(change (mod (add (mod x 'a) y) 'a) (select (gt (add x y) 0) (mod (add x y) 'a) (add (mod (add x y) 'a) 'a)))",
 
   // Shift
   "(change (lshift 'a 'b) (!lsh 'a 'b))",
@@ -168,6 +165,8 @@ static Rule rules[] = {
   "(change (lt (div x 'a) 'b) (!only-if (!and (!gt 'a 0) (!gt 'b 0)) (lt x (!mul 'b 'a))))",
   "(change (lt 'b (add x 'a)) (lt (!sub 'b 'a) x))",
   "(change (lt 'b (sub x 'a)) (lt (!add 'b 'a) x))",
+  "(change (lt 'b (sub 'a x)) (gt (!sub 'a 'b) x))",
+  "(change (lt (sub 'a x) 'b) (gt x (!sub 'a 'b)))",
   "(change (lt 'b (mul x 'a)) (!only-if (!and (!gt 'a 0) (!gt 'b 0)) (lt (!div 'b 'a) x)))",
   "(change (lt 'b (div x 'a)) (!only-if (!and (!gt 'a 0) (!gt 'b 0)) (le (!mul 'a (!add 'b 1)) x)))",
   "(change (lt x (add x 'a)) (!lt 0 'a))",

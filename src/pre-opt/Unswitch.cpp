@@ -1,4 +1,7 @@
 #include "PreLoopPasses.h"
+#include "PrePasses.h"
+#include "../opt/Passes.h"
+#include "../opt/CleanupPasses.h"
 #include "../utils/Matcher.h"
 
 using namespace sys;
@@ -10,6 +13,10 @@ std::map<std::string, int> Unswitch::stats() {
 }
 
 namespace {
+
+// Loops that shouldn't be further processed.
+// For example, these might contain the side loop produced by unrolling.
+std::set<Op*> dont;
 
 Rule cmpmod("(eq (mod x 'a) 'b)");
 Rule cmpmod0("(mod x 'a)");
@@ -139,6 +146,9 @@ void unroll(Op *loop, int vi) {
   opmap.clear();
   // Rename induction variable.
   opmap[loop] = sideloop;
+
+  // The side loop shouldn't be further processed.
+  dont.insert(sideloop);
 
   for (auto x : body)
     copy(x);
@@ -484,6 +494,9 @@ bool Unswitch::gtconst(Op *loop, Op *cond) {
 }
 
 bool Unswitch::runImpl(Op *loop) {
+  if (dont.count(loop))
+    return false;
+  
   // Erased loop, but yet to be deleted.
   if (!loop->getOperandCount())
     return false;
@@ -506,13 +519,22 @@ bool Unswitch::runImpl(Op *loop) {
 
   auto cond = branch->DEF();
 
-  return 
+  bool changed = 
     (isa<IntOp>(step) && cmpmod(loop, cond)) ||
     ltconst(loop, cond) ||
     gtconst(loop, cond);
+
+  if (changed) {
+    TidyMemory(module).run();
+    RegularFold(module).run();
+    DCE(module, /*elimBlocks=*/false).run();
+  }
+
+  return changed;
 }
 
 void Unswitch::run() {
+  dont.clear();
   bool changed;
   do {
     changed = false;

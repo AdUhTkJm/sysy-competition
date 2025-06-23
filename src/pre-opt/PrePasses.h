@@ -31,6 +31,19 @@ public:
   void run() override;
 };
 
+// Folds memory, similar to DLE in later passes.
+class TidyMemory : public Pass {
+  int tidied = 0;
+
+  void runImpl(Region *region);
+public:
+  TidyMemory(ModuleOp *module): Pass(module) {}
+    
+  std::string name() override { return "tidy-memory"; };
+  std::map<std::string, int> stats() override;
+  void run() override;
+};
+
 // Localizes global variables.
 class Localize : public Pass {
   bool beforeFlatten;
