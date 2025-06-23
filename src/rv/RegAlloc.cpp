@@ -72,7 +72,7 @@ std::map<std::string, int> RegAlloc::stats() {
     op->add<Spilled##AttrTy> GET_SPILLED_ARGS(v##Index);
 
 #define GET_SPILLED_ARGS(op) \
-  (op->getResultType() == Value::f32, spillOffset[op], op)
+  (fpreg(op->getResultType()), spillOffset[op], op)
 
 #define BINARY ADD_ATTR(0, RsAttr) ADD_ATTR(1, Rs2Attr)
 #define UNARY ADD_ATTR(0, RsAttr)
@@ -172,7 +172,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     auto ty = op->getResultType();
 
     // It is necessary to put those GetArgs to the front.
-    if (ty == Value::f32 && fcnt < 8) {
+    if (fpreg(ty) && fcnt < 8) {
       op->moveToStart(entry);
       builder.setBeforeOp(op);
       builder.create<PlaceHolderOp>({ fargHolders[fcnt] });
@@ -180,7 +180,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       fcnt++;
       continue;
     }
-    if (ty != Value::f32 && cnt < 8) {
+    if (!fpreg(ty) && cnt < 8) {
       op->moveToStart(entry);
       builder.setBeforeOp(op);
       builder.create<PlaceHolderOp>({ argHolders[cnt] });
@@ -283,7 +283,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
           // FP and int are using different registers.
           // However, they are using the same stack,
           // so that must be taken into account when spilling.
-          if (activeOp->getResultType() == Value::f32 ^ op->getResultType() == Value::f32) {
+          if (fpreg(activeOp->getResultType()) ^ fpreg(op->getResultType())) {
             spillInterf[op].insert(activeOp);
             spillInterf[activeOp].insert(op);
             continue;
@@ -372,8 +372,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       continue;
     }
 
-    auto rcnt = op->getResultType() != Value::f32 ? regcount : regcountf;
-    auto rorder = op->getResultType() != Value::f32 ? order : orderf;
+    auto rcnt = !fpreg(op->getResultType()) ? regcount : regcountf;
+    auto rorder = !fpreg(op->getResultType()) ? order : orderf;
 
     for (int i = 0; i < rcnt; i++) {
       if (!bad.count(rorder[i]) && !unpreferred.count(rorder[i])) {
@@ -426,10 +426,19 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       highest = desired;
   }
 
-  // Only a single register is spilled. Let's use s11.
+  // Only a single register is spilled. Let's use s10.
   if (highest == currentOffset) {
     for (auto [op, _] : spillOffset)
-      assignment[op] = op->getResultType() == Value::f32 ? fspillReg : spillReg;
+      assignment[op] = fpreg(op->getResultType()) ? fspillReg : spillReg;
+    spillOffset.clear();
+  }
+
+  // Only 2 registers are spilled. Let's use s10 and s11..
+  if (highest == currentOffset + 8) {
+    for (auto [op, offset] : spillOffset) {
+      auto fp = fpreg(op->getResultType());
+      assignment[op] = offset ? (fp ? fspillReg2 : spillReg2) : (fp ? fspillReg : spillReg);
+    }
     spillOffset.clear();
   }
 
@@ -439,7 +448,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
   const auto getReg = [&](Op *op) {
     return assignment.count(op) ? assignment[op] :
-      op->getResultType() == Value::f32 ? orderf[0] : order[0];
+      fpreg(op->getResultType()) ? orderf[0] : order[0];
   };
 
   // Convert all operands to registers.
@@ -652,7 +661,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         builder.setBeforeOp(term);
         auto def = ops[i].defining;
         Op *mv;
-        if (phi->getResultType() == Value::f32) {
+        if (fpreg(phi->getResultType())) {
           mv = builder.create<FmvOp>({
             new ImpureAttr,
             spillOffset.count(phi) ? (Attr*) new SpilledRdAttr GET_SPILLED_ARGS(phi) : RDC(getReg(phi)),
