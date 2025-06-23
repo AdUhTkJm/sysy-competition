@@ -100,6 +100,7 @@ bool norange(Op *op) {
     NORANGE(GotoOp)
     NORANGE(BranchOp)
     NORANGE(ReturnOp)
+    NORANGE(StoreOp)
   ;
 }
 

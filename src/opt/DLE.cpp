@@ -31,9 +31,44 @@ void DLE::runImpl(Region *region) {
       }
       
       // This call might invalidate all living stores.
-      // We can have more granularity but I don't want to do it now.
+      // Check its arguments to see what's been passed into it,
+      // and clear the store of those things.
+      // Moreover, clear the stores of globals.
       if (isa<CallOp>(op) && op->has<ImpureAttr>()) {
-        liveStore.clear();
+        std::set<Op*> toclear;
+        for (auto operand : op->getOperands()) {
+          auto def = operand.defining;
+          if (!def->has<AliasAttr>())
+            continue;
+          auto alias = ALIAS(def);
+          if (alias->unknown) {
+            liveStore.clear();
+            break;
+          }
+
+          for (auto [base, _] : alias->location)
+            toclear.insert(base);
+        }
+        std::vector<Op*> remaining;
+        for (auto store : liveStore) {
+          auto x = store->DEF(1);
+          if (!x->has<AliasAttr>())
+            continue;
+
+          bool good = true;
+          for (auto [base, _] : ALIAS(x)->location) {
+            // Also invalidate globals.
+            if (toclear.count(base) || isa<GetGlobalOp>(base) || isa<GlobalOp>(base)) {
+              good = false;
+              break;
+            }
+          }
+          if (!good)
+            continue;
+
+          remaining.push_back(store);
+        }
+        liveStore = std::move(remaining);
         continue;
       }
 

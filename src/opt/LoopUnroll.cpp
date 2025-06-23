@@ -246,10 +246,6 @@ bool ConstLoopUnroll::runImpl(LoopInfo *loop) {
   if (unroll == -1)
     return false;
 
-  // If the constant-bounded loop has a single iteration, it'll be handled by regular fold.
-  if (unroll == 1)
-    return false;
-
   // Record the phi values at the beginning of `exit` that are taken from the latch.
   // Note that "taken from latch" doesn't necessarily mean it's in the loop.
   // It can be from something that passes through all the loop, for example.

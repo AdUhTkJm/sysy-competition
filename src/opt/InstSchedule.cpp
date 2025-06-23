@@ -5,6 +5,11 @@
 using namespace sys;
 
 void InstSchedule::runImpl(BasicBlock *bb) {
+  // If there are local arrays, then there are probably initialization.
+  // We'd like to keep those stores in order to achieve better cache performance.
+  if (isa<AllocaOp>(bb->getFirstOp()))
+    return;
+  
   for (auto op : bb->getOps()) {
     // We can't reschedule if there is any pinned operations.
     // TODO: Perhaps there's some way to mitigate this?
