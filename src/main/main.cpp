@@ -71,6 +71,8 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::LoopDCE>();
   pm.addPass<sys::Fusion>();
   pm.addPass<sys::Unswitch>();
+  pm.addPass<sys::DCE>(/*elimBlocks=*/ false);
+  pm.addPass<sys::ColumnMajor>();
   pm.addPass<sys::Parallelizable>();
   pm.addPass<sys::LoopDCE>();
   // pm.addPass<sys::Unroll>(); // Unrolling doesn't help.

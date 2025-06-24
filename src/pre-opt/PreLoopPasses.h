@@ -78,6 +78,32 @@ public:
   void run() override;
 };
 
+// For 2D arrays, if their access pattern suggests so,
+// then reorder them into column major format.
+class ColumnMajor : public Pass {
+  struct AccessData {
+    int depth = 0;
+    // `true` when there exists a loop such that this array's last dimension is
+    // contiguously accessed on the deepest dimension;
+    // i.e. it's the smallest entry in SubscriptAttr.
+    bool contiguous = false;
+    // `true` when there exists a loop such that this array's last dimension is
+    // NOT contiguously accessed on the deepest dimension.
+    bool jumping = false;
+    // `false` when some accesses to the array do not have SubscriptAttr.
+    bool valid = true;
+  };
+  std::unordered_map<Op*, AccessData> data;
+
+  void collectDepth(Region *region, int depth);
+public:
+  ColumnMajor(ModuleOp *module): Pass(module) {}
+
+  std::string name() override { return "column-major"; }
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
+};
+
 class Unroll : public Pass {
   int unrolled = 0;
 public:
