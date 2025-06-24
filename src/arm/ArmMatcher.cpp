@@ -297,10 +297,13 @@ bool ArmRule::matchExpr(Expr *expr, Op* op) {
 
   MATCH_BINARY("addw", AddWOp);
   MATCH_BINARY("addx", AddXOp);
+  MATCH_BINARY("fadd", FaddOp);
   MATCH_BINARY("subw", SubWOp);
   MATCH_BINARY("subx", SubXOp);
+  MATCH_BINARY("fsub", FsubOp);
   MATCH_BINARY("mulw", MulWOp);
   MATCH_BINARY("mulx", MulXOp);
+  MATCH_BINARY("fmul", FmulOp);
   MATCH_BINARY("sdivw", SdivWOp);
   MATCH_BINARY("sdivx", SdivXOp);
   MATCH_BINARY("and", AndOp);
@@ -455,6 +458,8 @@ Op *ArmRule::buildExpr(Expr *expr) {
 
   BUILD_TERNARY("maddw", MaddWOp);
   BUILD_TERNARY("maddx", MaddXOp);
+  BUILD_TERNARY("fmadd", FmaddOp);
+  BUILD_TERNARY("fmsub", FmsubOp);
 
   BUILD_TERNARY_IMM("strwr", StrWROp);
   BUILD_TERNARY_IMM("strxr", StrXROp);

@@ -48,6 +48,7 @@ using namespace sys::arm;
 
 #define TERNARY_W(Ty, name) TERNARY(Ty, name, wreg)
 #define TERNARY_X(Ty, name) TERNARY(Ty, name, xreg)
+#define TERNARY_F(Ty, name) TERNARY(Ty, name, freg)
 #define TERNARY_V(Ty, name) TERNARY(Ty, name, vreg)
 #define BINARY_W(Ty, name) BINARY(Ty, name, wreg)
 #define BINARY_X(Ty, name) BINARY(Ty, name, xreg)
@@ -111,6 +112,9 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   
   TERNARY_X(MsubXOp, "msub");
   TERNARY_X(MaddXOp, "madd");
+
+  TERNARY_F(FmaddOp, "fmadd");
+  TERNARY_F(FmsubOp, "fmsub");
 
   BINARY_W(AddWOp, "add");
   BINARY_W(SubWOp, "sub");

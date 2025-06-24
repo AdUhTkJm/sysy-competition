@@ -237,7 +237,7 @@ int StrengthReduct::runImpl() {
       auto srai = builder.create<AsrXIOp>({ x }, { new IntAttr(63) });
       auto vi = builder.create<MovIOp>({ new IntAttr(64) });
       auto sub = builder.create<SubWOp>({ vi, n });
-      auto srl = builder.create<LslXOp>({ srai, sub });
+      auto srl = builder.create<LsrXOp>({ srai, sub });
       auto add = builder.create<AddXOp>({ x, srl });
       builder.replace<AsrXOp>(op, { add, n });
       return true;

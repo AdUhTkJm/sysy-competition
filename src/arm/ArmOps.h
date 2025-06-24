@@ -201,6 +201,8 @@ ARMOPF(FaddOp);
 ARMOPF(FsubOp);
 ARMOPF(FmulOp);
 ARMOPF(FdivOp);
+ARMOPF(FmaddOp);
+ARMOPF(FmsubOp);
 
 // ====== Vector Ops ======
 ARMOP(St1Op);

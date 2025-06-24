@@ -21,6 +21,10 @@ static ArmRule rules[] = {
   "(change (addw (mulw x y) z) (maddw x y z))",
   "(change (addw z (mulw x y)) (maddw x y z))",
 
+  // FADD, FSUB
+  // "(change (fadd (fmul x y) z) (fmadd x y z))",
+  // "(change (fadd z (fmul x y)) (fmadd x y z))",
+
   // SUB
   "(change (subw x (mov #a)) (!only-if (!inbit 12 (!minus #a)) (addwi x (!minus #a))))",
   "(change (subx x (mov #a)) (!only-if (!inbit 12 (!minus #a)) (addxi x (!minus #a))))",

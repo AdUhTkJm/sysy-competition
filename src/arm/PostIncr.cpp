@@ -49,7 +49,6 @@ void PostIncr::runImpl(LoopInfo *info) {
       if (it == final.end())
         continue;
 
-      auto op = *it;
       if (!lastuse || it < lastbb) {
         // Either that's the first use, or found a later use.
         lastuse = use;
