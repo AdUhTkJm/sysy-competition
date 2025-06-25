@@ -172,4 +172,30 @@ void DSE::run() {
   auto gets = module->findAll<GetGlobalOp>();
   for (auto glob : globs)
     removeUnread(glob, gets);
+
+  // Finally, look at a load-store pattern like this:
+  //   %a = load %1
+  //   store %a, %1
+  // The second store is useless.
+  // Only do this on each basic block to avoid complicated analysis.
+  auto loads = module->findAll<LoadOp>();
+  std::vector<Op*> remove;
+  for (auto load : loads) {
+    auto loadAddr = load->DEF();
+    for (auto runner = load->nextOp(); runner; runner = runner->nextOp()) {
+      if (isa<StoreOp>(runner)) {
+        auto addr = runner->DEF(1), value = runner->DEF(0);
+        if (value == load && addr != loadAddr)
+          continue;
+        if (value == load && addr == loadAddr) {
+          remove.push_back(runner);
+          continue;
+        }
+        break;
+      }
+    }
+  }
+
+  for (auto op : remove)
+    op->erase();
 }

@@ -36,12 +36,16 @@ BasicBlock *BasicBlock::nextBlock() const {
 
 Op *Op::prevOp() {
   auto it = place;
+  if (it == parent->begin())
+    return nullptr;
   return *--it;
 }
 
 Op *Op::nextOp() {
   auto it = place;
-  return *++it;
+  if (++it == parent->end())
+    return nullptr;
+  return *it;
 }
 
 Value::Value(Op *from): defining(from) {}

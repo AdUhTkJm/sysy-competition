@@ -24,6 +24,10 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
   auto preheader = info->preheader;
   auto header = info->header;
   auto latch = info->getLatch();
+  // Maps an op to its increase amount, when the amount is non-constant but loop-invariant.
+  // The increase amount is actually a multiplication of all ops in the vector.
+  std::unordered_map<Op*, std::vector<Op*>> invar;
+  Builder builder;
 
   for (auto op : bb->getOps()) {
     if (op->has<IncreaseAttr>())
@@ -35,8 +39,21 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
       if (!x->has<IncreaseAttr>()) {
         if (y->has<IncreaseAttr>())
           std::swap(x, y);
-        else
+        else {
+          // When neither has IncreaseAttr, it's still possible that `x` or `y` is `invar`.
+          // It can't proceed when both or none of them are there.
+          // TODO: make up an addition at preheader when both are `invar`?
+          if (!(invar.count(x) ^ invar.count(y)))
+            continue;
+          if (!invar.count(x) && invar.count(y))
+            std::swap(x, y);
+          if (info->contains(y->getParent()) && !isa<IntOp>(y))
+            continue;
+
+          invar[op] = invar[x];
+          start[y] = y;
           continue;
+        }
       }
 
       // Case 1. x + <invariant>
@@ -82,6 +99,29 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
     if (isa<MulIOp>(op)) {
       auto x = op->DEF(0);
       auto y = op->DEF(1);
+      // Case 1. x * <invar>
+      if (x->has<IncreaseAttr>() && INCR(x)->amt.size() == 1 && !info->contains(y->getParent())) {
+        auto amt = INCR(x)->amt[0];
+        std::vector<Op*> incr = { y };
+        if (amt != 1) {
+          builder.setBeforeOp(info->preheader->getLastOp());
+          auto vi = builder.create<IntOp>({ new IntAttr(amt) });
+          incr.push_back(vi);
+          start[vi] = vi;
+        }
+        invar[op] = incr;
+        start[y] = y;
+        continue;
+      }
+
+      // Case 2. <invar> * <invar>
+      if (invar.count(x) && !info->contains(y->getParent())) {
+        invar[op] = invar[x];
+        invar[op].push_back(y);
+        start[y] = y;
+        continue;
+      }
+
       if (!x->has<IncreaseAttr>()) {
         if (y->has<IncreaseAttr>())
           std::swap(x, y);
@@ -89,7 +129,7 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
           continue;
       }
 
-      // Case 1. x * 'a
+      // Case 3. x * 'a
       if (isa<IntOp>(y)) {
         auto amt = INCR(x)->amt;
         int v = V(y);
@@ -104,12 +144,17 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
 
   // After marking, now time to rewrite.
   auto term = preheader->getLastOp();
-  Builder builder;
   builder.setBeforeOp(term);
+
+  // for (auto [k, v] : invar) {
+  //   std::cerr << k;
+  //   for (auto x : v)
+  //     std::cerr << "  " << x;
+  // }
 
   std::vector<Op*> candidates;
   for (auto op : bb->getOps()) {
-    if (isa<PhiOp>(op) || !op->has<IncreaseAttr>())
+    if (isa<PhiOp>(op) || (!invar.count(op) && !op->has<IncreaseAttr>()))
       continue;
 
     if (nochange.count(op))
@@ -122,7 +167,12 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
   // if the unrolled loop have a surrounding loop.
   // We don't want to assign a phi to each of them.
   // We use a threshold to guard against this.
-  if (candidates.size() >= 6) {
+  int sz = 0;
+  for (auto c : candidates) {
+    if (isa<AddLOp>(c))
+      sz++;
+  }
+  if (sz >= 4) {
     for (auto op : candidates)
       nochange.insert(op);
     candidates.clear();
@@ -166,15 +216,23 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
 
     builder.setToBlockStart(header);
     auto phi = builder.create<PhiOp>({ start[op] }, { new FromAttr(preheader) });
-
-    auto amt = INCR(op)->amt;
-    if (amt.size() > 1)
-      continue;
-
     builder.setBeforeOp(op);
-    auto vi = builder.create<IntOp>({ new IntAttr(amt[0]) });
 
-    Op *add = builder.create<AddLOp>({ phi, vi });
+    Op *add;
+    if (invar.count(op)) {
+      const auto &amt = invar[op];
+      auto incr = amt[0];
+      for (int i = 1; i < amt.size(); i++)
+        incr = builder.create<MulIOp>({ incr->getResult(), amt[i] });
+      add = builder.create<AddLOp>({ phi, incr });
+    } else {
+      auto amt = INCR(op)->amt;
+      if (amt.size() > 1)
+        continue;
+
+      auto vi = builder.create<IntOp>({ new IntAttr(amt[0]) });
+      add = builder.create<AddLOp>({ phi, vi });
+    }
 
     op->replaceAllUsesWith(phi);
     op->erase();

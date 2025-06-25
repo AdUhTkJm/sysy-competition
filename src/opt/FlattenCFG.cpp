@@ -171,15 +171,13 @@ void tidy(FuncOp *func) {
       continue;
 
     std::vector<Op*> remove;
-    for (auto op = term->nextOp(); op != bb->getLastOp(); op = op->nextOp()) {
+    for (auto op = term->nextOp(); op; op = op->nextOp()) {
       op->removeAllOperands();
       remove.push_back(op);
     }
-    bb->getLastOp()->removeAllOperands();
 
     for (auto op : remove)
       op->erase();
-    bb->getLastOp()->erase();
   }
 
   // Get a terminator for basic blocks.

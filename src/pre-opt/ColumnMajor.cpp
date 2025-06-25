@@ -99,8 +99,6 @@ void ColumnMajor::run() {
   Base(module).run();
   ArrayAccess(module).run();
 
-  module->dump();
-
   auto funcs = collectFuncs();
   try {
     for (auto func : funcs)
