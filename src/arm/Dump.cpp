@@ -137,7 +137,7 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   BINARY_X(LslXOp, "lslv");
   BINARY_X(LsrXOp, "lsr");
   BINARY_X(AndOp, "and");
-  BINARY_X(OrOp, "or");
+  BINARY_X(OrOp, "orr");
   BINARY_X(EorOp, "eor");
 
   BINARY_V(AddVOp, "add");
