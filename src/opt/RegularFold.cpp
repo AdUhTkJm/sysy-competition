@@ -229,6 +229,18 @@ static Rule rules[] = {
   "(change (select c 1 0) (snz c))",
   "(change (select c 0 1) (not c))",
   "(change (select c x x) x)",
+  "(change (select c (eq x y) 0) (and (eq x y) c))",
+  "(change (select c (ne x y) 0) (and (ne x y) c))",
+  "(change (select c (lt x y) 0) (and (lt x y) c))",
+  "(change (select c (le x y) 0) (and (le x y) c))",
+  "(change (select c (eq x y) 1) (or (eq x y) (not c)))",
+  "(change (select c (ne x y) 1) (or (ne x y) (not c)))",
+  "(change (select c (lt x y) 1) (or (lt x y) (not c)))",
+  "(change (select c (le x y) 1) (or (le x y) (not c)))",
+  "(change (select c 1 (eq x y)) (or (eq x y) c))",
+  "(change (select c 1 (ne x y)) (or (ne x y) c))",
+  "(change (select c 1 (lt x y)) (or (lt x y) c))",
+  "(change (select c 1 (le x y)) (or (le x y) c))",
 
   // float -> int
   "(change (f2i *a) (!cvt *a))",
