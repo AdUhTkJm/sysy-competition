@@ -17,31 +17,19 @@ void TCO::runImpl(FuncOp *func) {
   // If not, then there's no need to perform TCO even though it's correct to do.
   bool hasCallRet = false;
 
-  const auto lastDone = [](Op *ret) -> Op* {
-    if (ret->getOperandCount() == 0) {
-      if (ret == ret->getParent()->getFirstOp())
-        return nullptr;
-
-      return ret->prevOp();
-    }
-    return ret->DEF();
-  };
-
   for (auto ret : rets) {
-    Op *def = lastDone(ret);
-    if (!def)
-      continue;
+    if (!ret->getOperandCount())
+      return;
 
-    if (isa<IntOp>(def) || isa<LoadOp>(def) || isa<FloatOp>(def))
-      continue;
-
-    if (isa<CallOp>(def) && NAME(def) == name && def->getUses().size() == 1) {
+    auto def = ret->DEF();
+    if (isa<CallOp>(def)) {
+      const auto &callname = NAME(def);
+      if (callname != name || def != ret->prevOp())
+        return;
       hasCallRet = true;
-      continue;
     }
 
-    // Not tail recursive. Return.
-    return;
+    // Other operations aren't important.
   }
 
   if (!hasCallRet)
@@ -93,7 +81,7 @@ void TCO::runImpl(FuncOp *func) {
 
   builder.setToBlockStart(newEntry);
   for (auto ret : rets) {
-    auto def = lastDone(ret);
+    auto def = ret->DEF();
 
     // Store the arguments into correct allocas.
     // Replace this call with a `continue`.
