@@ -128,16 +128,25 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   // First of all, add 35 precolored placeholders before each call.
   // This denotes that a CallOp clobbers those registers.
   runRewriter(funcOp, [&](CallOp *op) {
-    // Find `writeReg`s before this call.
-    auto runner = op->prevOp();
-    for (; runner && isa<WriteRegOp>(runner); runner = runner->prevOp());
+    // Make sure arguments don't conflict.
+    std::vector<Op*> writes;
+    for (auto runner = op->prevOp(); runner && isa<WriteRegOp>(runner); runner = runner->prevOp())
+      writes.push_back(runner);
 
-    // Locate just before these arguments.
-    if (!runner)
-      builder.setBeforeOp(op->getParent()->getFirstOp());
-    else 
-      builder.setAfterOp(runner);
-    
+    // `writes` are in backward order.
+    // We need to insert a placeholder for everything after this writereg in the vector.
+    for (int i = 0; i < int(writes.size()) - 1; i++) {
+      builder.setBeforeOp(writes[i]);
+      for (int j = i + 1; j < writes.size(); j++) {
+        auto reg = REG(writes[j]);
+        auto placeholder = builder.create<PlaceHolderOp>();
+        assignment[placeholder] = reg;
+        if (isFP(reg))
+          placeholder->setResultType(Value::f32);
+      }
+    }
+
+    builder.setBeforeOp(op);
     for (auto reg : callerSaved) {
       auto placeholder = builder.create<PlaceHolderOp>();
       assignment[placeholder] = reg;
@@ -145,6 +154,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       if (isFP(reg))
         placeholder->setResultType(Value::f32);
     }
+
     return false;
   });
 
