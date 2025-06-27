@@ -109,20 +109,6 @@ public:
   void run() override;
 };
 
-// Unify offsets of the same base.
-// In other words, given `%0 = addl %1 %2` for constant %2, fold `addl %1 %3` into `%0 + (%3 - %2)`.
-class Offset : public Pass {
-  int folded = 0;
-
-  void runImpl(Region *region);
-public:
-  Offset(ModuleOp *module): Pass(module) {}
-
-  std::string name() override { return "offset"; };
-  std::map<std::string, int> stats() override;
-  void run() override;
-};
-
 }
 
 #endif
