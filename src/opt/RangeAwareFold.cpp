@@ -9,6 +9,9 @@ std::map<std::string, int> RangeAwareFold::stats() {
   };
 }
 
+// Defined in Specialize.cpp.
+void removeRange(Region *region);
+
 void RangeAwareFold::run() {
   Builder builder;
 
@@ -75,4 +78,11 @@ void RangeAwareFold::run() {
     }
     return false;
   });
+  
+  auto funcs = collectFuncs();
+
+  for (auto func : funcs) {
+    auto region = func->getRegion();
+    removeRange(region);
+  }
 }

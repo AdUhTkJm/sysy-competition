@@ -64,6 +64,8 @@ void copy(Region *tgt, Region *src) {
   }
 }
 
+}
+
 void removeRange(Region *region) {
   for (auto bb : region->getBlocks()) {
     for (auto op : bb->getOps()) {
@@ -73,8 +75,6 @@ void removeRange(Region *region) {
       op->remove<RangeAttr>();
     }
   }
-}
-
 }
 
 bool Specialize::specialize() {
