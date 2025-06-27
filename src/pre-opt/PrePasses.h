@@ -69,7 +69,8 @@ public:
 class TCO : public Pass {
   int uncalled = 0;
 
-  void runImpl(FuncOp *func);
+  bool runImpl(FuncOp *func);
+  bool runAdd(FuncOp *func);
 public:
   TCO(ModuleOp *module): Pass(module) {}
     
