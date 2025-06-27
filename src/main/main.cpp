@@ -144,8 +144,6 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::InlineStore>();
   pm.addPass<sys::SynthConstArray>();
   pm.addPass<sys::RegularFold>();
-  // pm.addPass<sys::Superopt>();
-  // pm.addPass<sys::RegularFold>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GCM>();
   pm.addPass<sys::GVN>();
