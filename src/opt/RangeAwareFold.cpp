@@ -1,5 +1,4 @@
 #include "CleanupPasses.h"
-#include "Analysis.h"
 #include "../utils/Matcher.h"
 
 using namespace sys;
@@ -10,19 +9,7 @@ std::map<std::string, int> RangeAwareFold::stats() {
   };
 }
 
-void RangeAwareFold::removeRange(Region *region) {
-  for (auto bb : region->getBlocks()) {
-    for (auto op : bb->getOps()) {
-      if (!isa<PhiOp>(op))
-        break;
-
-      op->remove<RangeAttr>();
-    }
-  }
-}
-
 void RangeAwareFold::run() {
-  Range(module).run();
   Builder builder;
 
   // Fold left/right shifts early.
@@ -88,12 +75,4 @@ void RangeAwareFold::run() {
     }
     return false;
   });
-
-  // Remove all range attributes for phi.
-  auto funcs = collectFuncs();
-
-  for (auto func : funcs) {
-    auto region = func->getRegion();
-    removeRange(region);
-  }
 }

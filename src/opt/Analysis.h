@@ -51,6 +51,9 @@ class Range : public Pass {
 
   // Reorder the blocks so that they have a single exit.
   void postdom(Region *region);
+  // Split a single operation into two for comparison branches.
+  void split(Region *region);
+  // Give RangeAttr to operations.
   void analyze(Region *region);
 public:
   Range(ModuleOp *module): Pass(module) {}

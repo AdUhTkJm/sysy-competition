@@ -101,8 +101,6 @@ public:
 
 class RangeAwareFold : public Pass {
   int folded = 0;
-
-  void removeRange(Region *region);
 public:
   RangeAwareFold(ModuleOp *module): Pass(module) {}
 

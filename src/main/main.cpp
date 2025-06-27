@@ -124,10 +124,8 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DSE>();
   pm.addPass<sys::DLE>();
   pm.addPass<sys::Select>();
+  pm.addPass<sys::RegularFold>();
   pm.addPass<sys::Specialize>();
-  pm.addPass<sys::RegularFold>();
-  pm.addPass<sys::RangeAwareFold>();
-  pm.addPass<sys::RegularFold>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GCM>();
   pm.addPass<sys::GVN>();

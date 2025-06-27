@@ -109,8 +109,65 @@ bool norange(Op *op) {
 
 int nowiden;
 
-// Seems still have some problems.
-// Sometimes operations aren't properly updated.
+// Check phi nodes created by Range::split().
+bool updateConditional(Op *op, bool &changed) {
+  if (op->getOperandCount() != 1)
+    return false;
+  
+  auto parent = op->getParent();
+  if (parent->preds.size() != 1)
+    return false;
+  
+  auto pred = *parent->preds.begin();
+  auto from = FROM(op->getAttrs()[0]);
+  if (pred != from)
+    return false;
+  
+  // Check whether this op is a condition.
+  auto x = op->DEF();
+  if (!x->has<RangeAttr>())
+    return false;
+
+  auto term = pred->getLastOp();
+  if (!isa<BranchOp>(term))
+    return false;
+
+  auto bb1 = TARGET(term), bb2 = ELSE(term);
+  bool isTarget = parent == bb1;
+
+  auto cond = term->DEF(0);
+  // TODO: more comparison types (also change Range.cpp)
+  if (!isa<LtOp>(cond))
+    return false;
+
+  if (cond->DEF(0) != x)
+    return false;
+
+  auto y = cond->DEF(1);
+  if (!y->has<RangeAttr>())
+    return false;
+
+  // Now this is of form `x < y`.
+  auto [xlow, xhigh] = RANGE(x);
+  auto [ylow, yhigh] = RANGE(y);
+
+  IRange r = isTarget
+    ? IRange { xlow, std::min(xhigh, yhigh - 1) } // x < y
+    : IRange { std::max(xlow, ylow), xhigh };     // x >= y
+  if (!op->has<RangeAttr>()) {
+    op->add<RangeAttr>(r);
+    changed = true;
+    return true;
+  }
+
+  auto &rop = RANGE(op);
+  if (rop != r) {
+    changed = true;
+    rop = r;
+  }
+  return true;
+}
+
 bool calculateRange(Op *op) {
   if (isa<IntOp>(op)) {
     if (op->has<RangeAttr>())
@@ -156,6 +213,14 @@ bool calculateRange(Op *op) {
   UPDATE_BOOL_RANGE(SetNotZeroOp);
   
   if (isa<PhiOp>(op)) {
+    bool changed = false;
+    bool success = updateConditional(op, changed);
+    if (changed)
+      return true;
+    if (success)
+      return false;
+    // Proceed only when neither successful nor changed.
+
     int min = INT_MAX, max = INT_MIN;
     for (auto operand : op->getOperands()) {
       auto def = operand.defining;
@@ -227,6 +292,78 @@ void Range::postdom(Region *region) {
 
   // Now we can calculate the post-domination tree.
   region->updatePDoms();
+  region->updateDoms();
+}
+
+void Range::split(Region *region) {
+  Builder builder;
+
+  for (auto bb : region->getBlocks()) {
+    auto term = bb->getLastOp();
+    if (!isa<BranchOp>(term))
+      continue;
+
+    auto cond = term->DEF();
+    if (!isa<LtOp>(cond))
+      continue;
+
+    auto x = cond->DEF(0);
+
+    auto bb1 = TARGET(term), bb2 = ELSE(term);
+
+    // Make sure this isn't the branch of a while loop.
+    // Unrotated loops won't matter.
+
+    // For rotated loops with a single block, this would fail.
+    if (bb1 == bb || bb2 == bb)
+      continue;
+    // For rotated loops with separate header and latch, this fails,
+    // as latch jumps to header but it doesn't dominate header.
+    if (!bb->dominates(bb1) || !bb->dominates(bb2))
+      continue;
+
+    // Have a look whether we've already split it first.
+    // Don't do it repeatedly.
+    int found = 0;
+    auto bb1phis = bb1->getPhis();
+    for (auto phi : bb1phis) {
+      if (phi->getOperandCount() == 1 && phi->DEF() == x) {
+        found++;
+        break;
+      }
+    }
+    auto bb2phis = bb2->getPhis();
+    for (auto phi : bb2phis) {
+      if (phi->getOperandCount() == 1 && phi->DEF() == x) {
+        found++;
+        break;
+      }
+    }
+    if (found == 2)
+      continue;
+
+    // Now give a phi for both successors.
+    builder.setToBlockStart(bb1);
+    auto x1 = builder.create<PhiOp>({ x }, { new FromAttr(bb) });
+    builder.setToBlockStart(bb2);
+    auto x2 = builder.create<PhiOp>({ x }, { new FromAttr(bb) });
+
+    // Rename operations.
+    auto uses = x->getUses();
+    for (auto use : uses) {
+      if (use == x1 || use == x2)
+        continue;
+
+      auto parent = use->getParent();
+      // Both branch get to here; use the original `x` instead.
+      if (parent->postDominates(bb1) && parent->postDominates(bb2))
+        continue;
+      if (bb1->dominates(parent))
+        use->replaceOperand(x, x1);
+      if (bb2->dominates(parent))
+        use->replaceOperand(x, x2);
+    }
+  }
 }
 
 void Range::analyze(Region *region) {
@@ -248,6 +385,8 @@ void Range::run() {
   for (auto func : funcs) {
     auto region = func->getRegion();
     removeRange(region);
+    postdom(region);
+    split(region);
     analyze(region);
   }
 

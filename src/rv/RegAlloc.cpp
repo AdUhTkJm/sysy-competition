@@ -128,7 +128,16 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   // First of all, add 35 precolored placeholders before each call.
   // This denotes that a CallOp clobbers those registers.
   runRewriter(funcOp, [&](CallOp *op) {
-    builder.setBeforeOp(op);
+    // Find `writeReg`s before this call.
+    auto runner = op->prevOp();
+    for (; runner && isa<WriteRegOp>(runner); runner = runner->prevOp());
+
+    // Locate just before these arguments.
+    if (!runner)
+      builder.setBeforeOp(op->getParent()->getFirstOp());
+    else 
+      builder.setAfterOp(runner);
+    
     for (auto reg : callerSaved) {
       auto placeholder = builder.create<PlaceHolderOp>();
       assignment[placeholder] = reg;
