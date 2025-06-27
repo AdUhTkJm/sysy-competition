@@ -1,4 +1,3 @@
-#include "LoopPasses.h"
 #include "Analysis.h"
 
 using namespace sys;
@@ -15,7 +14,7 @@ int clamp(int64_t x) {
 
 using IRange = std::pair<int, int>;
 
-IRange join(IRange l, IRange r, bool widen) {
+IRange join(IRange l, IRange r, bool widen = false) {
   auto [a1, b1] = l;
   auto [a2, b2] = r;
   if (widen)
@@ -71,11 +70,15 @@ int64_t maxmul(int a1, int b1, int a2, int b2) {
 }
 
 int64_t mindiv(int64_t a1, int64_t b1, int64_t a2, int64_t b2) {
+  if (a2 == 0 || b2 == 0)
+    return INT_MIN;
   int64_t x[] = { a1 / a2, a1 / b2, b1 / a2, b1 / b2 };
   return *std::min_element(x, x + 4);
 }
 
 int64_t maxdiv(int64_t a1, int64_t b1, int64_t a2, int64_t b2) {
+  if (a2 == 0 || b2 == 0)
+    return INT_MAX;
   int64_t x[] = { a1 / a2, a1 / b2, b1 / a2, b1 / b2 };
   return *std::max_element(x, x + 4);
 }
@@ -182,6 +185,13 @@ bool calculateRange(Op *op) {
   return false;
 }
 
+void removeRange(Region *region) {
+  for (auto bb : region->getBlocks()) {
+    for (auto op : bb->getOps())
+      op->remove<RangeAttr>();
+  }
+}
+
 }
 
 void Range::postdom(Region *region) {
@@ -219,7 +229,7 @@ void Range::postdom(Region *region) {
   region->updatePDoms();
 }
 
-void Range::runImpl(Region *region, const LoopForest &forest) {
+void Range::analyze(Region *region) {
   bool changed;
   nowiden = 4;
   do {
@@ -233,12 +243,53 @@ void Range::runImpl(Region *region, const LoopForest &forest) {
 }
 
 void Range::run() {
-  LoopAnalysis loop(module);
-  loop.run();
-  auto forests = loop.getResult();
-
   auto funcs = collectFuncs();
 
-  for (auto func : funcs)
-    runImpl(func->getRegion(), forests[func]);
+  for (auto func : funcs) {
+    auto region = func->getRegion();
+    removeRange(region);
+    analyze(region);
+  }
+
+  auto calls = module->findAll<CallOp>();
+  // Find range of call arguments.
+  // Maps [funcname, argId] to the range.
+  // TODO: for recursive functions, perhaps we can improve this?
+  std::map<std::pair<std::string, int>, IRange> argrange;
+  for (auto call : calls) {
+    const auto &name = NAME(call);
+    if (isExtern(name))
+      continue;
+    
+    for (int i = 0; i < call->getOperandCount(); i++) {
+      auto def = call->DEF(i);
+      if (!def->has<RangeAttr>()) {
+        argrange[{ name, i }] = { INT_MIN, INT_MAX };
+        break;
+      }
+
+      auto &range = argrange[{ name, i }];
+      range = join(range, RANGE(def));
+    }
+  }
+
+  for (auto func : funcs) {
+    int argcnt = func->get<ArgCountAttr>()->count;
+    if (argcnt == 0)
+      continue;
+
+    auto region = func->getRegion();
+    removeRange(region);
+
+    const auto &name = NAME(func);
+    auto getargs = func->findAll<GetArgOp>();
+    std::unordered_map<int, Op*> getarg;
+    for (auto g : getargs)
+      getarg[V(g)] = g;
+
+    for (int i = 0; i < argcnt; i++)
+      getarg[i]->add<RangeAttr>(argrange[{ name, i }]);
+    
+    analyze(region);
+  }
 }

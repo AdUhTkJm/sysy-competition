@@ -202,6 +202,17 @@ public:
   void run() override;
 };
 
+// Specialize functions according to argument signs.
+class Specialize : public Pass {
+  bool specialize();
+public:
+  Specialize(ModuleOp *module): Pass(module) {}
+
+  std::string name() override { return "specialize"; }
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
+};
+
 class Verify : public Pass {
 public:
   Verify(ModuleOp *module): Pass(module) {}

@@ -7,6 +7,8 @@ namespace {
 #define ALLOWED(Ty) || isa<Ty>(op)
 bool hoistable(Op *op) {
   return isa<AddIOp>(op)
+    ALLOWED(IntOp)
+    ALLOWED(AddLOp)
     ALLOWED(SubIOp)
     ALLOWED(OrIOp)
     ALLOWED(AndIOp)
@@ -16,6 +18,24 @@ bool hoistable(Op *op) {
     ALLOWED(LtOp)
     ALLOWED(NeOp)
   ;
+}
+
+bool identical(Op *a, Op *b) {
+  if (a->opid != b->opid || a->getOperandCount() != b->getOperandCount())
+    return false;
+
+  // Avoid infinite loops.
+  if (isa<PhiOp>(a))
+    return false;
+
+  if (isa<IntOp>(a))
+    return V(a) == V(b);
+  
+  for (int i = 0; i < a->getOperandCount(); i++) {
+    if (!identical(a->DEF(i), b->DEF(i)))
+      return false;
+  }
+  return true;
 }
 
 }
@@ -29,6 +49,37 @@ std::map<std::string, int> Select::stats() {
 void Select::run() {
   Builder builder;
   auto phis = module->findAll<PhiOp>();
+
+  // Hoist identical ops out of an if.
+  for (auto phi : phis) {
+    if (phi->getOperandCount() != 2)
+      continue;
+
+    const auto &attrs = phi->getAttrs();
+    auto bb1 = FROM(attrs[0]), bb2 = FROM(attrs[1]);
+
+    // Check if their unique predecessors are the same.
+    if (bb1->preds.size() != 1 || bb2->preds.size() != 1)
+      continue;
+    auto pred1 = *bb1->preds.begin(), pred2 = *bb2->preds.begin();
+    if (pred1 != pred2)
+      continue;
+
+    auto pred = pred1;
+    auto term = pred->getLastOp();
+    
+    // Now check if both bb1 and bb2 have identical initial op sequence.
+    auto r1 = bb1->getFirstOp(), r2 = bb2->getFirstOp();
+    while (hoistable(r1) && identical(r1, r2)) {
+      auto x1 = r1->nextOp(), x2 = r2->nextOp();
+      
+      r1->moveBefore(term);
+      r2->replaceAllUsesWith(r1);
+      r2->erase();
+
+      r1 = x1, r2 = x2;
+    }
+  }
 
   for (auto phi : phis) {
     // If the phi has two empty blocks as predecessors, then it is a `select`.

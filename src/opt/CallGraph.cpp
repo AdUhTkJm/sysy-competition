@@ -18,8 +18,7 @@ void CallGraph::run() {
   auto funcs = collectFuncs();
   for (auto func : funcs) {
     // Remove the old version.
-    if (func->has<CallerAttr>())
-      func->remove<CallerAttr>();
+    func->remove<CallerAttr>();
 
     const auto &name = NAME(func);
     const auto &callersSet = calledBy[name];

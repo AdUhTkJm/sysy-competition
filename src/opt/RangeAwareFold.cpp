@@ -1,4 +1,6 @@
 #include "CleanupPasses.h"
+#include "Analysis.h"
+#include "../utils/Matcher.h"
 
 using namespace sys;
 
@@ -20,6 +22,7 @@ void RangeAwareFold::removeRange(Region *region) {
 }
 
 void RangeAwareFold::run() {
+  Range(module).run();
   Builder builder;
 
   // Fold left/right shifts early.
@@ -68,7 +71,25 @@ void RangeAwareFold::run() {
     return false;
   });
 
-  // Remove all positive attributes for phi.
+  Rule eq_or("(or (eq x 1) (not x))");
+  runRewriter([&](OrIOp *op) {
+    if (eq_or.match(op)) {
+      auto x = eq_or.extract("x");
+      if (!x->has<RangeAttr>())
+        return false;
+      auto [low, high] = RANGE(x);
+      if (low == 0) {
+        folded++;
+        builder.setBeforeOp(op);
+        auto two = builder.create<IntOp>({ new IntAttr(2) });
+        builder.replace<LtOp>(op, { x, two });
+        return false;
+      }
+    }
+    return false;
+  });
+
+  // Remove all range attributes for phi.
   auto funcs = collectFuncs();
 
   for (auto func : funcs) {

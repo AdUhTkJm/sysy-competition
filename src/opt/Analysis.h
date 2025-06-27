@@ -51,7 +51,7 @@ class Range : public Pass {
 
   // Reorder the blocks so that they have a single exit.
   void postdom(Region *region);
-  void runImpl(Region *region, const LoopForest &forest);
+  void analyze(Region *region);
 public:
   Range(ModuleOp *module): Pass(module) {}
 

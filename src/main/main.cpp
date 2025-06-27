@@ -115,10 +115,7 @@ void initPipeline(sys::PassManager &pm) {
   
   // ===== Misc =====
 
-  pm.addPass<sys::Range>();
-  pm.addPass<sys::RangeAwareFold>();
   pm.addPass<sys::RegularFold>();
-  // pm.addPass<sys::Offset>(); // Buggy?
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::SimplifyCFG>();
@@ -127,6 +124,9 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DSE>();
   pm.addPass<sys::DLE>();
   pm.addPass<sys::Select>();
+  pm.addPass<sys::Specialize>();
+  pm.addPass<sys::RegularFold>();
+  pm.addPass<sys::RangeAwareFold>();
   pm.addPass<sys::RegularFold>();
   pm.addPass<sys::DCE>();
   pm.addPass<sys::GCM>();
