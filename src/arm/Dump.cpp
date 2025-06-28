@@ -193,6 +193,12 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   case StrDOp::id:
     os << "str " << dreg(RS(op)) << ", [" << xreg(RS2(op)) << ", #" << V(op) << "]\n";
     break;
+  case StpDOp::id:
+    os << "stp " << dreg(RS(op)) << ", " << dreg(RS2(op)) << ", [" << xreg(RS3(op)) << ", #" << V(op) << "]\n";
+    break;
+  case StpXOp::id:
+    os << "stp " << xreg(RS(op)) << ", " << xreg(RS2(op)) << ", [" << xreg(RS3(op)) << ", #" << V(op) << "]\n";
+    break;
   case LdrXOp::id:
     os << "ldr " << xreg(RD(op)) << ", [" << xreg(RS(op)) << ", #" << V(op) << "]\n";
     break;
@@ -204,6 +210,12 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     break;
   case LdrDOp::id:
     os << "ldr " << dreg(RD(op)) << ", [" << xreg(RS(op)) << ", #" << V(op) << "]\n";
+    break;
+  case LdpDOp::id:
+    os << "ldp " << dreg(RS(op)) << ", " << dreg(RS2(op)) << ", [" << xreg(RS3(op)) << ", #" << V(op) << "]\n";
+    break;
+  case LdpXOp::id:
+    os << "ldp " << xreg(RS(op)) << ", " << xreg(RS2(op)) << ", [" << xreg(RS3(op)) << ", #" << V(op) << "]\n";
     break;
   case LdrXPOp::id:
     os << "ldr " << xreg(RD(op)) << ", [" << xreg(RS(op)) << "], #" << V(op) << "]\n";

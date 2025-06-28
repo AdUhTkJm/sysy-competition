@@ -205,7 +205,38 @@ void RegAlloc::tidyup(Region *region) {
 }
 
 void save(Builder builder, const std::vector<Reg> &regs, int offset) {
-  for (auto reg : regs) {
+  if (offset >= 512) {
+    for (auto reg : regs) {
+      offset -= 8;
+      bool fp = isFP(reg);
+      if (fp)
+        builder.create<StrDOp>({ RSC(reg), RS2C(Reg::sp), new IntAttr(offset) });
+      else
+        builder.create<StrXOp>({ RSC(reg), RS2C(Reg::sp), new IntAttr(offset) });
+    }
+    return;
+  }
+
+  for (int i = 0; i < regs.size() / 2 * 2; i += 2) {
+    Reg r1 = regs[i];
+    Reg r2 = regs[i + 1]; 
+    offset -= 16;
+    bool fp = isFP(r1), fp2 = isFP(r2);
+    if (fp && fp2)
+      builder.create<StpDOp>({ RSC(r1), RS2C(r2), RS3C(Reg::sp), new IntAttr(offset) });
+    if (!fp && !fp2)
+      builder.create<StpXOp>({ RSC(r1), RS2C(r2), RS3C(Reg::sp), new IntAttr(offset) });
+    if (fp && !fp2) {
+      builder.create<StrDOp>({ RSC(r1), RS2C(Reg::sp), new IntAttr(offset + 8) });
+      builder.create<StrXOp>({ RSC(r2), RS2C(Reg::sp), new IntAttr(offset) });
+    }
+    if (!fp && fp2) {
+      builder.create<StrXOp>({ RSC(r1), RS2C(Reg::sp), new IntAttr(offset + 8) });
+      builder.create<StrDOp>({ RSC(r2), RS2C(Reg::sp), new IntAttr(offset) });
+    }
+  }
+  if (regs.size() & 1) {
+    Reg reg = regs.back();
     offset -= 8;
     bool fp = isFP(reg);
     if (fp)
@@ -216,7 +247,40 @@ void save(Builder builder, const std::vector<Reg> &regs, int offset) {
 }
 
 void load(Builder builder, const std::vector<Reg> &regs, int offset) {
-  for (auto reg : regs) {
+  if (offset >= 512) {
+    for (auto reg : regs) {
+      offset -= 8;
+      bool fp = isFP(reg);
+      if (fp)
+        builder.create<LdrDOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
+      else
+        builder.create<LdrXOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
+    }
+    return;
+  }
+
+  // We don't have two rds, so we'd just use rs and rs2.
+  // It won't be used anywhere else anyway.
+  for (int i = 0; i < regs.size() / 2 * 2; i += 2) {
+    Reg r1 = regs[i];
+    Reg r2 = regs[i + 1]; 
+    offset -= 16;
+    bool fp = isFP(r1), fp2 = isFP(r2);
+    if (fp && fp2)
+      builder.create<LdpDOp>({ RSC(r1), RS2C(r2), RS3C(Reg::sp), new IntAttr(offset) });
+    if (!fp && !fp2)
+      builder.create<LdpXOp>({ RSC(r1), RS2C(r2), RS3C(Reg::sp), new IntAttr(offset) });
+    if (fp && !fp2) {
+      builder.create<LdrDOp>({ RDC(r1), RSC(Reg::sp), new IntAttr(offset + 8) });
+      builder.create<LdrXOp>({ RDC(r2), RSC(Reg::sp), new IntAttr(offset) });
+    }
+    if (!fp && fp2) {
+      builder.create<LdrXOp>({ RDC(r1), RSC(Reg::sp), new IntAttr(offset + 8) });
+      builder.create<LdrDOp>({ RDC(r2), RSC(Reg::sp), new IntAttr(offset) });
+    }
+  }
+  if (regs.size() & 1) {
+    Reg reg = regs.back();
     offset -= 8;
     bool fp = isFP(reg);
     if (fp)

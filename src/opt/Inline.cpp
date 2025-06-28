@@ -18,7 +18,6 @@ bool isRecursive(Op *op) {
 namespace {
 
 void doInline(Op *call, Region *fnRegion) {
-  std::cerr << "inlining " << call;
   Builder builder;
 
   // Maps old Op to new Op.

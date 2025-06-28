@@ -109,6 +109,12 @@ ARMOP(StrXOp); // Store i64
 ARMOP(StrFOp); // Store f32
 ARMOP(StrDOp); // Store f64
 
+// ==== Access two registers ====
+ARMOP(LdpXOp); // Store i64
+ARMOP(LdpDOp); // Store f64
+ARMOP(StpXOp); // Store i64
+ARMOP(StpDOp); // Store f64
+
 // ==== Take another register, L-shifted by amount (can be 0) ====
 ARMOP(LdrWROp); // Load i32
 ARMOPL(LdrXROp); // Load i64

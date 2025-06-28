@@ -37,15 +37,15 @@ static const Reg leafOrder[] = {
 };
 // Order for non-leaf functions.
 static const Reg normalOrder[] = {
-  Reg::x19, Reg::x20, Reg::x21, Reg::x22,
-  Reg::x23, Reg::x24, Reg::x25, Reg::x26,
-  Reg::x27,
-
   Reg::x0, Reg::x1, Reg::x2, Reg::x3,
   Reg::x4, Reg::x5, Reg::x6, Reg::x7,
 
   Reg::x8, Reg::x9, Reg::x10, Reg::x11,
   Reg::x12, Reg::x13, Reg::x14,
+
+  Reg::x19, Reg::x20, Reg::x21, Reg::x22,
+  Reg::x23, Reg::x24, Reg::x25, Reg::x26,
+  Reg::x27,
 };
 
 // The same, but for floating point registers.
@@ -63,16 +63,16 @@ static const Reg leafOrderf[] = {
 };
 // Order for non-leaf functions.
 static const Reg normalOrderf[] = {
-  Reg::v16, Reg::v17, Reg::v18,
-  Reg::v19, Reg::v20, Reg::v21, Reg::v22,
-  Reg::v23, Reg::v24, Reg::v25, Reg::v26,
-  Reg::v27, Reg::v28, Reg::v29,
-
   Reg::v0, Reg::v1, Reg::v2, Reg::v3,
   Reg::v4, Reg::v5, Reg::v6, Reg::v7,
 
   Reg::v8, Reg::v9, Reg::v10, Reg::v11,
   Reg::v12, Reg::v13, Reg::v14,
+
+  Reg::v16, Reg::v17, Reg::v18,
+  Reg::v19, Reg::v20, Reg::v21, Reg::v22,
+  Reg::v23, Reg::v24, Reg::v25, Reg::v26,
+  Reg::v27, Reg::v28, Reg::v29,
 };
 
 static const std::set<Reg> callerSaved = {
