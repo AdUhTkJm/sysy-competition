@@ -39,6 +39,8 @@ bool ArmDCE::isImpure(Op *op) {
     IMPURE(WriteRegOp)
     IMPURE(SubSpOp)
     IMPURE(PlaceHolderOp)
+    IMPURE(CloneOp)
+    IMPURE(JoinOp)
   ;
 }
 

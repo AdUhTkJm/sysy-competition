@@ -98,6 +98,8 @@ void Lower::run() {
   REPLACE(BroadcastOp, DupOp);
   REPLACE(sys::AddVOp, AddVOp);
   REPLACE(sys::MulVOp, MulVOp);
+  REPLACE(sys::CloneOp, CloneOp);
+  REPLACE(sys::JoinOp, JoinOp);
 
   runRewriter([&](FloatOp *op) {
     float value = F(op);

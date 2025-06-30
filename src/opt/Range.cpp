@@ -104,6 +104,8 @@ bool norange(Op *op) {
     NORANGE(BranchOp)
     NORANGE(ReturnOp)
     NORANGE(StoreOp)
+    NORANGE(CloneOp)
+    NORANGE(JoinOp)
   ;
 }
 

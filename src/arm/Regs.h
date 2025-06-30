@@ -30,6 +30,7 @@ static const Reg leafOrder[] = {
 
   Reg::x8, Reg::x9, Reg::x10, Reg::x11,
   Reg::x12, Reg::x13, Reg::x14,
+  Reg::x16, Reg::x17,
 
   Reg::x19, Reg::x20, Reg::x21, Reg::x22,
   Reg::x23, Reg::x24, Reg::x25, Reg::x26,
@@ -42,6 +43,7 @@ static const Reg normalOrder[] = {
 
   Reg::x8, Reg::x9, Reg::x10, Reg::x11,
   Reg::x12, Reg::x13, Reg::x14,
+  Reg::x16, Reg::x17,
 
   Reg::x19, Reg::x20, Reg::x21, Reg::x22,
   Reg::x23, Reg::x24, Reg::x25, Reg::x26,
@@ -81,6 +83,7 @@ static const std::set<Reg> callerSaved = {
 
   Reg::x8, Reg::x9, Reg::x10, Reg::x11,
   Reg::x12, Reg::x13, Reg::x14, Reg::x15,
+  Reg::x16, Reg::x17,
 
   Reg::v0, Reg::v1, Reg::v2, Reg::v3,
   Reg::v4, Reg::v5, Reg::v6, Reg::v7,
@@ -100,9 +103,9 @@ static const std::set<Reg> calleeSaved = {
   Reg::v27, Reg::v28, Reg::v29, Reg::v30,
 };
 
-constexpr int leafRegCnt = 23;
+constexpr int leafRegCnt = 26;
 constexpr int leafRegCntf = 29;
-constexpr int normalRegCnt = 23;
+constexpr int normalRegCnt = 26;
 constexpr int normalRegCntf = 29;
 
 }

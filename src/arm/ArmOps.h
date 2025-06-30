@@ -223,6 +223,8 @@ ARMOPE(ReadRegOp);
 ARMOP(WriteRegOp);
 ARMOP(PlaceHolderOp);
 ARMOP(SubSpOp);
+ARMOP(CloneOp);
+ARMOP(JoinOp);
 
 inline bool hasRd(Op *op) {
   return !(
@@ -247,7 +249,9 @@ inline bool hasRd(Op *op) {
     isa<CbnzOp>(op) ||
     isa<RetOp>(op) ||
     isa<WriteRegOp>(op) ||
-    isa<SubSpOp>(op)
+    isa<SubSpOp>(op) ||
+    isa<CloneOp>(op) ||
+    isa<JoinOp>(op)
   );
 }
 
