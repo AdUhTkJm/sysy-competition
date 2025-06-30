@@ -125,7 +125,16 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
 
   // First of all, add 35 precolored placeholders before each call.
   // This denotes that a call clobbers those registers.
-  runRewriter(funcOp, [&](BlOp *op) {
+  // Note clones and joins will also be emitted as calls.
+  std::vector<Op*> clobbering = funcOp->findAll<BlOp>();
+  auto clones = funcOp->findAll<CloneOp>();
+  auto joins = funcOp->findAll<JoinOp>();
+  for (auto cl : clones)
+    clobbering.push_back(cl);
+  for (auto j : joins)
+    clobbering.push_back(j);
+
+  for (auto op : clobbering) {
     builder.setBeforeOp(op);
     for (auto reg : callerSaved) {
       auto placeholder = builder.create<PlaceHolderOp>();
@@ -134,8 +143,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       if (isFP(reg))
         placeholder->setResultType(Value::f32);
     }
-    return false;
-  });
+  };
 
   // Similarly, add placeholders around each GetArg.
   // First create placeholders for a0-a7.

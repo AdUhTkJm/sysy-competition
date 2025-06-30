@@ -135,7 +135,7 @@ void dumpOp(Op *op, std::ostream &os) {
 
   if (op->has<TargetAttr>()) {
     auto bb = TARGET(op);
-    ss << "bb" << getCount(bb) << ", ";
+    ss << ".Lbb" << getCount(bb) << ", ";
   }
 
   if (op->has<NameAttr>()) {
@@ -160,7 +160,7 @@ void Dump::dump(std::ostream &os) {
   for (auto func : funcs) {
     os << NAME(func) << ":\n";
     for (auto bb : func->getRegion()->getBlocks()) {
-      os << "bb" << getCount(bb) << ":\n";
+      os << ".Lbb" << getCount(bb) << ":\n";
 
       for (auto op : bb->getOps()) {
         os << "  ";

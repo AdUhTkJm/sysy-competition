@@ -32,18 +32,18 @@ using namespace sys::arm;
 
 #define JMP(Ty, name) \
   case Ty::id: \
-    os << name << " bb" << bbcnt(TARGET(op)) << "\n"; \
+    os << name << " .Lbb" << bbcnt(TARGET(op)) << "\n"; \
     break
 
 #define JMP_UNARY(Ty, name) \
   case Ty::id: \
-    os << name << ' ' << wreg(RS(op)) << ", bb" << bbcnt(TARGET(op)) << "\n"; \
+    os << name << ' ' << wreg(RS(op)) << ", .Lbb" << bbcnt(TARGET(op)) << "\n"; \
     break
     
 #define JMP_BINARY(Ty, name) \
   case Ty::id: \
     os << "cmp " << wreg(RS(op)) << ", " << wreg(RS2(op)) << "\n  "; \
-    os << name << " bb" << bbcnt(TARGET(op)) << "\n"; \
+    os << name << " .Lbb" << bbcnt(TARGET(op)) << "\n"; \
     break
 
 #define TERNARY_W(Ty, name) TERNARY(Ty, name, wreg)
@@ -375,7 +375,7 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
 
 void Dump::dumpBody(Region *region, std::ostream &os) {
   for (auto bb : region->getBlocks()) {
-    os << "bb" << bbcnt(bb) << ":\n";
+    os << ".Lbb" << bbcnt(bb) << ":\n";
     
     for (auto op : bb->getOps()) {
       os << "  ";

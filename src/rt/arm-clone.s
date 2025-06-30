@@ -1,6 +1,3 @@
-; Note: this will be directly inlined for `CloneOp`.
-; It is not a function call.
-
 ; x0: Function pointer
 ; x1: Stack top
 clone_worker:
@@ -10,5 +7,12 @@ clone_worker:
 
   ; CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_THREAD | CLONE_SIGHAND
   mov x0, 0x10F00
-  mov x2
+  mov x2, xzr
+  mov x3, xzr
+  mov x4, xzr
   svc #0
+
+  cbnz x0, __parent
+
+  ; 
+.L__parent:
