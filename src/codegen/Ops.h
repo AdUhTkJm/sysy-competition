@@ -114,6 +114,11 @@ OPV(MulVOp);
 
 OPV(BroadcastOp);
 
+// ====== Multi-threaded ======
+
+OP(CloneOp);
+OP(JoinOp);
+
 // vectorized load/store is detected by size.
 
 }

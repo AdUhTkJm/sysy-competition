@@ -239,7 +239,7 @@ bool TCO::runAdd(FuncOp *func) {
   
   auto def = accret->DEF();
   builder.replace<ContinueOp>(accret);
-  accret->DEF()->erase();
+  def->erase();
   replace->erase();
 
   // Fill the before region with "true".

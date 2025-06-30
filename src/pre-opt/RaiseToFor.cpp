@@ -5,6 +5,7 @@
 using namespace sys;
 
 static Rule forCond("(lt (load x) y)");
+static Rule forCondLe("(le (load x) y)");
 static Rule constIncr("(store (add (load x) y) x)");
 
 std::map<std::string, int> RaiseToFor::stats() {
@@ -32,18 +33,29 @@ void RaiseToFor::run() {
 
     auto proceed = before->getLastBlock()->getLastOp();
     auto cond = proceed->DEF();
-    if (!forCond.match(cond))
+    // `stop` is the final condition (might be offseted by 1, for example)
+    // `stopvar` is the original value.
+    Op *ivAddr = nullptr, *stop, *stopvar;
+    if (forCond.match(cond)) {
+      // The induction variable is `load x`, and the address should be `x`.
+      ivAddr = forCond.extract("x");
+      stop = stopvar = forCond.extract("y");
+    }
+    if (!ivAddr && forCondLe.match(cond)) {
+      ivAddr = forCondLe.extract("x");
+      stopvar = forCondLe.extract("y");
+      builder.setAfterOp(stopvar);
+      auto one = builder.create<IntOp>({ new IntAttr(1) });
+      stop = builder.create<AddIOp>({ stopvar, one });
+    }
+    if (!ivAddr)
       continue;
-
-    // The induction variable is `load x`, and the address should be `x`.
-    auto ivAddr = forCond.extract("x");
-    Op *stop = forCond.extract("y");
 
     // Make sure `stop` is loop-invariant.
-    if (isa<CallOp>(stop) && stop->has<ImpureAttr>())
+    if (isa<CallOp>(stopvar) && stopvar->has<ImpureAttr>())
       continue;
-    if (isa<LoadOp>(stop)) {
-      auto addr = stop->DEF(0);
+    if (isa<LoadOp>(stopvar)) {
+      auto addr = stopvar->DEF(0);
       bool bad = false;
 
       for (auto use : addr->getUses()) {

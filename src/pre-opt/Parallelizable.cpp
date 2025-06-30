@@ -112,6 +112,11 @@ void Parallelizable::run() {
   auto funcs = collectFuncs();
   for (auto func : funcs) {
     auto region = func->getRegion();
+    // Clear stale data.
+    for (auto bb : region->getBlocks()) {
+      for (auto op : bb->getOps())
+        op->remove<ParallelizableAttr>();
+    }
 
     for (auto bb : region->getBlocks()) {
       for (auto op : bb->getOps()) {

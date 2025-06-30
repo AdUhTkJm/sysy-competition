@@ -104,6 +104,15 @@ public:
   void run() override;
 };
 
+class Parallelize : public Pass {
+public:
+  Parallelize(ModuleOp *module): Pass(module) {}
+
+  std::string name() override { return "parallelize"; }
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
+};
+
 class Unroll : public Pass {
   int unrolled = 0;
 public:

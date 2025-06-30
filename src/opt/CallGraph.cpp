@@ -8,6 +8,10 @@ void CallGraph::run() {
   std::map<std::string, std::set<std::string>> calledBy;
 
   auto calls = module->findAll<CallOp>();
+  // We consider `clone()` syscall also as calling the worker function.
+  auto workers = module->findAll<CloneOp>();
+  calls.reserve(calls.size() + workers.size());
+  std::copy(workers.begin(), workers.end(), std::back_inserter(calls));
   for (auto call : calls) {
     auto func = call->getParentOp<FuncOp>();
     auto calledName = NAME(call);
