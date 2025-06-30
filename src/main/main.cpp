@@ -70,8 +70,8 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::View>();
   pm.addPass<sys::LoopDCE>();
   pm.addPass<sys::Fusion>();
-  // if (opts.arm) // RV only has a single core.
-  //   pm.addPass<sys::Parallelize>();
+  if (opts.arm) // RV only has a single core.
+    pm.addPass<sys::Parallelize>();
   pm.addPass<sys::Unswitch>();
   pm.addPass<sys::DCE>(/*elimBlocks=*/ false);
   pm.addPass<sys::ColumnMajor>();

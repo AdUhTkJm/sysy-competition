@@ -41,6 +41,7 @@ bool ArmDCE::isImpure(Op *op) {
     IMPURE(PlaceHolderOp)
     IMPURE(CloneOp)
     IMPURE(JoinOp)
+    IMPURE(WakeOp)
   ;
 }
 

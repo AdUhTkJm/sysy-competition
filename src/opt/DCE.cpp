@@ -17,7 +17,8 @@ bool DCE::isImpure(Op *op) {
       isa<BranchOp>(op) || isa<GotoOp>(op) ||
       isa<ProceedOp>(op) || isa<BreakOp>(op) ||
       isa<ContinueOp>(op) || isa<ForOp>(op) ||
-      isa<CloneOp>(op) || isa<JoinOp>(op))
+      isa<CloneOp>(op) || isa<JoinOp>(op) ||
+      isa<WakeOp>(op))
     return true;
 
   if (isa<CallOp>(op)) {

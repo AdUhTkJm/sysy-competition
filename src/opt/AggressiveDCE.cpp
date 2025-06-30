@@ -17,7 +17,8 @@ static bool preserved(Op *op) {
     PRESERVED(StoreOp)
     PRESERVED(ReturnOp)
     PRESERVED(CloneOp)
-    PRESERVED(JoinOp);
+    PRESERVED(JoinOp)
+    PRESERVED(WakeOp);
 }
 
 void AggressiveDCE::runImpl(FuncOp *fn) {

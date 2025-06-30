@@ -36,7 +36,7 @@ void InlineStore::run() {
   // Remove unused globals, and find out ones only used in <once> functions.
   std::vector<std::string> queue;
   for (auto [k, v] : gMap) {
-    if (used[k].empty())
+    if (used[k].empty() && !v->has<ImpureAttr>())
       v->erase();
     if (used[k].size() == 1) {
       auto name = *used[k].begin();

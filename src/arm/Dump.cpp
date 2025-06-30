@@ -367,6 +367,22 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   case Ld1Op::id:
     os << "ld1 {" << vreg(RD(op)) << "}, [" << xreg(RS(op)) << "]\n";
     break;
+  case JoinOp::id:
+    os << "ldr x0, =_lock" << NAME(op) << "\n  ";
+    os << "bl futex_wait\n";
+    break;
+  case CloneOp::id:
+    os << "ldr x0, =" << NAME(op) << "\n  ";
+    os << "ldr x1, =_stack" << NAME(op) << "\n  ";
+    os << "add x1, x1, #-2048\n  "; // Create a 2KB stack for that thread.
+    os << "bl instantiate_worker\n";
+    break;
+  case WakeOp::id:
+    os << "ldr x0, =_lock" << NAME(op) << "\n  ";
+    os << "mov x1, #1\n  ";
+    os << "str x1, [x0, #0]\n  ";
+    os << "bl futex_wake\n";
+    break;
   default:
     std::cerr << "unimplemented op: " << op;
     assert(false);
@@ -384,6 +400,10 @@ void Dump::dumpBody(Region *region, std::ostream &os) {
   }
 }
 
+static void operator>>(const char *p, std::ostream &w) {
+  w << p;
+}
+
 void Dump::dump(std::ostream &os) {
   os << ".global main\n\n";
 
@@ -394,6 +414,14 @@ void Dump::dump(std::ostream &os) {
     auto region = func->getRegion();
     dumpBody(region, os);
     os << "\n\n";
+  }
+
+  auto clones = module->findAll<CloneOp>();
+  if (clones.size()) {
+#include "../rt/arm-clone.s"
+    >> os;
+#include "../rt/arm-join.s"
+    >> os;
   }
 
   auto globals = collectGlobals();

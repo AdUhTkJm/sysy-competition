@@ -100,6 +100,7 @@ void Lower::run() {
   REPLACE(sys::MulVOp, MulVOp);
   REPLACE(sys::CloneOp, CloneOp);
   REPLACE(sys::JoinOp, JoinOp);
+  REPLACE(sys::WakeOp, WakeOp);
 
   runRewriter([&](FloatOp *op) {
     float value = F(op);

@@ -225,6 +225,7 @@ ARMOP(PlaceHolderOp);
 ARMOP(SubSpOp);
 ARMOP(CloneOp);
 ARMOP(JoinOp);
+ARMOP(WakeOp);
 
 inline bool hasRd(Op *op) {
   return !(
@@ -251,7 +252,8 @@ inline bool hasRd(Op *op) {
     isa<WriteRegOp>(op) ||
     isa<SubSpOp>(op) ||
     isa<CloneOp>(op) ||
-    isa<JoinOp>(op)
+    isa<JoinOp>(op) ||
+    isa<WakeOp>(op)
   );
 }
 

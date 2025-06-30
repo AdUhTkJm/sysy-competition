@@ -15,7 +15,8 @@ static bool pinned(Op *op) {
     PINNED(PhiOp)
     PINNED(AllocaOp)
     PINNED(CloneOp)
-    PINNED(JoinOp);
+    PINNED(JoinOp)
+    PINNED(WakeOp);
 }
 
 // Schedule `op` to the first block that is dominated by its inputs.

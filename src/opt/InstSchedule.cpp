@@ -13,7 +13,7 @@ void InstSchedule::runImpl(BasicBlock *bb) {
   for (auto op : bb->getOps()) {
     // We can't reschedule if there is any pinned operations.
     // TODO: Perhaps there's some way to mitigate this?
-    if (isa<CallOp>(op) && op->has<ImpureAttr>() || isa<CloneOp>(op) || isa<JoinOp>(op))
+    if (isa<CallOp>(op) && op->has<ImpureAttr>() || isa<CloneOp>(op) || isa<JoinOp>(op) || isa<WakeOp>(op))
       return;
   }
 

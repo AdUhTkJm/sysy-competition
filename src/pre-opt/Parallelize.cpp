@@ -160,7 +160,24 @@ void Parallelize::run() {
     builder.setBeforeOp(loop);
     builder.create<CloneOp>({ new NameAttr(workername) });
     builder.setAfterOp(loop);
-    builder.create<JoinOp>();
+    builder.create<JoinOp>({ new NameAttr(workername) });
+
+    // Create a WakeOp at the end.
+    builder.setToRegionEnd(worker->getRegion());
+    builder.create<WakeOp>({ new NameAttr(workername) });
+
+    // Create globals that gets used by backend.
+    builder.setToRegionStart(module->getRegion());
+    builder.create<GlobalOp>({ new ImpureAttr,
+      new IntArrayAttr(new int[1] { }, 1),
+      new SizeAttr(4),
+      new NameAttr("_lock" + workername)
+    });
+    builder.create<GlobalOp>({ new ImpureAttr,
+      new IntArrayAttr(new int[2048] { }, 2048),
+      new SizeAttr(8192),
+      new NameAttr("_stack" + workername)
+    });
   }
 
   MoveAlloca(module).run();

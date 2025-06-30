@@ -118,6 +118,7 @@ OPV(BroadcastOp);
 
 OP(CloneOp);
 OP(JoinOp);
+OP(WakeOp);
 
 // vectorized load/store is detected by size.
 
