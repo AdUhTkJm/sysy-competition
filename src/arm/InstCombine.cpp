@@ -18,10 +18,12 @@ static ArmRule rules[] = {
   "(change (addw (lslwi x #a) x) (addwl x x #a))",
   "(change (addx x (lslwi x #a)) (addxl x x #a))",
   "(change (addx (lslwi x #a) x) (addxl x x #a))",
+  "(change (addw x (asrwi x #a)) (addwar x x #a))",
+  "(change (addw (asrwi x #a) x) (addwar x x #a))",
   "(change (addw (mulw x y) z) (maddw x y z))",
   "(change (addw z (mulw x y)) (maddw x y z))",
 
-  // FADD, FSUB
+  // FADD, FSUB: precision changes unexpectedly
   // "(change (fadd (fmul x y) z) (fmadd x y z))",
   // "(change (fadd z (fmul x y)) (fmadd x y z))",
 

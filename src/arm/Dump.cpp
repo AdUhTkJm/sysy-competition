@@ -316,6 +316,9 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   case AddWROp::id:
     os << "add " << wreg(RD(op))  << ", " << wreg(RS(op)) << ", " << wreg(RS2(op)) << ", lsr " << V(op) << "\n";
     break;
+  case AddWAROp::id:
+    os << "add " << wreg(RD(op))  << ", " << wreg(RS(op)) << ", " << wreg(RS2(op)) << ", asr " << V(op) << "\n";
+    break;
   case LdrWROp::id:
     os << "ldr " << wreg(RD(op)) << ", [" << xreg(RS(op)) << ", " << xreg(RS2(op));
     if (V(op))
