@@ -173,7 +173,8 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   JMP_UNARY(CbnzOp, "cbnz");
 
   case AdrOp::id:
-    os << "ldr " << xreg(RD(op)) << ", =" << NAME(op) << "\n";
+    os << "adrp " << xreg(RD(op)) << ", " << NAME(op) << "\n  ";
+    os << "add " << xreg(RD(op)) << ", " << xreg(RD(op)) << ", :lo12:" << NAME(op) << "\n";
     break;
   case FmovWOp::id:
     os << "fmov " << freg(RD(op)) << ", " << wreg(RS(op)) << "\n";
@@ -368,20 +369,28 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
     os << "ld1 {" << vreg(RD(op)) << "}, [" << xreg(RS(op)) << "]\n";
     break;
   case JoinOp::id:
-    os << "ldr x0, =_lock" << NAME(op) << "\n  ";
-    os << "bl futex_wait\n";
+    os << "adrp x0, _lock" << NAME(op) << "\n  ";
+    os << "add x0, x0, :lo12:_lock" << NAME(op) << "\n  ";
+    os << "bl spinlock_wait\n";
     break;
   case CloneOp::id:
-    os << "ldr x0, =" << NAME(op) << "\n  ";
-    os << "ldr x1, =_stack" << NAME(op) << "\n  ";
-    os << "add x1, x1, #-2048\n  "; // Create a 2KB stack for that thread.
+    os << "adrp x0, " << NAME(op) << "\n  ";
+    os << "add x0, x0, :lo12:" << NAME(op) << "\n  ";
+    os << "adrp x1, _stack" << NAME(op) << "\n  ";
+    os << "add x1, x1, :lo12:_stack" << NAME(op) << "\n  ";
+    os << "add x1, x1, #8192\n  ";
+    os << "mov x2, #1\n  ";
+    os << "adrp x3, _lock" << NAME(op) << "\n  ";
+    os << "add x3, x3, :lo12:_lock" << NAME(op) << "\n  ";
+    os << "str x2, [x3]\n  ";
     os << "bl instantiate_worker\n";
     break;
   case WakeOp::id:
-    os << "ldr x0, =_lock" << NAME(op) << "\n  ";
-    os << "mov x1, #1\n  ";
-    os << "str x1, [x0, #0]\n  ";
-    os << "bl futex_wake\n";
+    os << "adrp x0, _lock" << NAME(op) << "\n  ";
+    os << "add x0, x0, :lo12:_lock" << NAME(op) << "\n  ";
+    os << "dmb ish\n  ";
+    os << "mov w1, #0\n  ";
+    os << "stlr w1, [x0]\n";
     break;
   default:
     std::cerr << "unimplemented op: " << op;
@@ -464,8 +473,9 @@ void Dump::dump(std::ostream &os) {
   }
 
   if (bss.size()) {
-    os << "\n\n.section .bss\n.balign 16\n";
+    os << "\n\n.section .bss\n";
     for (auto global : bss) {
+      os << ".balign 16\n";
       os << NAME(global) << ":\n  .skip " << SIZE(global) << "\n";
     }
   }

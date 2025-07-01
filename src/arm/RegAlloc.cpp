@@ -11,44 +11,48 @@ class SpilledRdAttr : public AttrImpl<SpilledRdAttr, ARMLINE + 4194304> {
 public:
   bool fp;
   int offset;
+  Op *ref;
 
-  SpilledRdAttr(bool fp, int offset): fp(fp), offset(offset) {}
+  SpilledRdAttr(bool fp, int offset, Op *ref): fp(fp), offset(offset), ref(ref) {}
 
   std::string toString() override { return "<rd = " + std::to_string(offset) + (fp ? "f" : "") + ">"; }
-  SpilledRdAttr *clone() override { return new SpilledRdAttr(fp, offset); }
+  SpilledRdAttr *clone() override { return new SpilledRdAttr(fp, offset, ref); }
 };
 
 class SpilledRsAttr : public AttrImpl<SpilledRsAttr, ARMLINE + 4194304> {
 public:
   bool fp;
   int offset;
+  Op *ref;
 
-  SpilledRsAttr(bool fp, int offset): fp(fp), offset(offset) {}
+  SpilledRsAttr(bool fp, int offset, Op *ref): fp(fp), offset(offset), ref(ref) {}
 
   std::string toString() override { return "<rs = " + std::to_string(offset) + (fp ? "f" : "") + ">"; }
-  SpilledRsAttr *clone() override { return new SpilledRsAttr(fp, offset); }
+  SpilledRsAttr *clone() override { return new SpilledRsAttr(fp, offset, ref); }
 };
 
 class SpilledRs2Attr : public AttrImpl<SpilledRs2Attr, ARMLINE + 4194304> {
 public:
   bool fp;
   int offset;
+  Op *ref;
 
-  SpilledRs2Attr(bool fp, int offset): fp(fp), offset(offset) {}
+  SpilledRs2Attr(bool fp, int offset, Op *ref): fp(fp), offset(offset), ref(ref) {}
 
   std::string toString() override { return "<rs2 = " + std::to_string(offset) + + (fp ? "f" : "") + ">"; }
-  SpilledRs2Attr *clone() override { return new SpilledRs2Attr(fp, offset); }
+  SpilledRs2Attr *clone() override { return new SpilledRs2Attr(fp, offset, ref); }
 };
 
 class SpilledRs3Attr : public AttrImpl<SpilledRs3Attr, ARMLINE + 4194304> {
 public:
   bool fp;
   int offset;
+  Op *ref;
 
-  SpilledRs3Attr(bool fp, int offset): fp(fp), offset(offset) {}
+  SpilledRs3Attr(bool fp, int offset, Op *ref): fp(fp), offset(offset), ref(ref) {}
 
   std::string toString() override { return "<rs3 = " + std::to_string(offset) + + (fp ? "f" : "") + ">"; }
-  SpilledRs3Attr *clone() override { return new SpilledRs3Attr(fp, offset); }
+  SpilledRs3Attr *clone() override { return new SpilledRs3Attr(fp, offset, ref); }
 };
 
 bool fpreg(Value::Type ty) {
@@ -81,10 +85,10 @@ std::map<std::string, int> RegAlloc::stats() {
   if (!spillOffset.count(v##Index)) \
     op->add<AttrTy>(getReg(v##Index)); \
   else \
-    op->add<Spilled##AttrTy>(fpreg(v##Index->getResultType()), spillOffset[v##Index]);
+    op->add<Spilled##AttrTy> GET_SPILLED_ARGS(v##Index);
 
 #define GET_SPILLED_ARGS(op) \
-  (fpreg(op->getResultType()), spillOffset[op])
+  (fpreg(op->getResultType()), spillOffset[op], op)
 
 #define NULLARY
 #define UNARY ADD_ATTR(0, RsAttr)
@@ -845,6 +849,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   }
 
   // Deal with spilled variables.
+  std::vector<Op*> remove;
   for (auto bb : region->getBlocks()) {
     int delta = 0;
     for (auto op : bb->getOps()) {
@@ -862,6 +867,12 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       }
 
       if (auto rd = op->find<SpilledRdAttr>()) {
+        // We will rematerialize them later.
+        if (isa<MovIOp>(rd->ref) || isa<AdrOp>(rd->ref)) {
+          remove.push_back(op);
+          continue;
+        }
+
         int offset = delta + rd->offset;
         bool fp = rd->fp;
         auto reg = fp ? fspillReg : spillReg;
@@ -882,7 +893,13 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         auto reg = fp ? fspillReg : spillReg;
 
         builder.setBeforeOp(op);
-        if (offset < 16384) {
+        // Rematerialized.
+        auto ref = rs->ref;
+        if (isa<MovIOp>(ref))
+          builder.create<MovIOp>({ RDC(reg), new IntAttr(V(ref)) });
+        else if (isa<AdrOp>(ref))
+          builder.create<AdrOp>({ RDC(reg), new NameAttr(NAME(ref)) });
+        else if (offset < 16384) {
           if (fp)
             builder.create<LdrFOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
           else
@@ -897,7 +914,12 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         auto reg = fp ? fspillReg2 : spillReg2;
 
         builder.setBeforeOp(op);
-        if (offset < 16384) {
+        auto ref = rs2->ref;
+        if (isa<MovIOp>(ref))
+          builder.create<MovIOp>({ RDC(reg), new IntAttr(V(ref)) });
+        else if (isa<AdrOp>(ref))
+          builder.create<AdrOp>({ RDC(reg), new NameAttr(NAME(ref)) });
+        else if (offset < 16384) {
           if (fp)
             builder.create<LdrFOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
           else
@@ -912,7 +934,12 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         auto reg = fp ? fspillReg3 : spillReg3;
 
         builder.setBeforeOp(op);
-        if (offset < 16384) {
+        auto ref = rs3->ref;
+        if (isa<MovIOp>(ref))
+          builder.create<MovIOp>({ RDC(reg), new IntAttr(V(ref)) });
+        else if (isa<AdrOp>(ref))
+          builder.create<AdrOp>({ RDC(reg), new NameAttr(NAME(ref)) });
+        else if (offset < 16384) {
           if (fp)
             builder.create<LdrFOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
           else
@@ -922,6 +949,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       }
     }
   }
+
+  for (auto op : remove)
+    op->erase();
 }
 
 void RegAlloc::run() {

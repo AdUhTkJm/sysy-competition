@@ -169,8 +169,8 @@ void Parallelize::run() {
     // Create globals that gets used by backend.
     builder.setToRegionStart(module->getRegion());
     builder.create<GlobalOp>({ new ImpureAttr,
-      new IntArrayAttr(new int[1] { }, 1),
-      new SizeAttr(4),
+      new IntArrayAttr(new int[2] { }, 2),
+      new SizeAttr(8), // It might get localized when size = 4.
       new NameAttr("_lock" + workername)
     });
     builder.create<GlobalOp>({ new ImpureAttr,
