@@ -23,15 +23,31 @@ bool parallelizable(Op *loop) {
 
 }
 
+int opcount(Region *region);
+
 void Parallelize::run() {
   Parallelizable(module).run();
   Builder builder;
 
-  // Identify parallelizable loops.
-  auto loops = module->findAll<ForOp>();
+  // Identify parallelizable loops. We only want top-level ones.
+  auto funcs = collectFuncs();
+  std::vector<Op*> loops;
+  for (auto func : funcs) {
+    auto region = func->getRegion();
+
+    for (auto bb : region->getBlocks()) {
+      for (auto op : bb->getOps()) {
+        if (isa<ForOp>(op))
+          loops.push_back(op);
+      }
+    }
+  }
+
   int cnt = 0;
   for (auto loop : loops) {
     if (!parallelizable(loop))
+      continue;
+    if (opcount(loop->getRegion()) <= 100 && loop->findAll<CallOp>().empty())
       continue;
 
     // Split the loop into two halves.
@@ -73,11 +89,7 @@ void Parallelize::run() {
 
     // `newstop` will be marked as captured below.
     auto newone = builder.create<IntOp>({ new IntAttr(1) });
-    auto next = builder.create<AddIOp>({ newone });
-    cloneMap[next] = next;
-    cloned.insert(next);
-    
-    auto copiedLoop = builder.create<ForOp>({ next, stop, step, ivAddr });
+    auto copiedLoop = builder.create<ForOp>({ newstop, stop, step, ivAddr });
 
     // Copy the loop content.
     auto bbloop = loop->getRegion()->getFirstBlock();
@@ -138,11 +150,6 @@ void Parallelize::run() {
       cloneMap[op] = load;
     }
 
-    // Move the start and stop calculation to just before the loop,
-    // to fix dominance.
-    next->moveBefore(copiedLoop);
-    next->pushOperand(cloneMap[newstop]);
-
     // Replace again. This time we can safely ignore things that aren't in cloneMap.
     for (auto [_, v] : cloneMap) {
       for (int i = 0; i < v->getOperandCount(); i++) {
@@ -152,8 +159,8 @@ void Parallelize::run() {
       }
     }
     // Also replace the `stop` and `step` values.
+    copiedLoop->setOperand(0, cloneMap[newstop]);
     copiedLoop->setOperand(1, cloneMap[stop]);
-    builder.setBeforeOp(copiedLoop);
     copiedLoop->setOperand(2, newone);
 
     // Clone a thread.
