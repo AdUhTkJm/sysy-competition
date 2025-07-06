@@ -196,7 +196,7 @@ ARM 中，寄存器的长度信息实际上被指令名称所确定。例如，`
 
 ### Parallelizable
 
-判断一个 for 循环是否有 loop-carried depedencies。如果没有，打上 `<parallelizable>` 的属性。
+判断一个 for 循环是否有 loop-carried dependencies。如果没有，打上 `<parallelizable>` 的属性。
 
 ### Parallelize
 

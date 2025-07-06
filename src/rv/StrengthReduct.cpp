@@ -1,4 +1,5 @@
 #include "RvPasses.h"
+#include "../opt/LoopPasses.h"
 #include <cmath>
 
 using namespace sys;
@@ -35,6 +36,27 @@ Multiplier chooseMultiplier(int d) {
     shPost--;
   }
   return { shPost, mHigh, l };
+}
+
+namespace {
+
+void hoistLi(LoopInfo *loop) {
+  for (auto subloop : loop->subloops)
+    hoistLi(subloop);
+
+  if (!loop->preheader)
+    return;
+  auto term = loop->preheader->getLastOp();
+
+  for (auto bb : loop->bbs) {
+    auto ops = bb->getOps();
+    for (auto op : ops) {
+      if (isa<LiOp>(op))
+        op->moveBefore(term);
+    }
+  }
+}
+
 }
 
 int StrengthReduct::runImpl() {
@@ -199,8 +221,8 @@ int StrengthReduct::runImpl() {
       // We only need to `sra` an extra 32 bit to retrieve it.
       Value mVal = builder.create<LiOp>({ new IntAttr(m) });
       Value mulsh = builder.create<MulOp>({ n, mVal });
-      Value sra = builder.create<SraiOp>({ mulsh }, { new IntAttr(32 + shPost) });
       Value xsign = builder.create<SraiOp>({ n }, { new IntAttr(31) });
+      Value sra = builder.create<SraiOp>({ mulsh }, { new IntAttr(32 + shPost) });
       builder.replace<SubwOp>(op, { sra, xsign });
       return true;
     } else {
@@ -348,4 +370,16 @@ void StrengthReduct::run() {
     converted = runImpl();
     convertedTotal += converted;
   } while (converted);
+
+  // After conversion, we might produce more `li`s.
+  // We can pull them out of loop.
+  LoopAnalysis analysis(module);
+  analysis.run();
+  auto forests = analysis.getResult();
+  for (const auto &[func, forest] : forests) {
+    for (auto loop : forest.getLoops()) {
+      if (!loop->getParent())
+        hoistLi(loop);
+    }
+  }
 }
