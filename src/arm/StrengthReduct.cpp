@@ -1,4 +1,5 @@
 #include "ArmPasses.h"
+#include "../opt/LoopPasses.h"
 
 using namespace sys::arm;
 using namespace sys;
@@ -11,6 +12,27 @@ struct Multiplier {
 };
 
 Multiplier chooseMultiplier(int d);
+
+namespace {
+
+void hoistMovi(LoopInfo *loop) {
+  for (auto subloop : loop->subloops)
+    hoistMovi(subloop);
+
+  if (!loop->preheader)
+    return;
+  auto term = loop->preheader->getLastOp();
+
+  for (auto bb : loop->bbs) {
+    auto ops = bb->getOps();
+    for (auto op : ops) {
+      if (isa<MovIOp>(op))
+        op->moveBefore(term);
+    }
+  }
+}
+
+}
 
 std::map<std::string, int> StrengthReduct::stats() {
   return {
@@ -255,4 +277,16 @@ void StrengthReduct::run() {
     converted = runImpl();
     convertedTotal += converted;
   } while (converted);
+
+  // After conversion, we might produce more `mov`s.
+  // We can pull them out of loop.
+  LoopAnalysis analysis(module);
+  analysis.run();
+  auto forests = analysis.getResult();
+  for (const auto &[func, forest] : forests) {
+    for (auto loop : forest.getLoops()) {
+      if (!loop->getParent())
+        hoistMovi(loop);
+    }
+  }
 }

@@ -109,6 +109,15 @@ public:
   void run() override;
 };
 
+class Reassociate : public Pass {
+public:
+  Reassociate(ModuleOp *module): Pass(module) {}
+
+  std::string name() override { return "reassociate"; };
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
+};
+
 }
 
 #endif
