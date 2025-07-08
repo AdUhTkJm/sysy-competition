@@ -359,6 +359,18 @@ void RegularFold::run() {
       return false;
     });
 
+    runRewriter([&](DivFOp *op) {
+      auto y = op->DEF(1);
+      if (isa<FloatOp>(y) && F(y) == 2) {
+        folded++;
+        builder.setBeforeOp(op);
+        auto half = builder.create<FloatOp>({ new FloatAttr(0.5) });
+        builder.replace<MulFOp>(op, { op->getOperand(0), half });
+        return false;
+      }
+      return false;
+    });
+
     foldedTotal += folded;
   } while (folded);
 }
