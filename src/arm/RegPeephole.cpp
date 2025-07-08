@@ -88,6 +88,61 @@ int RegAlloc::latePeephole(Op *funcOp) {
     return false;
   });
 
+  bool changed;
+  std::vector<Op*> stores;
+  do {
+    changed = false;
+    // This modifies the content of stores, so cannot run in a rewriter.
+    stores = funcOp->findAll<StrWOp>();
+    for (auto op : stores) {
+      if (op == op->getParent()->getLastOp())
+        continue;
+      auto next = op->nextOp();
+
+      //   str wzr, N(sp)
+      //   str wzr, N+4(sp)
+      // becomes
+      //   str xzr, N(sp)
+      // only when N is a multiple of 8.
+      //
+      // We know `sp` is 16-aligned, but we don't know for other registers.
+      // That's why we fold it only for `sp`.
+      if (isa<StrWOp>(next) &&
+          RS(op) == Reg::xzr && RS2(op) == Reg::sp &&
+          RS(next) == Reg::xzr && RS2(next) == Reg::sp &&
+          V(op) % 8 == 0 && V(next) == V(op) + 4) {
+        converted++;
+        changed = true;
+
+        auto offset = V(op);
+        builder.replace<StrXOp>(op, {
+          RSC(Reg::xzr),
+          RS2C(Reg::sp),
+          new IntAttr(offset),
+        });
+        next->erase();
+        break;
+      }
+      
+      if (isa<StrWOp>(next) &&
+          RS(op) == Reg::xzr && RS2(op) == Reg::sp &&
+          RS(next) == Reg::xzr && RS2(next) == Reg::sp &&
+          V(op) % 8 == 4 && V(next) == V(op) - 4) {
+        converted++;
+        changed = true;
+
+        auto offset = V(op);
+        builder.replace<StrWOp>(op, {
+          RSC(Reg::xzr),
+          RS2C(Reg::sp),
+          new IntAttr(offset - 4),
+        });
+        next->erase();
+        break;
+      }
+    }
+  } while (changed);
+
   runRewriter(funcOp, [&](MulVOp *op) {
     if (op == op->getParent()->getLastOp())
       return false;

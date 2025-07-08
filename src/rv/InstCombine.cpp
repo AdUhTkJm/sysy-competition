@@ -15,7 +15,7 @@ bool inRange(Op *op) {
   return attr->value >= -2048 && attr->value <= 2047;
 }
 
-int inRange(int x) {
+bool inRange(int x) {
   return x >= -2048 && x <= 2047;
 }
 

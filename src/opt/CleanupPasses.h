@@ -110,6 +110,7 @@ public:
 };
 
 class Reassociate : public Pass {
+  void runImpl(Region *region);
 public:
   Reassociate(ModuleOp *module): Pass(module) {}
 

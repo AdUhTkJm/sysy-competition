@@ -246,6 +246,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       if (isa<ReadRegOp>(op))
         priority[op] = 1;
       
+      if (isa<MovIOp>(op) && (V(op) <= 32767 && V(op) >= -32768))
+        priority[op] = -2;
+      
       if (isa<PhiOp>(op)) {
         priority[op] = currentPriority + 1;
         for (auto x : op->getOperands()) {
