@@ -2,14 +2,10 @@
 
 using namespace sys;
 
-namespace {
-
 struct Associated {
   bool ref;
   std::vector<Op*> mem;
 };
-
-}
 
 void Reassociate::runImpl(Region *region) {
   std::map<Op*, Associated> data;
