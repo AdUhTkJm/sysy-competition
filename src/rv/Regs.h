@@ -21,7 +21,7 @@ const Reg leafOrder[] = {
   
   Reg::s0, Reg::s1, Reg::s2, Reg::s3, 
   Reg::s4, Reg::s5, Reg::s6, Reg::s7,
-  Reg::s8, Reg::s9, // Reg::s10, Reg::s11,
+  Reg::s8, Reg::s9,
 };
 // Order for non-leaf functions.
 const Reg normalOrder[] = {
@@ -29,12 +29,12 @@ const Reg normalOrder[] = {
   Reg::a4, Reg::a5, Reg::a6, Reg::a7,
   Reg::ra,
 
-  Reg::s0, Reg::s1, Reg::s2, Reg::s3, 
-  Reg::s4, Reg::s5, Reg::s6, Reg::s7,
-  Reg::s8, Reg::s9, // Reg::s10, Reg::s11,
-
   Reg::t0, Reg::t1, Reg::t2, Reg::t3,
   Reg::t4, Reg::t5, Reg::t6,
+
+  Reg::s0, Reg::s1, Reg::s2, Reg::s3, 
+  Reg::s4, Reg::s5, Reg::s6, Reg::s7,
+  Reg::s8, Reg::s9,
 };
 const Reg argRegs[] = {
   Reg::a0, Reg::a1, Reg::a2, Reg::a3,
@@ -65,8 +65,8 @@ const std::set<Reg> calleeSaved = {
   Reg::fs4, Reg::fs5, Reg::fs6, Reg::fs7,
   Reg::fs8, Reg::fs9, Reg::fs10, Reg::fs11,
 };
-constexpr int leafRegCnt = 25;
-constexpr int normalRegCnt = 26;
+constexpr int leafRegCnt = sizeof(leafOrder) / sizeof(Reg);
+constexpr int normalRegCnt = sizeof(normalOrder) / sizeof(Reg);
 
 const Reg leafOrderf[] = {
   Reg::fa0, Reg::fa1, Reg::fa2, Reg::fa3,
@@ -78,7 +78,7 @@ const Reg leafOrderf[] = {
   
   Reg::fs0, Reg::fs1, Reg::fs2, Reg::fs3, 
   Reg::fs4, Reg::fs5, Reg::fs6, Reg::fs7,
-  Reg::fs8, Reg::fs9, // Reg::fs10, Reg::fs11,
+  Reg::fs8, Reg::fs9,
 };
 // Order for non-leaf functions.
 const Reg normalOrderf[] = {
@@ -91,7 +91,7 @@ const Reg normalOrderf[] = {
 
   Reg::fs0, Reg::fs1, Reg::fs2, Reg::fs3, 
   Reg::fs4, Reg::fs5, Reg::fs6, Reg::fs7,
-  Reg::fs8, Reg::fs9, // Reg::fs10, Reg::fs11,
+  Reg::fs8, Reg::fs9,
 };
 const Reg fargRegs[] = {
   Reg::fa0, Reg::fa1, Reg::fa2, Reg::fa3,
