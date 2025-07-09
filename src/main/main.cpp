@@ -69,6 +69,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::RegularFold>();
   pm.addPass<sys::View>();
   pm.addPass<sys::LoopDCE>();
+  pm.addPass<sys::TidyMemory>();
   pm.addPass<sys::Fusion>();
   if (opts.arm && (!opts.noLink || opts.o1)) // RV only has a single core.
     pm.addPass<sys::Parallelize>();

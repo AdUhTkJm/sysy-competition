@@ -12,22 +12,36 @@ std::map<std::string, int> Fusion::stats() {
 
 namespace {
 
-bool identical(Op *a, Op *b) {
+bool identical(Op *a, Op *b, const std::unordered_set<Op*> &written) {
+  if (a == b)
+    return true;
+
   if (a->opid != b->opid)
     return false;
 
   if (isa<IntOp>(a))
     return V(a) == V(b);
 
-  return a == b;
+  if (a->getOperandCount() != b->getOperandCount())
+    return false;
+
+  for (int i = 0; i < a->getOperandCount(); i++) {
+    if (!identical(a->DEF(i), b->DEF(i), written))
+      return false;
+  }
+
+  if (isa<LoadOp>(a))
+    return a->DEF()->has<BaseAttr>() && !written.count(BASE(a->DEF()));
+
+  return true;
 }
 
 // We only combine for loops with identical start, stop and step for now.
 // We might do peeling in the future, but I don't feel like it currently.
-bool fusible(Op *a, Op *b) {
-  return identical(a->DEF(0), b->DEF(0))
-      && identical(a->DEF(1), b->DEF(1))
-      && identical(a->DEF(2), b->DEF(2));
+bool fusible(Op *a, Op *b, const std::unordered_set<Op*> &written) {
+  return identical(a->DEF(0), b->DEF(0), written)
+      && identical(a->DEF(1), b->DEF(1), written)
+      && identical(a->DEF(2), b->DEF(2), written);
 }
 
 // Ops that can't be hoisted to before the loop.
@@ -59,6 +73,11 @@ void Fusion::runImpl(FuncOp *func) {
       Op *next;
       bool good = true;
       std::unordered_set<Op*> reads, writes;
+
+      auto calls = loop->findAll<CallOp>();
+      for (auto call : calls)
+        BAD(call->has<ImpureAttr>());
+
       auto stores = loop->findAll<StoreOp>();
       for (auto store : stores) {
         auto addr = store->DEF(1);
@@ -82,24 +101,34 @@ void Fusion::runImpl(FuncOp *func) {
 
         BAD(pinned(next));
 
-        // Stores and loads to scalars are hoistable when the first loop doesn't touch it.
+        // Stores and loads are hoistable when the first loop doesn't touch it.
         if (isa<StoreOp>(next)) {
           auto addr = BASE(next->DEF(1));
-          BAD(isa<GetGlobalOp>(addr));
-          BAD(reads.count(addr) || writes.count(addr) || SIZE(addr) != SIZE(next)); 
+          BAD(reads.count(addr) || writes.count(addr));
         }
         if (isa<LoadOp>(next)) {
           auto addr = BASE(next->DEF());
-          BAD(isa<GetGlobalOp>(addr));
-          BAD(writes.count(addr) || SIZE(addr) != SIZE(next));
+          BAD(writes.count(addr));
         }
         hoisted.push_back(next);
       }
       if (!good || (next->atBack() && !isa<ForOp>(next)))
         continue;
 
+      auto ncalls = next->findAll<CallOp>();
+      for (auto call : ncalls)
+        BAD(call->has<ImpureAttr>());
+
+      // Find all writes in `next`.
+      auto nwrites = next->findAll<StoreOp>();
+      for (auto op : nwrites) {
+        auto addr = op->DEF(1);
+        BAD(!addr->has<BaseAttr>());
+        writes.insert(BASE(addr));
+      }
+
       // Two consecutive for's. Check whether they can get combined.
-      if (!fusible(next, loop))
+      if (!good || !fusible(next, loop, writes))
         return;
 
       // In case the induction variable aren't the same,
@@ -112,7 +141,7 @@ void Fusion::runImpl(FuncOp *func) {
       }
 
       // A very strict way of checking dependency:
-      // 1) all subscripts must be the same;
+      // 1) all subscripts must be the same (except for those that are only read);
       // 2) non-array variables must be disjoint.
       // Polyhedral approach here? Might extend when I have time.
       std::unordered_set<Op*> arrays;
@@ -128,6 +157,8 @@ void Fusion::runImpl(FuncOp *func) {
         arrays.insert(final);
 
       AffineExpr subscripts;
+      Op *subscrOp = nullptr;
+      std::unordered_set<Op*> nonsub, hassub;
 
       auto region = next->getRegion();
       auto bb = region->getFirstBlock();
@@ -137,7 +168,6 @@ void Fusion::runImpl(FuncOp *func) {
       std::copy(loads.begin(), loads.end(), std::back_inserter(access));
 
       auto naccess = next->findAll<LoadOp>();
-      auto nwrites = next->findAll<StoreOp>();
       std::copy(nwrites.begin(), nwrites.end(), std::back_inserter(naccess));
 
       std::unordered_set<Op*> local, nlocal;
@@ -161,11 +191,23 @@ void Fusion::runImpl(FuncOp *func) {
       // Check subscript.
       for (auto op : access) {
         auto addr = isa<LoadOp>(op) ? op->DEF() : op->DEF(1);
+        auto base = BASE(addr);
+        if (!writes.count(base))
+          continue;
+
         if (!addr->has<SubscriptAttr>()) {
-          auto base = BASE(addr);
-          BAD(arrays.count(base) || isa<GetGlobalOp>(base));
+          BAD(hassub.count(base));
+          nonsub.insert(base);
+          if (arrays.count(base) || isa<GetGlobalOp>(base)) {
+            if (!subscrOp)
+              subscrOp = addr;
+            BAD(!identical(subscrOp, addr, writes));
+          }
           continue;
         }
+
+        BAD(nonsub.count(base));
+        hassub.insert(base);
 
         const auto &subscript = SUBSCRIPT(addr);
         if (subscripts.empty())

@@ -14,8 +14,7 @@ std::map<std::string, int> DSE::stats() {
 void DSE::runImpl(Region *region) {
   used.clear();
   // Use a dataflow approach.
-  // If it's wrong, then switch back to the coarse approach similar to Globalization.
-  std::map<BasicBlock *, std::set<Op*>> in, out;
+  std::map<BasicBlock*, std::set<Op*>> in, out;
   const auto &bbs = region->getBlocks();
   std::deque<BasicBlock*> worklist(bbs.begin(), bbs.end());
 
@@ -48,7 +47,7 @@ void DSE::runImpl(Region *region) {
           auto addr = store->getOperand(1).defining;
           // If this op stores to the exact same place as one of the `live` ops,
           // then that store is no longer live.
-          if (mustAlias(addr, op->DEF(1)))
+          if (mustAlias(addr, op->DEF(1)) || addr == op->DEF(1))
             killed.push_back(store);
         }
         for (auto kill : killed)
@@ -173,7 +172,7 @@ void DSE::run() {
   for (auto glob : globs)
     removeUnread(glob, gets);
 
-  // Finally, look at a load-store pattern like this:
+  // Look at a load-store pattern like this:
   //   %a = load %1
   //   store %a, %1
   // The second store is useless.
@@ -196,6 +195,28 @@ void DSE::run() {
     }
   }
 
+  // Look at a store-store pattern like this:
+  //   store %a, %1
+  // <no load/call in between>
+  //   store %b, %1
+  // The first store is useless.
+  auto stores = module->findAll<StoreOp>();
+  for (auto store : stores) {
+    auto storeAddr = store->DEF(1);
+    for (auto runner = store->nextOp(); runner; runner = runner->nextOp()) {
+      if (isa<LoadOp>(runner) || isa<CallOp>(runner))
+        break;
+      if (isa<StoreOp>(runner)) {
+        if (runner->DEF(1) == storeAddr) {
+          remove.push_back(store);
+          continue;
+        }
+        break;
+      }
+    }
+  }
+  
+  elim += remove.size();
   for (auto op : remove)
     op->erase();
 }
