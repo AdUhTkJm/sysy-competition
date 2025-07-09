@@ -131,15 +131,6 @@ void Fusion::runImpl(FuncOp *func) {
       if (!good || !fusible(next, loop, writes))
         return;
 
-      // In case the induction variable aren't the same,
-      // we add another store at the end of the second loop.
-      if (loop->DEF(3) != next->DEF(3)) {
-        Builder builder;
-        builder.setAfterOp(next);
-        Value stop = next->DEF(1);
-        builder.create<StoreOp>({ stop, next->DEF(3) }, { new SizeAttr(4) });
-      }
-
       // A very strict way of checking dependency:
       // 1) all subscripts must be the same (except for those that are only read);
       // 2) non-array variables must be disjoint.
@@ -218,6 +209,15 @@ void Fusion::runImpl(FuncOp *func) {
 
       if (!good)
         continue;
+
+      // In case the induction variable aren't the same,
+      // we add another store at the end of the second loop.
+      if (loop->DEF(3) != next->DEF(3)) {
+        Builder builder;
+        builder.setAfterOp(next);
+        Value stop = next->DEF(1);
+        builder.create<StoreOp>({ stop, next->DEF(3) }, { new SizeAttr(4) });
+      }
 
       // Hoist the ops between `next` and `loop` to before `loop`.
       for (auto op : hoisted)
