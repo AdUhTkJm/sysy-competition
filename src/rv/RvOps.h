@@ -108,6 +108,10 @@ RVOP(PlaceHolderOp); // See regalloc; holds a place to denote a register isn't a
 RVOPF(FcvtswOp); // i32 -> f32
 RVOP(FcvtwsRtzOp); // f32 -> i32, round to zero
 RVOPF(FmvwxOp); // copies bit pattern from i32 to f32
+RVOPF(FmvdxOp);
+RVOPL(FmvxdOp);
+RVOP(FldOp); // These are only used in stack save/restore.
+RVOP(FsdOp);
 RVOP(FeqOp); // Note these Ops must have been added with a `.s` in Dump.
 RVOP(FltOp);
 RVOP(FleOp);

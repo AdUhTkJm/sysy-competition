@@ -76,7 +76,7 @@ namespace rv {
   X(fa7)
 
 #define X(name) name,
-enum class Reg : signed int {
+enum class Reg : signed {
   REGS
 };
 

@@ -37,6 +37,8 @@ void dumpOp(Op *op, std::ostream &os) {
     { "feq", "feq.s" },
     { "fcvtsw", "fcvt.s.w" },
     { "fmvwx", "fmv.w.x" },
+    { "fmvdx", "fmv.d.x" },
+    { "fmvxd", "fmv.x.d" },
     { "fmv", "fmv.s" },
   };
 
@@ -68,7 +70,6 @@ void dumpOp(Op *op, std::ostream &os) {
         assert(false);
       }
     } else {
-      // A very ad-hoc, ugly hack. Since all FPs are float, we just ignore `size` (which might be 8).
       name = "fsw";
     }
     // Dump as `sw a0, 4(a1)`
@@ -93,20 +94,24 @@ void dumpOp(Op *op, std::ostream &os) {
         assert(false);
       }
     } else {
-      // A very ad-hoc, ugly hack. Since all FPs are float, we just ignore `size` (which might be 8).
       name = "flw";
     }
-    auto rd = op->get<RdAttr>()->reg;
-    auto rs = op->get<RsAttr>()->reg;
-    auto offset = V(op);
-    os << name << " " << rd << ", " << offset << "(" << rs << ")\n";
+    os << name << " " << RD(op) << ", " << V(op) << "(" << RS(op) << ")\n";
     return;
   }
 
   if (isa<FcvtwsRtzOp>(op)) {
-    auto rd = op->get<RdAttr>()->reg;
-    auto rs = op->get<RsAttr>()->reg;
-    os << "fcvt.w.s " << rd << ", " << rs << ", rtz\n";
+    os << "fcvt.w.s " << RD(op) << ", " << RS(op) << ", rtz\n";
+    return;
+  }
+
+  if (isa<FsdOp>(op)) {
+    os << "fsd " << RS(op) << ", " << V(op) << "(" << RS2(op) << ")\n";
+    return;
+  }
+
+  if (isa<FldOp>(op)) {
+    os << "fld " << RD(op) << ", " << V(op) << "(" << RS(op) << ")\n";
     return;
   }
 

@@ -249,13 +249,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       if (isa<ReadRegOp>(op))
         priority[op] = 1;
       
-      if (isa<LiOp>(op)) {
-        if (V(op) <= 2047 && V(op) >= -2048)
-          priority[op] = -2;
-        priority[op] = -1;
-      }
-      if (isa<LaOp>(op))
-        priority[op] = -1;
+      if (isa<LiOp>(op) && (V(op) <= 2047 && V(op) >= -2048))
+        priority[op] = -2;
 
       if (isa<PhiOp>(op)) {
         priority[op] = currentPriority + 1;
@@ -461,6 +456,34 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     spillOffset.clear();
   }
 
+  // If possible, map some offsets to floating-point registers.
+  if (spillOffset.size()) {
+    // Try to reuse floating-point registers for spilling.
+    std::unordered_set<Reg> used;
+    for (auto [op, x] : assignment) {
+      if (isa<PlaceHolderOp>(op))
+        continue;
+      used.insert(x);
+    }
+
+    std::unordered_map<int, Reg> fpmv;
+    auto off = STACKOFF(funcOp);
+    for (auto reg : leafOrderf) {
+      if (highest <= off)
+        break;
+      if (used.count(reg) || (!isLeaf && !calleeSaved.count(reg)))
+        continue;
+
+      fpmv[highest] = reg;
+      highest -= 8;
+    }
+
+    for (auto &[_, offset] : spillOffset) {
+      if (fpmv.count(offset))
+        offset = -int(fpmv[offset]);
+    }
+  }
+
   // Allocate more stack space for it.
   if (spillOffset.size())
     STACKOFF(funcOp) = highest + 8;
@@ -661,7 +684,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   }
 
   // Don't forget that register 0 and offset 0 are the same.
-#define SOFFSET(op, Ty) ((Reg) (-(op)->get<Spilled##Ty##Attr>()->offset-1))
+  // We only need to guarantee that SOFFSET doesn't collide with existing regs.
+#define SOFFSET(op, Ty) ((Reg) (-(op)->get<Spilled##Ty##Attr>()->offset-1000))
 #define SPILLABLE(op, Ty) (op->has<Ty##Attr>() ? op->get<Ty##Attr>()->reg : SOFFSET(op, Ty))
 
   // Detect circular copies and calculate a correct order.
@@ -779,7 +803,6 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     if (members.empty())
       continue;
 
-    std::cerr << "remark: cycle detected at bb" << bbmap[bb] << "\n";
     for (auto header : headers) {
       const auto &cycle = members[header];
       assert(!cycle.empty());
@@ -859,7 +882,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         auto reg = fp ? fspillReg : spillReg;
 
         builder.setAfterOp(op);
-        if (offset < 2048)
+        if (offset < delta)
+          builder.create<FmvdxOp>({ RDC(Reg(delta - offset)), RSC(reg) });
+        else if (offset < 2048)
           builder.create<StoreOp>({ RSC(reg), RS2C(Reg::sp), new IntAttr(offset), new SizeAttr(8) });
         else if (offset < 4096) {
           builder.create<AddiOp>({ RDC(spillReg2), RSC(Reg::sp), new IntAttr(2047), new SizeAttr(8) });
@@ -882,6 +907,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
           builder.create<LiOp>({ RDC(reg), new IntAttr(V(ref)) });
         else if (isa<LaOp>(ref))
           builder.create<LaOp>({ RDC(reg), new NameAttr(NAME(ref)) });
+        else if (offset < delta)
+          builder.create<FmvxdOp>({ RDC(reg), RSC(Reg(delta - offset)) });
         else if (offset < 2048)
           builder.create<LoadOp>(ldty, { RDC(reg), RSC(Reg::sp), new IntAttr(offset), new SizeAttr(8) });
         else if (offset < 4096) {
@@ -905,6 +932,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
           builder.create<LiOp>({ RDC(reg), new IntAttr(V(ref)) });
         else if (isa<LaOp>(ref))
           builder.create<LaOp>({ RDC(reg), new NameAttr(NAME(ref)) });
+        else if (offset < delta)
+          builder.create<FmvxdOp>({ RDC(reg), RSC(Reg(delta - offset)) });
         else if (offset < 2048)
           builder.create<LoadOp>(ldty, { RDC(reg), RSC(Reg::sp), new IntAttr(offset), new SizeAttr(8) });
         else if (offset < 4096) {

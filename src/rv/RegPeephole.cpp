@@ -63,7 +63,7 @@ int RegAlloc::latePeephole(Op *funcOp) {
   int converted = 0;
 
   runRewriter(funcOp, [&](StoreOp *op) {
-    if (op == op->getParent()->getLastOp())
+    if (op->atBack())
       return false;
 
     //   sw a0, N(addr)
@@ -78,9 +78,25 @@ int RegAlloc::latePeephole(Op *funcOp) {
       builder.setBeforeOp(next);
       CREATE_MV(isFP(RD(next)), RD(next), RS(op));
       next->erase();
-      return true;
+      return false;
     }
 
+    return false;
+  });
+
+  runRewriter(funcOp, [&](FmvdxOp *op) {
+    if (op->atBack())
+      return false;
+
+    auto next = op->nextOp();
+    if (isa<FmvxdOp>(next) && RS(next) == RD(op)) {
+      converted++;
+      builder.setBeforeOp(next);
+      CREATE_MV(isFP(RD(next)), RD(next), RS(op));
+      next->erase();
+      return false;
+    }
+    
     return false;
   });
 
@@ -294,13 +310,19 @@ void RegAlloc::tidyup(Region *region) {
   });
 }
 
+#define CREATE_STORE(addr, offset) \
+  if (isFP(reg)) \
+    builder.create<FsdOp>({ RSC(reg), RS2C(addr), new IntAttr(offset) }); \
+  else \
+    builder.create<StoreOp>({ RSC(reg), RS2C(addr), new IntAttr(offset), new SizeAttr(8) });
+
 void save(Builder builder, const std::vector<Reg> &regs, int offset) {
   using sys::rv::StoreOp;
 
   for (auto reg : regs) {
     offset -= 8;
     if (offset < 2048)
-      builder.create<StoreOp>({ RSC(reg), RS2C(Reg::sp), new IntAttr(offset), new SizeAttr(8) });
+      CREATE_STORE(Reg::sp, offset)
     else {
       // li   t6, offset
       // addi t6, t6, sp
@@ -308,10 +330,16 @@ void save(Builder builder, const std::vector<Reg> &regs, int offset) {
       // (Because reg might be `s11`)
       builder.create<LiOp>({ RDC(spillReg2), new IntAttr(offset) });
       builder.create<AddOp>({ RDC(spillReg2), RSC(spillReg2), RS2C(Reg::sp) });
-      builder.create<StoreOp>({ RSC(reg), RS2C(spillReg2), new IntAttr(0), new SizeAttr(8) });
+      CREATE_STORE(spillReg2, 0);
     }
   }
 }
+
+#define CREATE_LOAD(addr, offset) \
+  if (isFP(reg)) \
+    builder.create<FldOp>({ RDC(reg), RSC(addr), new IntAttr(offset) }); \
+  else \
+    builder.create<LoadOp>(ty, { RDC(reg), RSC(addr), new IntAttr(offset), new SizeAttr(8) });
 
 void load(Builder builder, const std::vector<Reg> &regs, int offset) {
   using sys::rv::LoadOp;
@@ -321,14 +349,14 @@ void load(Builder builder, const std::vector<Reg> &regs, int offset) {
     auto isFloat = isFP(reg);
     Value::Type ty = isFloat ? Value::f32 : Value::i64;
     if (offset < 2048)
-      builder.create<LoadOp>(ty, { RDC(reg), RSC(Reg::sp), new IntAttr(offset), new SizeAttr(8) });
+      CREATE_LOAD(Reg::sp, offset)
     else {
       // li   s11, offset
       // addi s11, s11, sp
       // ld   reg, 0(s11)
       builder.create<LiOp>({ RDC(spillReg), new IntAttr(offset) });
       builder.create<AddOp>({ RDC(spillReg), RSC(spillReg), RS2C(Reg::sp) });
-      builder.create<LoadOp>(ty, { RDC(reg), RSC(spillReg), new IntAttr(0), new SizeAttr(8) });
+      CREATE_LOAD(spillReg, 0);
     }
   }
 }
