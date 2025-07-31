@@ -352,10 +352,8 @@ void Vectorize::runImpl(LoopInfo *info) {
   auto exit = info->getExit();
   auto region = header->getParent();
 
-  std::vector<BasicBlock*> blocks;
   std::unordered_map<Op*, Op*> cloneMap;
   std::unordered_map<BasicBlock*, BasicBlock*> rewireMap;
-  blocks.reserve(info->getBlocks().size());
 
   auto newpreheader = region->insert(exit);
 

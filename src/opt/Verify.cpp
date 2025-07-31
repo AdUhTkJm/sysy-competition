@@ -44,21 +44,29 @@ void Verify::run() {
   }
 
   auto phis = module->findAll<PhiOp>();
+  bool nonfrom = false;
   for (auto phi : phis) {
     // Check the number of phi's must be equal to the number of predecessors.
     auto parent = phi->getParent();
     if (parent->preds.size() != phi->getOperandCount()) {
-      std::cerr << module << "phi without enough operands:\n  " << phi;
+      std::cerr << module << "phi with " << phi->getOperandCount() <<
+        " operand(s), but expected " << parent->preds.size() << ":\n  " << phi;
       assert(false);
     }
 
     // Check that all operands from Phi must come from the immediate predecessor.
     auto bb = phi->getParent();
     for (auto attr : phi->getAttrs()) {
+      if (!isa<FromAttr>(attr)) {
+        nonfrom = true;
+        continue;
+      }
       if (!bb->preds.count(FROM(attr))) {
         std::cerr << module << "phi operands are not from predecessor:\n  " << phi;
         assert(false);
       }
     }
   }
+  if (nonfrom)
+    std::cerr << "warning: phi has non-FromAttr\n";
 }

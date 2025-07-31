@@ -131,6 +131,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::RegularFold>();
   pm.addPass<sys::Range>();
   pm.addPass<sys::RangeAwareFold>();
+  pm.addPass<sys::Splice>();
   pm.addPass<sys::DCE>();
   // pm.addPass<sys::Reassociate>();
   pm.addPass<sys::GCM>();

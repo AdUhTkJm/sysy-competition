@@ -45,10 +45,25 @@ IRange join(IRange l, IRange r, bool widen = false) {
     } \
   }
 
-#define UPDATE_BOOL_RANGE(Ty) \
+#define UPDATE_BOOL_RANGE(Ty, valid, unsat) \
   if (isa<Ty>(op)) { \
-    if (!op->has<RangeAttr>()) { \
-      op->add<RangeAttr>(0, 1); \
+    auto l = op->getOperand(0).defining; \
+    auto r = op->getOperand(1).defining; \
+    if (l->has<RangeAttr>() && r->has<RangeAttr>()) { \
+      auto [a1, b1] = RANGE(l); \
+      auto [a2, b2] = RANGE(r); \
+      auto range = valid ? IRange { 1, 1 } : unsat ? IRange { 0, 0 } : IRange { 0, 1 }; \
+      if (auto rangeAttr = op->find<RangeAttr>()) { \
+        auto xrange = join(range, rangeAttr->range, false); \
+        if (xrange == rangeAttr->range) \
+          return false; \
+        op->remove<RangeAttr>(); \
+        op->add<RangeAttr>(xrange); \
+      } else \
+        op->add<RangeAttr>(range); \
+      return true; \
+    } else if (!op->has<RangeAttr>()) { \
+      op->add<RangeAttr>(IRange { 0, 1 }); \
       return true; \
     } \
   }
@@ -72,6 +87,9 @@ int64_t maxmul(int a1, int b1, int a2, int b2) {
 int64_t mindiv(int64_t a1, int64_t b1, int64_t a2, int64_t b2) {
   if (a2 == 0 || b2 == 0)
     return INT_MIN;
+  if (a2 * b2 < 0)
+    return -std::max(std::abs(a1), std::abs(a2));
+  
   int64_t x[] = { a1 / a2, a1 / b2, b1 / a2, b1 / b2 };
   return *std::min_element(x, x + 4);
 }
@@ -79,6 +97,9 @@ int64_t mindiv(int64_t a1, int64_t b1, int64_t a2, int64_t b2) {
 int64_t maxdiv(int64_t a1, int64_t b1, int64_t a2, int64_t b2) {
   if (a2 == 0 || b2 == 0)
     return INT_MAX;
+  if (a2 * b2 < 0)
+    return std::max(std::abs(a1), std::abs(a2));
+  
   int64_t x[] = { a1 / a2, a1 / b2, b1 / a2, b1 / b2 };
   return *std::max_element(x, x + 4);
 }
@@ -117,13 +138,7 @@ bool updateConditional(Op *op, bool &changed) {
     return false;
   
   auto parent = op->getParent();
-  if (parent->preds.size() != 1)
-    return false;
-  
-  auto pred = *parent->preds.begin();
-  auto from = FROM(op->getAttrs()[0]);
-  if (pred != from)
-    return false;
+  auto pred = FROM(op->getAttrs()[0]);
   
   // Check whether this op is a condition.
   auto x = op->DEF();
@@ -134,8 +149,7 @@ bool updateConditional(Op *op, bool &changed) {
   if (!isa<BranchOp>(term))
     return false;
 
-  auto bb1 = TARGET(term), bb2 = ELSE(term);
-  bool isTarget = parent == bb1;
+  bool isTarget = parent == TARGET(term);
 
   auto cond = term->DEF(0);
   // TODO: more comparison types (also change Range.cpp)
@@ -207,12 +221,18 @@ bool calculateRange(Op *op) {
   UPDATE_RANGE(DivIOp, mindiv(a1, b1, a2, b2), maxdiv(a1, b1, a2, b2));
   UPDATE_RANGE(ModIOp, minmod(a1, b1, a2, b2), maxmod(a1, b1, a2, b2));
 
-  UPDATE_BOOL_RANGE(EqOp);
-  UPDATE_BOOL_RANGE(LeOp);
-  UPDATE_BOOL_RANGE(LtOp);
-  UPDATE_BOOL_RANGE(NeOp);
-  UPDATE_BOOL_RANGE(NotOp);
-  UPDATE_BOOL_RANGE(SetNotZeroOp);
+  UPDATE_BOOL_RANGE(EqOp, (a1 == a2 && b1 == b2 && a1 == b1), (a1 > b2 || a2 > b1));
+  UPDATE_BOOL_RANGE(LeOp, (b1 <= a2), (a1 > b2));
+  UPDATE_BOOL_RANGE(LtOp, (b1 < a2), (a1 >= b2));
+  UPDATE_BOOL_RANGE(NeOp, (a1 > b2 || a2 > b1), (a1 == a2 && b1 == b2 && a1 == b1));
+
+  if (isa<NotOp>(op) || isa<SetNotZeroOp>(op)) {
+    if (!op->has<RangeAttr>()) {
+      op->add<RangeAttr>(IRange { 0, 1 });
+      return true;
+    }
+    return false;
+  }
   
   if (isa<PhiOp>(op)) {
     bool changed = false;
@@ -428,9 +448,13 @@ void Range::run() {
     for (auto g : getargs)
       getarg[V(g)] = g;
 
-    for (int i = 0; i < argcnt; i++)
-      getarg[i]->add<RangeAttr>(argrange[{ name, i }]);
-    
+    for (int i = 0; i < argcnt; i++) {
+      if (!argrange.count({name, i}))
+        getarg[i]->add<RangeAttr>(IRange { INT_MIN, INT_MAX });
+      else
+        getarg[i]->add<RangeAttr>(argrange[{ name, i }]);
+    }
+
     analyze(region);
   }
 }

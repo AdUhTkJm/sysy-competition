@@ -1,5 +1,5 @@
 {
-	"dependencies": {
+	"devDependencies": {
 		"@types/node": "^22.15.21",
 		"axios": "^1.9.0",
 		"cheerio": "^1.0.0",

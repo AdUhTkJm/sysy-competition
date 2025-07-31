@@ -221,6 +221,16 @@ public:
   void run() override;
 };
 
+class Splice : public Pass {
+  void runImpl(LoopInfo *loop);
+public:
+  Splice(ModuleOp *module): Pass(module) {}
+
+  std::string name() override { return "splice"; }
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
+};
+
 }
 
 #endif

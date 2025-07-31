@@ -24,6 +24,11 @@ bool pinned(Op *op) {
 
 bool noAlias(Op *load, const std::vector<Op*> &stores) {
   auto addr = load->DEF();
+  // Sometimes we don't have stores while unable to analyze loads.
+  // It's safe to say no alias anyway.
+  if (!stores.size())
+    return true;
+
   while (isa<PhiOp>(addr)) {
     // Conservatively assume alias.
     if (addr->getOperandCount() >= 2)

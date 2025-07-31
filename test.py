@@ -226,7 +226,7 @@ def run_asm(file: str):
   if args.input:
     with open(args.input, "r") as f:
       buffer = f.read().encode('utf-8')
-  return proc.run([f"temp/{basename}"], input=buffer if args.input else None)
+  return proc.run([qemu, f"temp/{basename}"], input=buffer if args.input else None)
 
 def run(full_file: str, no_exec: bool):
   basename = os.path.splitext(os.path.basename(full_file))[0]

@@ -12,7 +12,8 @@ void NoStore::runImpl(Op *func) {
     if (isa<GetGlobalOp>(base))
       return;
   }
-  func->add<NoStoreAttr>();
+  if (!func->has<NoStoreAttr>())
+    func->add<NoStoreAttr>();
 }
 
 void NoStore::run() {
