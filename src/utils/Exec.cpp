@@ -362,3 +362,8 @@ void Interpreter::run(std::istream &input) {
   auto exit = execf(fnMap["main"]->getRegion(), {});
   retcode = exit.vi;
 }
+
+void Interpreter::runFunction(const std::string &func, const std::vector<Value> &args) {
+  auto exit = execf(fnMap[func]->getRegion(), args);
+  retcode = exit.vi;
+}

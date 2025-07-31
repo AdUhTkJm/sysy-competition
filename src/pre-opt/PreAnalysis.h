@@ -44,6 +44,17 @@ public:
   void run() override;
 };
 
+// Checks whether a function does not store to global variable.
+class NoStore : public Pass {
+  void runImpl(Op *func);
+public:
+  NoStore(ModuleOp *module): Pass(module) {}
+    
+  std::string name() override { return "no-store"; };
+  std::map<std::string, int> stats() override { return {}; };
+  void run() override;
+};
+
 }
 
 #endif

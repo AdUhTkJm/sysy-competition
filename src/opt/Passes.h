@@ -222,6 +222,16 @@ public:
   void run() override;
 };
 
+// Precompute some values for recursive functions.
+class Cached : public Pass {
+public:
+  Cached(ModuleOp *module): Pass(module) {}
+  
+  std::string name() override { return "cached"; };
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
+};
+
 }
 
 #endif

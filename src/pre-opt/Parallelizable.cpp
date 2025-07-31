@@ -5,6 +5,8 @@ using namespace sys;
 #define BAD(cond) if (cond) return
 
 void Parallelizable::runImpl(Op *loop, int depth) {
+  NoStore(module).run();
+  auto fnMap = getFunctionMap();
   // Find deeper loops inside the current one.
   auto entry = loop->getRegion()->getFirstBlock();
   for (auto op : entry->getOps()) {
@@ -12,7 +14,7 @@ void Parallelizable::runImpl(Op *loop, int depth) {
       runImpl(op, depth + 1);
   }
   for (auto op : entry->getOps())
-    BAD(isa<CallOp>(op) && op->has<ImpureAttr>());
+    BAD(isa<CallOp>(op) && op->has<ImpureAttr>() && (isExtern(NAME(op)) || !fnMap[NAME(op)]->has<NoStoreAttr>()));
 
   // The subscript for this variable `loop` must be the same.
   std::unordered_map<Op*, std::vector<std::pair<Op*, bool>>> access, ops;

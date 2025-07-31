@@ -45,6 +45,12 @@ public:
   ParallelizableAttr *clone() override { return new ParallelizableAttr(accum); }
 };
 
+class NoStoreAttr : public AttrImpl<NoStoreAttr, PREOPTLINE> {
+public:
+  std::string toString() override { return "<no store>"; }
+  NoStoreAttr *clone() override { return new NoStoreAttr; }
+};
+
 }
 
 #define SUBSCRIPT(op) (op)->get<SubscriptAttr>()->subscript

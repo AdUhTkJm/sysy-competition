@@ -53,6 +53,7 @@ public:
   ~Interpreter();
 
   void run(std::istream &input);
+  void runFunction(const std::string &func, const std::vector<Value> &args);
   std::string out() { return outbuf.str(); }
   int exitcode() { return retcode & 0xff; }
 };
