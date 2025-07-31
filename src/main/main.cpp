@@ -32,6 +32,7 @@ void initArmPipeline(sys::PassManager &pm) {
   pm.addPass<StrengthReduct>();
   pm.addPass<InstCombine>();
   pm.addPass<ArmDCE>();
+  pm.addPass<sys::GVN>();
   pm.addPass<PostIncr>();
   pm.addPass<ArmDCE>();
   pm.addPass<RegAlloc>();

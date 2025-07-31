@@ -1,5 +1,6 @@
 #include "Passes.h"
 #include "../rv/RvOps.h"
+#include "../arm/ArmOps.h"
 
 using namespace sys;
 
@@ -74,6 +75,10 @@ bool allowed(Op *op) {
 
   // RISC-V GVN
     ALLOW(rv::AddOp)
+    ALLOW(rv::LiOp)
+
+  // ARM GVN
+    ALLOW(arm::MovIOp)
   ;
 }
 

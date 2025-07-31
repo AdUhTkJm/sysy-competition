@@ -20,6 +20,8 @@ static ArmRule rules[] = {
   "(change (addx (lslwi y #a) x) (addxl x y #a))",
   "(change (addw x (lslxi y #a)) (addwl x y #a))",
   "(change (addw (lslxi y #a) x) (addwl x y #a))",
+  "(change (addx x (lslxi y #a)) (addxl x y #a))",
+  "(change (addx (lslxi y #a) x) (addxl x y #a))",
   "(change (addw x (asrwi y #a)) (addwar x y #a))",
   "(change (addw (asrwi y #a) x) (addwar x y #a))",
   "(change (addw (mulw x y) z) (maddw x y z))",
