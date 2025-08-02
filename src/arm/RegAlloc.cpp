@@ -139,6 +139,23 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     clobbering.push_back(j);
 
   for (auto op : clobbering) {
+    std::vector<Op*> writes;
+    for (auto runner = op->prevOp(); runner && isa<WriteRegOp>(runner); runner = runner->prevOp())
+      writes.push_back(runner);
+
+    // `writes` are in backward order.
+    // We need to insert a placeholder for everything after this writereg in the vector.
+    for (int i = 0; i < int(writes.size()) - 1; i++) {
+      builder.setBeforeOp(writes[i]);
+      for (int j = i + 1; j < writes.size(); j++) {
+        auto reg = REG(writes[j]);
+        auto placeholder = builder.create<PlaceHolderOp>();
+        assignment[placeholder] = reg;
+        if (isFP(reg))
+          placeholder->setResultType(Value::f32);
+      }
+    }
+    
     builder.setBeforeOp(op);
     for (auto reg : callerSaved) {
       auto placeholder = builder.create<PlaceHolderOp>();
@@ -448,6 +465,34 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     }
     spillOffset.clear();
   }
+  
+  // If possible, map some offsets to floating-point registers.
+  if (spillOffset.size()) {
+    // Try to reuse floating-point registers for spilling.
+    std::unordered_set<Reg> used;
+    for (auto [op, x] : assignment) {
+      if (isa<PlaceHolderOp>(op))
+        continue;
+      used.insert(x);
+    }
+
+    std::unordered_map<int, Reg> fpmv;
+    auto off = STACKOFF(funcOp);
+    for (auto reg : leafOrderf) {
+      if (highest <= off)
+        break;
+      if (used.count(reg) || (!isLeaf && !calleeSaved.count(reg)))
+        continue;
+
+      fpmv[highest] = reg;
+      highest -= 8;
+    }
+
+    for (auto &[_, offset] : spillOffset) {
+      if (fpmv.count(offset))
+        offset = -int(fpmv[offset]);
+    }
+  }
 
   // Allocate more stack space for it.
   if (spillOffset.size())
@@ -683,7 +728,7 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
     }
   }
 
-#define SOFFSET(op, Ty) ((Reg) (-(op)->get<Spilled##Ty##Attr>()->offset-1))
+#define SOFFSET(op, Ty) ((Reg) (-(op)->get<Spilled##Ty##Attr>()->offset-1000))
 #define SPILLABLE(op, Ty) (op->has<Ty##Attr>() ? op->get<Ty##Attr>()->reg : SOFFSET(op, Ty))
 
   // Detect circular copies and calculate a correct order.
@@ -882,7 +927,9 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
         auto reg = fp ? fspillReg : spillReg;
 
         builder.setAfterOp(op);
-        if (offset < 16384) {
+        if (offset < delta)
+          builder.create<FmovXOp>({ RDC(Reg(delta - offset)), RSC(reg) });
+        else if (offset < 16384) {
           if (fp)
             builder.create<StrFOp>({ RSC(reg), RS2C(Reg::sp), new IntAttr(offset) });
           else
@@ -903,6 +950,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
           builder.create<MovIOp>({ RDC(reg), new IntAttr(V(ref)) });
         else if (isa<AdrOp>(ref))
           builder.create<AdrOp>({ RDC(reg), new NameAttr(NAME(ref)) });
+        else if (offset < delta)
+          builder.create<FmovDOp>({ RDC(reg), RSC(Reg(delta - offset)) });
         else if (offset < 16384) {
           if (fp)
             builder.create<LdrFOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
@@ -923,6 +972,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
           builder.create<MovIOp>({ RDC(reg), new IntAttr(V(ref)) });
         else if (isa<AdrOp>(ref))
           builder.create<AdrOp>({ RDC(reg), new NameAttr(NAME(ref)) });
+        else if (offset < delta)
+          builder.create<FmovDOp>({ RDC(reg), RSC(Reg(delta - offset)) });
         else if (offset < 16384) {
           if (fp)
             builder.create<LdrFOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });
@@ -943,6 +994,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
           builder.create<MovIOp>({ RDC(reg), new IntAttr(V(ref)) });
         else if (isa<AdrOp>(ref))
           builder.create<AdrOp>({ RDC(reg), new NameAttr(NAME(ref)) });
+        else if (offset < delta)
+          builder.create<FmovDOp>({ RDC(reg), RSC(Reg(delta - offset)) });
         else if (offset < 16384) {
           if (fp)
             builder.create<LdrFOp>({ RDC(reg), RSC(Reg::sp), new IntAttr(offset) });

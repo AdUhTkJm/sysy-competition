@@ -179,6 +179,12 @@ void Dump::dumpOp(Op *op, std::ostream &os) {
   case FmovWOp::id:
     os << "fmov " << freg(RD(op)) << ", " << wreg(RS(op)) << "\n";
     break;
+  case FmovDOp::id:
+    os << "fmov " << xreg(RD(op)) << ", " << dreg(RS(op)) << "\n";
+    break;
+  case FmovXOp::id:
+    os << "fmov " << dreg(RD(op)) << ", " << xreg(RS(op)) << "\n";
+    break;
   case BlOp::id:
     os << "bl " << NAME(op) << "\n";
     break;

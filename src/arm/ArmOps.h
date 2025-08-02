@@ -56,7 +56,9 @@ ARMOP(MovkOp); // Keep the immediate and load 16 bytes. Allows a shift amount.
 ARMOP(MovnOp); // Load `not immediate`.
 ARMOP(MovROp); // To distinguish from loading immediates, an `R` is for moving between registers.
 
-ARMOPF(FmovWOp); // Move from a 32-bit w-register to a fp register.
+ARMOPF(FmovWOp); // Move from a w-register to a fp register.
+ARMOP(FmovXOp); // Move from an x-register to a fp register.
+ARMOP(FmovDOp); // Move from a 64-bit fp regsiter to a w-register.
 ARMOPF(FmovFOp); // Move a floating point immediate to a fp register.
 
 ARMOPL(AdrOp); // The ADR instruction only allows 1 MB range. We use pseudo-instr `ldr x0, =label` when Dumping.
