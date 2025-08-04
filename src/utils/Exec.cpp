@@ -315,6 +315,29 @@ Interpreter::Value Interpreter::execf(Region *region, const std::vector<Value> &
       break;
     }
     case CallOp::id: {
+      bool utilized = false;
+      switch (cache_type) {
+      case 3: {
+        auto i = args[0].vi, j = args[1].vi, k = args[2].vi;
+        if (i < CACHE_3_N && j < CACHE_3_N && k < CACHE_3_N && i >= 0 && j >= 0 && k >= 0) {
+          value[ip] = { ((cache_3_ptr) cache)[i][j][k] };
+          utilized = true;
+        }
+        break;
+      }
+      case 2: {
+        auto i = args[0].vi, j = args[1].vi;
+        if (i < CACHE_2_N && j < CACHE_2_N && i >= 0 && j >= 0) {
+          value[ip] = { ((cache_2_ptr) cache)[i][j] };
+          utilized = true;
+        }
+        break;
+      }
+      }
+      if (utilized) {
+        ip = ip->nextOp();
+        break;
+      }
       const auto &name = NAME(ip);
       auto operands = ip->getOperands();
       std::vector<Value> args;
@@ -363,7 +386,21 @@ void Interpreter::run(std::istream &input) {
   retcode = exit.vi;
 }
 
-void Interpreter::runFunction(const std::string &func, const std::vector<Value> &args) {
-  auto exit = execf(fnMap[func]->getRegion(), args);
+void Interpreter::runFunction(const std::string &func, const std::vector<int> &args) {
+  std::vector<Value> values;
+  values.reserve(args.size());
+  for (auto x : args)
+    values.push_back(Value { .vi = x });
+  auto exit = execf(fnMap[func]->getRegion(), values);
+  if (cache) {
+    if (cache_type == 3) {
+      auto x = (cache_3_ptr) cache;
+      x[args[0]][args[1]][args[2]] = exit.vi;
+    }
+    if (cache_type == 2) {
+      auto x = (cache_2_ptr) cache;
+      x[args[0]][args[1]] = exit.vi;
+    }
+  }
   retcode = exit.vi;
 }

@@ -9,6 +9,18 @@
 
 namespace sys::exec {
 
+const int CACHE_3_N = 32;
+const int CACHE_2_N = 1024;
+
+using cache_3 = int[CACHE_3_N][CACHE_3_N][CACHE_3_N];
+using cache_2 = int[CACHE_2_N][CACHE_2_N];
+
+using cache_3_ptr = int(*)[CACHE_3_N][CACHE_3_N];
+using cache_2_ptr = int(*)[CACHE_2_N];
+
+const int CACHE_3_TOTAL = sizeof(cache_3) / sizeof(int);
+const int CACHE_2_TOTAL = sizeof(cache_2) / sizeof(int);
+
 class Interpreter {
   union Value {
     intptr_t vi;
@@ -40,6 +52,8 @@ class Interpreter {
   Value applyExtern(const std::string &name, const std::vector<Value> &args);
 
   unsigned retcode;
+  int *cache = nullptr;
+  int cache_type = 0;
 
   struct SemanticScope {
     Interpreter &parent;
@@ -53,7 +67,9 @@ public:
   ~Interpreter();
 
   void run(std::istream &input);
-  void runFunction(const std::string &func, const std::vector<Value> &args);
+  void runFunction(const std::string &func, const std::vector<int> &args);
+  void useCache(cache_3 cache) { this->cache = (int*) cache; cache_type = 3; }
+  void useCache(cache_2 cache) { this->cache = (int*) cache; cache_type = 2; }
   std::string out() { return outbuf.str(); }
   int exitcode() { return retcode & 0xff; }
 };

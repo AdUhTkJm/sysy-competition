@@ -134,6 +134,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::Splice>();
   pm.addPass<sys::DCE>();
   // pm.addPass<sys::Reassociate>();
+  // pm.addPass<sys::Cached>(); // This doesn't work... but why?
   pm.addPass<sys::GCM>();
   pm.addPass<sys::GVN>();
   pm.addPass<sys::AggressiveDCE>();
