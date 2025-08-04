@@ -13,11 +13,11 @@ bool parallelizable(Op *loop) {
   if (!loop->has<ParallelizableAttr>())
     return false;
 
-  auto bb = loop->getRegion()->getFirstBlock();
-  for (auto op : bb->getOps()) {
-    if (isa<ForOp>(op) && !parallelizable(op))
-      return false;
-  }
+  // auto bb = loop->getRegion()->getFirstBlock();
+  // for (auto op : bb->getOps()) {
+  //   if (isa<ForOp>(op) && !parallelizable(op))
+  //     return false;
+  // }
   return true;
 }
 
@@ -47,7 +47,7 @@ void Parallelize::run() {
   for (auto loop : loops) {
     if (!parallelizable(loop))
       continue;
-    if (opcount(loop->getRegion()) <= 100 && loop->findAll<CallOp>().empty())
+    if (opcount(loop->getRegion()) <= 100 && loop->findAll<CallOp>().empty() && loop->findAll<ForOp>().size() <= 1)
       continue;
 
     // Split the loop into two halves.
@@ -94,11 +94,27 @@ void Parallelize::run() {
     // Copy the loop content.
     auto bbloop = loop->getRegion()->getFirstBlock();
     builder.setToBlockStart(copiedLoop->appendRegion()->appendBlock());
-    for (auto x : bbloop->getOps()) {
+    
+    const std::function<void (Op*)> copy = [&](Op *x) {
       auto copied = builder.copy(x);
       cloneMap[x] = copied;
       cloned.insert(copied);
-    }
+
+      for (auto r : x->getRegions()) {
+        Builder::Guard guard(builder);
+        
+        auto cr = copied->appendRegion();
+
+        auto entry = r->getFirstBlock();
+        auto cEntry = cr->appendBlock();
+        builder.setToBlockStart(cEntry);
+        for (auto op : entry->getOps())
+          copy(op);
+      }
+    };
+
+    for (auto x : bbloop->getOps())
+      copy(x);
     // Replace old induction var with the new one.
     cloneMap[loop] = copiedLoop;
     cloned.insert(copiedLoop);
@@ -114,7 +130,7 @@ void Parallelize::run() {
       for (int i = 0; i < v->getOperandCount(); i++) {
         auto def = v->DEF(i);
 
-        if (isa<IntOp>(def) || isa<GetGlobalOp>(def))
+        if (isa<IntOp>(def) || isa<GetGlobalOp>(def) || isa<AllocaOp>(def))
           cloneMap[def] = builder.copy(def);
         else if (!cloneMap.count(def))
           captured.insert(def);

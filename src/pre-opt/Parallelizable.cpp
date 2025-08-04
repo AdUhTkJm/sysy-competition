@@ -8,13 +8,21 @@ void Parallelizable::runImpl(Op *loop, int depth) {
   NoStore(module).run();
   auto fnMap = getFunctionMap();
   // Find deeper loops inside the current one.
-  auto entry = loop->getRegion()->getFirstBlock();
+  auto region = loop->getRegion();
+  auto entry = region->getFirstBlock();
   for (auto op : entry->getOps()) {
     if (isa<ForOp>(op))
       runImpl(op, depth + 1);
   }
-  for (auto op : entry->getOps())
-    BAD(isa<CallOp>(op) && op->has<ImpureAttr>() && (isExtern(NAME(op)) || !fnMap[NAME(op)]->has<NoStoreAttr>()));
+  // Cannot call impure functions, unless the function never stores.
+  auto calls = loop->findAll<CallOp>();
+  for (auto call : calls) {
+    const auto &name = NAME(call);
+    BAD(call->has<ImpureAttr>() && (isExtern(name) || !fnMap[name]->has<NoStoreAttr>()));
+  }
+  // Cannot have early return.
+  if (loop->findAll<ReturnOp>().size())
+    return;
 
   // The subscript for this variable `loop` must be the same.
   std::unordered_map<Op*, std::vector<std::pair<Op*, bool>>> access, ops;
@@ -34,16 +42,37 @@ void Parallelizable::runImpl(Op *loop, int depth) {
     ops[BASE(addr)].emplace_back(load, false);
   }
 
+  // Stores that aren't nested in inner loops.
+  std::set<Op*> directStores;
+  for (auto op : region->getFirstBlock()->getOps()) {
+    if (isa<StoreOp>(op))
+      directStores.insert(BASE(op->DEF(1)));
+  }
+
   for (const auto &[base, access] : access) {
     // Check subscript.
     assert(access.size());
     auto [addr, isStore] = access[0];
     if (!addr->has<SubscriptAttr>()) {
+      // Acceptable if this scalar is only accessed in nested loops.
+      if (!directStores.count(addr))
+        continue;
       // We can accept loads as long as there's no stores into it.
       for (auto [_, isStore] : access)
         BAD(isStore);
       continue;
     }
+
+    // Similarly, we can accept loads to arrays when there are no stores.
+    bool hasStore = false;
+    for (auto [_, isStore] : access) {
+      if (isStore) {
+        hasStore = true;
+        break;
+      }
+    }
+    if (!hasStore)
+      continue;
 
     // The stride and constant of current loop.
     const auto &subscript = SUBSCRIPT(addr);
