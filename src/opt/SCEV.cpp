@@ -17,6 +17,7 @@ Rule constIncr("(add x 'a)");
 Rule constIncrL("(addl x 'a)");
 Rule modIncr("(mod (add x y) 'a)");
 Rule constDiv("(div x 'a)");
+Rule invarAdd("(addl x y)");
 
 }
 
@@ -43,6 +44,7 @@ void SCEV::rewrite(BasicBlock *bb, LoopInfo *info) {
           // When neither has IncreaseAttr, it's still possible that `x` or `y` is `invar`.
           // It can't proceed when both or none of them are there.
           // TODO: make up an addition at preheader when both are `invar`?
+
           if (!(invar.count(x) ^ invar.count(y)))
             continue;
           if (!invar.count(x) && invar.count(y))
@@ -579,6 +581,29 @@ void SCEV::replaceAfter(LoopInfo *info) {
         Value one = builder.create<IntOp>({ new IntAttr(1) });
         Value lsh = builder.create<LShiftLOp>({ one, mul });
         Value replace = builder.create<DivLOp>({ vstart, lsh });
+        latchphi->replaceOperand(latchval, replace);
+        continue;
+      }
+
+      // Match addition of loop-invariants.
+      if (invarAdd.match(latchval, { { "x", phi } })) {
+        auto incr = invarAdd.extract("y");
+        // Make sure the value is loop-invariant.
+        if (info->contains(incr->getParent()) || isa<LoadOp>(incr))
+          continue;
+
+        // Similar to the case where incr->amt.size() == 1 (see below).
+        Value diff = builder.create<SubIOp>({ stop->getResult(), start });
+        if (step != 1) {
+          auto vi = builder.create<IntOp>({ new IntAttr(step - 1) });
+          auto vj = builder.create<IntOp>({ new IntAttr(step) });
+          auto add = builder.create<AddIOp>({ diff, vi });
+          diff = builder.create<DivIOp>({ add, vj });
+        }
+        diff = builder.create<MulLOp>({ diff, incr });
+        Op *replace;
+        CREATE_ADD(vstart, diff);
+
         latchphi->replaceOperand(latchval, replace);
         continue;
       }

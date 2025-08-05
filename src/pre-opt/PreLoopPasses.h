@@ -45,7 +45,6 @@ public:
   std::string name() override { return "loop-dce"; }
   std::map<std::string, int> stats() override;
   void run() override;
-
 };
 
 // Loop fusion.

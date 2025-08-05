@@ -77,7 +77,7 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::Unswitch>();
   pm.addPass<sys::DCE>(/*elimBlocks=*/ false);
   pm.addPass<sys::ColumnMajor>();
-  // pm.addPass<sys::Parallelizable>();
+  pm.addPass<sys::Parallelizable>();
   pm.addPass<sys::LoopDCE>();
   // pm.addPass<sys::Unroll>(); // Unrolling doesn't help.
   pm.addPass<sys::Lower>();
@@ -157,7 +157,7 @@ void initPipeline(sys::PassManager &pm) {
 
   // ===== Another round of loop optimization =====
 
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < 3; i++) {
     pm.addPass<sys::CanonicalizeLoop>(/*lcssa=*/ true);
     pm.addPass<sys::LICM>();
     pm.addPass<sys::SCEV>();
