@@ -57,6 +57,51 @@ void tidymod(Op *loop, int vi) {
   }
 }
 
+bool isInvariant(Op *loop, Op *cond) {
+  // For simplicity we only check these things currently.
+  if (!(isa<LtOp>(cond) || isa<LeOp>(cond) || isa<EqOp>(cond) || isa<NeOp>(cond)))
+    return false;
+
+  auto stores = loop->findAll<StoreOp>();
+  std::set<Op*> bases;
+  for (auto store : stores) {
+    auto addr = store->DEF(1);
+    if (!addr->has<BaseAttr>())
+      return false;
+    bases.insert(BASE(addr));
+  }
+
+  for (auto op : cond->getOperands()) {
+    auto def = op.defining;
+    if (isa<LoadOp>(def)) {
+      auto addr = def->DEF();
+      if (!addr->has<BaseAttr>() || bases.count(BASE(addr)))
+        return false;
+      auto base = BASE(addr);
+      // The load refers to the induction variable.
+      if (isa<ForOp>(loop) && base == loop->DEF(3))
+        return false;
+      // The load should be a scalar. (Perhaps we can relax this with LICM-style operation?)
+      if (!isa<AllocaOp>(base) || SIZE(base) != 4)
+        return false;
+      continue;
+    }
+    if (isa<IntOp>(def))
+      continue;
+    return false;
+  }
+  return true;
+}
+
+void moveOperands(Op *op, Op *before) {
+  for (auto operand : op->getOperands())
+    moveOperands(operand.defining, before);
+  if (!op->inside(before) && op != before->DEF())
+    return;
+  
+  op->moveBefore(before);
+}
+
 }
 
 void unroll(Op *loop, int vi) {
@@ -221,7 +266,7 @@ bool Unswitch::ltconst(Op *loop, Op *cond) {
   auto stop = loop->getOperand(1);
   auto step = loop->getOperand(2);
   auto ivAddr = loop->getOperand(3);
-  // It's always save to do so. We've verified that the step is loop-invariant.
+  // It's always safe to do so. We've verified that the step is loop-invariant.
   if (step.defining->inside(loop))
     step.defining->moveBefore(loop);
   
@@ -371,7 +416,7 @@ bool Unswitch::gtconst(Op *loop, Op *cond) {
   auto stop = loop->getOperand(1);
   auto step = loop->getOperand(2);
   auto ivAddr = loop->getOperand(3);
-  // It's always save to do so. We've verified that the step is loop-invariant.
+  // It's always safe to do so. We've verified that the step is loop-invariant.
   if (step.defining->inside(loop))
     step.defining->moveBefore(loop);
   
@@ -493,6 +538,121 @@ bool Unswitch::gtconst(Op *loop, Op *cond) {
   return true;
 }
 
+bool Unswitch::invariant(Op *loop, Op *cond) {
+  if (!isInvariant(loop, cond))
+    return false;
+
+  bool isWhile = isa<WhileOp>(loop);
+  auto region = loop->getRegion(isWhile);
+  auto entry = region->getFirstBlock();
+
+  std::list<Op*> body = entry->getOps();
+  std::unordered_map<Op*, Op*> opmap;
+
+  // Hoist the `if` outside the loop.
+  Builder builder;
+  builder.setAfterOp(loop);
+  auto _if = builder.create<IfOp>({ cond });
+  auto ifso = _if->appendRegion();
+  auto ifnot = _if->appendRegion();
+
+  // This should be safe, as the condition is invariant.
+  loop->moveToStart(ifso->appendBlock());
+  moveOperands(cond, _if);
+
+  builder.setToBlockStart(ifnot->appendBlock());
+  auto floop = isWhile
+    ? (Op*) builder.create<WhileOp>(loop->getOperands())
+    : (Op*) builder.create<ForOp>(loop->getOperands());
+
+  // Copy the loop.
+  const std::function<void (Op*)> copy = [&](Op *x) {
+    auto copied = builder.copy(x);
+    opmap[x] = copied;
+
+    for (auto r : x->getRegions()) {
+      Builder::Guard guard(builder);
+      
+      auto cr = copied->appendRegion();
+
+      auto entry = r->getFirstBlock();
+      auto cEntry = cr->appendBlock();
+      builder.setToBlockStart(cEntry);
+      for (auto op : entry->getOps())
+        copy(op);
+    }
+  };
+
+  auto fregion = floop->appendRegion();
+  if (isWhile) {
+    // Also copy the first region.
+    builder.setToBlockStart(fregion->appendBlock());
+    for (auto x : loop->getRegion(0)->getFirstBlock()->getOps())
+      copy(x);
+    fregion = floop->appendRegion();
+  }
+
+  builder.setToBlockEnd(fregion->appendBlock());
+  opmap[loop] = floop;
+
+  for (auto x : body)
+    copy(x);
+
+  // Rewire operands.
+  for (auto [_, v] : opmap) {
+    for (int i = 0; i < v->getOperandCount(); i++) {
+      auto def = v->DEF(i);
+      v->setOperand(i, opmap.count(def) ? opmap[def] : def);
+    }
+  }
+
+  // Look for the if in the original loop. It should be true.
+  const auto &uses = cond->getUses();
+  for (auto use : uses) {
+    if (!isa<IfOp>(use))
+      continue;
+
+    // There is still a use outside the loop. Don't do anything on that.
+    if (!use->inside(loop))
+      continue;
+
+    // Move all ops in the "true" region outside the if.
+    auto ifso = use->getRegion(0);
+    ifso->getFirstBlock()->inlineBefore(use);
+  }
+  // Remove all if's.
+  for (auto it = uses.begin(); it != uses.end();) {
+    auto next = it; next++;
+    if (isa<IfOp>(*it) && (*it)->inside(loop))
+      (*it)->erase();
+    it = next;
+  }
+
+  // Similarly do it for the other side. The if condition should be false.
+  auto fcond = opmap[cond];
+  const auto &fuses = fcond->getUses();
+  for (auto use : fuses) {
+    if (!isa<IfOp>(use))
+      continue;
+
+    // Move all ops in the "false" region outside the if,
+    // only if that region is present.
+    if (use->getRegionCount() > 1) {
+      auto ifnot = use->getRegion(1);
+      ifnot->getFirstBlock()->inlineBefore(use);
+    }
+  }
+  for (auto it = fuses.begin(); it != fuses.end();) {
+    auto next = it; next++;
+    if (isa<IfOp>(*it))
+      (*it)->erase();
+    it = next;
+  }
+
+  unswitched++;
+  return true;
+}
+
 bool Unswitch::runImpl(Op *loop) {
   if (dont.count(loop))
     return false;
@@ -501,10 +661,10 @@ bool Unswitch::runImpl(Op *loop) {
   if (!loop->getOperandCount())
     return false;
 
-  // The step must be a constant.
+  // Hoist out invariants.
   auto step = loop->DEF(2);
 
-  // Find an "if" that is related to the induction variable.
+  // Find an "if".
   Op *branch = nullptr;
   auto region = loop->getRegion();
   auto entry = region->getFirstBlock();
@@ -522,7 +682,8 @@ bool Unswitch::runImpl(Op *loop) {
   bool changed = 
     (isa<IntOp>(step) && cmpmod(loop, cond)) ||
     ltconst(loop, cond) ||
-    gtconst(loop, cond);
+    gtconst(loop, cond) ||
+    invariant(loop, cond);
 
   if (changed) {
     TidyMemory(module).run();
@@ -541,5 +702,22 @@ void Unswitch::run() {
     auto loops = module->findAll<ForOp>();
     for (auto loop : loops)
       changed |= runImpl(loop);
+    
+    // "While"s also work when we're hoisting invariants.
+    loops = module->findAll<WhileOp>();
+    for (auto loop : loops) {
+      Op *branch = nullptr;
+      auto region = loop->getRegion(1);
+      auto entry = region->getFirstBlock();
+      for (auto op : entry->getOps()) {
+        if (isa<IfOp>(op)) {
+          branch = op;
+          break;
+        }
+      }
+      if (!branch)
+        continue;
+      changed |= invariant(loop, branch->DEF());
+    }
   } while (changed);
 }

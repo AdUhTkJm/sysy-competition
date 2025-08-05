@@ -18,7 +18,7 @@ bool DCE::isImpure(Op *op) {
       isa<ProceedOp>(op) || isa<BreakOp>(op) ||
       isa<ContinueOp>(op) || isa<ForOp>(op) ||
       isa<CloneOp>(op) || isa<JoinOp>(op) ||
-      isa<WakeOp>(op))
+      isa<WakeOp>(op) || isa<IfOp>(op))
     return true;
 
   if (isa<CallOp>(op)) {
@@ -28,7 +28,7 @@ bool DCE::isImpure(Op *op) {
     return fnMap[name]->has<ImpureAttr>();
   }
 
-  return false;
+  return op->has<ImpureAttr>();
 }
 
 bool DCE::markImpure(Region *region) {

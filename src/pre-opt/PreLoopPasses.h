@@ -70,6 +70,7 @@ class Unswitch : public Pass {
   bool cmpmod(Op *loop, Op *cond);
   bool ltconst(Op *loop, Op *cond);
   bool gtconst(Op *loop, Op *cond);
+  bool invariant(Op *loop, Op *cond);
 public:
   Unswitch(ModuleOp *module): Pass(module) {}
 
