@@ -37,7 +37,8 @@ void EarlyInline::run() {
     auto region = func->getRegion();
 
     // Inline very small functions only.
-    if (opcount(region) >= 200)
+    // But if the function is <once>'d, then we might also inline it.
+    if (opcount(region) >= 200 && !func->has<AtMostOnceAttr>())
       continue;
 
     // Don't inline recursive functions.

@@ -7,17 +7,36 @@ using namespace sys;
 
 namespace {
 
-// Requires that every layer of the loop is parallelizable
-// (i.e. no loop-carried dependencies), to avoid race condition.
-bool parallelizable(Op *loop) {
+bool parallelizable(Op *loop, std::unordered_map<Op*, int> &allocaMap) {
   if (!loop->has<ParallelizableAttr>())
     return false;
 
-  // auto bb = loop->getRegion()->getFirstBlock();
-  // for (auto op : bb->getOps()) {
-  //   if (isa<ForOp>(op) && !parallelizable(op))
-  //     return false;
-  // }
+  auto loads = loop->findAll<LoadOp>();
+  auto stores = loop->findAll<StoreOp>();
+  std::set<Op*> stored;
+  for (auto store : stores)
+    stored.insert(store->DEF(1));
+
+  for (auto load : loads) {
+    auto addr = load->DEF();
+    // Check for scalars that are only read but never stored.
+    if (!isa<AllocaOp>(addr) || SIZE(addr) != 4 || stored.count(addr))
+      continue;
+
+    // Find init value.
+    Op *init = nullptr;
+    for (Op *runner = loop->prevOp(); !runner->atFront(); runner = runner->prevOp()) {
+      if (isa<StoreOp>(runner) && runner->DEF(1) == addr)
+        init = runner->DEF(0);
+    }
+    // An alloca without a deterministic initial value.
+    // If it isn't a constant we'll need to copy-paste the whole use-def chain,
+    // which doesn't seem right (esp. when it involves loops).
+    if (!init || !isa<IntOp>(init))
+      return false;
+    allocaMap[addr] = V(init);
+  }
+
   return true;
 }
 
@@ -45,7 +64,9 @@ void Parallelize::run() {
 
   int cnt = 0;
   for (auto loop : loops) {
-    if (!parallelizable(loop))
+    // Maps allocas to their value before the loop.
+    std::unordered_map<Op*, int> allocaMap;
+    if (!parallelizable(loop, allocaMap))
       continue;
     if (opcount(loop->getRegion()) <= 100 && loop->findAll<CallOp>().empty() && loop->findAll<ForOp>().size() <= 1)
       continue;
@@ -134,6 +155,11 @@ void Parallelize::run() {
           cloneMap[def] = builder.copy(def);
         else if (!cloneMap.count(def))
           captured.insert(def);
+
+        if (isa<AllocaOp>(def) && allocaMap.count(def)) {
+          auto vi = builder.create<IntOp>({ new IntAttr(allocaMap[def]) });
+          builder.create<StoreOp>({ vi, cloneMap[def] });
+        }
       }
     }
 
