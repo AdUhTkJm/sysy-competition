@@ -7,7 +7,7 @@ using namespace sys;
 
 namespace {
 
-bool parallelizable(Op *loop, std::unordered_map<Op*, int> &allocaMap) {
+bool parallelizable(Op *loop, std::unordered_map<Op*, Op*> &allocaMap) {
   if (!loop->has<ParallelizableAttr>())
     return false;
 
@@ -28,13 +28,15 @@ bool parallelizable(Op *loop, std::unordered_map<Op*, int> &allocaMap) {
     for (Op *runner = loop->prevOp(); !runner->atFront(); runner = runner->prevOp()) {
       if (isa<StoreOp>(runner) && runner->DEF(1) == addr)
         init = runner->DEF(0);
+      if (isa<WhileOp>(runner) || isa<ForOp>(runner) || isa<IfOp>(runner))
+        break;
     }
     // An alloca without a deterministic initial value.
     // If it isn't a constant we'll need to copy-paste the whole use-def chain,
     // which doesn't seem right (esp. when it involves loops).
-    if (!init || !isa<IntOp>(init))
+    if (!init)
       return false;
-    allocaMap[addr] = V(init);
+    allocaMap[addr] = init;
   }
 
   return true;
@@ -65,7 +67,7 @@ void Parallelize::run() {
   int cnt = 0;
   for (auto loop : loops) {
     // Maps allocas to their value before the loop.
-    std::unordered_map<Op*, int> allocaMap;
+    std::unordered_map<Op*, Op*> allocaMap;
     if (!parallelizable(loop, allocaMap))
       continue;
     if (opcount(loop->getRegion()) <= 100 && loop->findAll<CallOp>().empty() && loop->findAll<ForOp>().size() <= 1)
@@ -157,8 +159,8 @@ void Parallelize::run() {
           captured.insert(def);
 
         if (isa<AllocaOp>(def) && allocaMap.count(def)) {
-          auto vi = builder.create<IntOp>({ new IntAttr(allocaMap[def]) });
-          builder.create<StoreOp>({ vi, cloneMap[def] });
+          auto init = allocaMap[def];
+          captured.insert(init);
         }
       }
     }
@@ -199,6 +201,10 @@ void Parallelize::run() {
         if (cloneMap.count(def))
           v->setOperand(i, cloneMap[def]);
       }
+    }
+    for (auto [alloca, init] : allocaMap) {
+      assert(cloneMap.count(init));
+      builder.create<StoreOp>({ cloneMap[init]->getResult(), cloneMap[alloca] });
     }
     // Also replace the `stop` and `step` values.
     copiedLoop->setOperand(0, cloneMap[newstop]);

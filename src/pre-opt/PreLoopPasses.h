@@ -123,6 +123,18 @@ public:
   void run() override;
 };
 
+// Try to hoist out access to adjacent elements of an array out of a loop.
+// This is done by GVN in LLVM, but I have no idea how it works there.
+class Adjacency : public Pass {
+  void runImpl(Op *loop);
+public:
+  Adjacency(ModuleOp *module): Pass(module) {}
+  
+  std::string name() override { return "adjacency"; }
+  std::map<std::string, int> stats() override { return {}; }
+  void run() override;
+};
+
 // Lower operations back to its original form.
 class Lower : public Pass {
 public:
