@@ -297,7 +297,11 @@ void Range::postdom(Region *region) {
     if (exits[0]->getLastOp()->getOperands().size() > 0) {
       auto phi = builder.create<PhiOp>();
       for (auto bb : exits) {
-        auto ret = bb->getLastOp()->getOperand();
+        auto last = bb->getLastOp();
+        // We might insert an empty return in codegen.
+        if (!last->getOperandCount())
+          continue;
+        auto ret = last->getOperand();
         phi->pushOperand(ret);
         phi->add<FromAttr>(bb);
       }

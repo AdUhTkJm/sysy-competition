@@ -367,8 +367,11 @@ void SCEV::runImpl(LoopInfo *info) {
   auto insert = nonphi(exit);
   
   std::unordered_map<Op*, Op*> exitlatch;
-  for (auto phi : exit->getPhis()) 
+  // std::cerr << info << "\n";
+  for (auto phi : exit->getPhis()) {
+    // std::cerr << "phi: " << phi;
     exitlatch[Op::getPhiFrom(phi, latch)] = phi;
+  }
 
   // Factor out the modulus.
   for (auto phi : mods) {
@@ -681,6 +684,7 @@ void SCEV::run() {
   auto forests = analysis.getResult();
 
   auto funcs = collectFuncs();
+  module->dump();
   
   for (auto func : funcs) {
     const auto &forest = forests[func];
