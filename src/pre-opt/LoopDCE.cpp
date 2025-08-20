@@ -11,6 +11,9 @@ std::map<std::string, int> LoopDCE::stats() {
 namespace {
 
 bool pure(Region *region) {
+  if (!region->getBlocks().size())
+    return true;
+
   auto entry = region->getFirstBlock();
   for (auto op : entry->getOps()) {
     if (op->has<ImpureAttr>())
@@ -42,14 +45,18 @@ void LoopDCE::run() {
         builder.setAfterOp(loop);
         builder.create<StoreOp>({ loop->getOperand(1), loop->getOperand(3) }, { new SizeAttr(4) });
         loop->erase(), changed = true, erased++;
+        continue;
       }
 
       // For a parallel loop (no loop-carried dependency) whose indvar is never used,
       // It is simply doing repeated work.
       if (loop->has<ParallelizableAttr>() && !loop->getUses().size()) {
-        auto entry = region->getFirstBlock();
-        entry->inlineBefore(loop);
+        if (region->getBlocks().size()) {
+          auto entry = region->getFirstBlock();
+          entry->inlineBefore(loop);
+        }
         loop->erase(), changed = true, erased++;
+        break;
       }
     }
   } while (changed);
