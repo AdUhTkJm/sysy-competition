@@ -73,8 +73,8 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::TidyMemory>();
   // if (opts.arm && (!opts.noLink || opts.o1)) // RV only has a single core.
   //   pm.addPass<sys::Parallelize>();
-  pm.addPass<sys::Fusion>();
-  pm.addPass<sys::Unswitch>();
+  // pm.addPass<sys::Fusion>();
+  // pm.addPass<sys::Unswitch>();
   pm.addPass<sys::DCE>(/*elimBlocks=*/ false);
   pm.addPass<sys::ColumnMajor>();
   pm.addPass<sys::Parallelizable>();
@@ -129,9 +129,9 @@ void initPipeline(sys::PassManager &pm) {
   pm.addPass<sys::DLE>();
   pm.addPass<sys::Select>();
   pm.addPass<sys::RegularFold>();
-  pm.addPass<sys::Range>();
-  pm.addPass<sys::RangeAwareFold>();
-  pm.addPass<sys::Splice>();
+  // pm.addPass<sys::Range>();
+  // pm.addPass<sys::RangeAwareFold>();
+  // pm.addPass<sys::Splice>();
   pm.addPass<sys::DCE>();
   // pm.addPass<sys::Reassociate>();
   // pm.addPass<sys::Cached>(); // This doesn't work... but why?
